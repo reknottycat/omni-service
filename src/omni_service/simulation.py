@@ -48,6 +48,7 @@ class FakePlatforms:
             do_POST = handle_request
             do_DELETE = handle_request
             do_PUT = handle_request
+            do_PATCH = handle_request
             do_GET = handle_request
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -88,6 +89,8 @@ class FakePlatforms:
             operation = "create_room"
         elif channel == "feishu" and route[-1:] == ["members"]:
             operation = "add_member"
+        elif channel == "feishu" and method == "PATCH":
+            operation = "update_card"
         with self.lock:
             # Intentionally omit credentials from the reviewable request record.
             self.requests.append({"channel": channel, "method": method,
@@ -105,6 +108,14 @@ class FakePlatforms:
                 expected = "simulation-token" if channel == "max" else "Bearer simulation-token"
                 if lower_headers.get("authorization") != expected:
                     return 401, {"error": "unauthorized"}, {}
+            if operation == 'update_card':
+                card = json.loads(payload.get('content', '{}'))
+                original = next((row for row in self.messages if row['channel'] == 'feishu'
+                                 and row['message_id'] == route[-1] and row['kind'] == 'interactive'), None)
+                if route[:-1] != ['open-apis','im','v1','messages'] or not original or card.get('schema') != '2.0':
+                    return 400, {'code': 1}, {}
+                original['card'] = card
+                return 200, {'code': 0, 'data': {}}, {}
 
             if operation == "create_room":
                 if route != ["open-apis", "im", "v1", "chats"] or method != "POST":

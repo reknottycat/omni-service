@@ -1,5 +1,6 @@
 """Feishu approval card rendering and the callback wire boundary."""
 
+from copy import deepcopy
 import re
 
 from .models import ChannelError, DraftDecision
@@ -13,6 +14,11 @@ _CHAT_ID = re.compile(r'oc_[A-Za-z0-9_]{1,125}')
 _MESSAGE_ID = re.compile(r'om_[A-Za-z0-9_]{1,125}')
 _USER_ID = re.compile(r'(?:ou_[A-Za-z0-9_]{1,125}|employee-[0-9]{1,10})')
 _VALUE_FIELDS = {'omni_action', 'draft_id', 'version'}
+_FINAL_HEADERS = {
+    'approved': ('已批准发送', 'green'),
+    'rejected': ('已拒绝发送', 'grey'),
+    'cancelled': ('草稿已取消', 'grey'),
+}
 
 
 def _matches(pattern, value):
@@ -43,10 +49,32 @@ def build_approval_card(*, draft_id, version, customer_text, reference=''):
         })
     return {
         'schema': '2.0',
-        'config': {'width_mode': 'default', 'enable_forward': False},
+        'config': {'width_mode': 'default', 'enable_forward': False, 'update_multi': True},
         'header': {'template': 'blue', 'title': _plain('对客译文待确认')},
         'body': {'direction': 'vertical', 'vertical_spacing': '8px', 'elements': elements},
     }
+
+
+def finalize_approval_card(card, status):
+    """Preserve the published preview while disabling both of its decisions."""
+    if (not isinstance(card, dict) or card.get('schema') != '2.0'
+            or not isinstance(status, str) or status not in _FINAL_HEADERS):
+        raise ChannelError('invalid_payload')
+    updated = deepcopy(card)
+    config, header, body = updated.get('config'), updated.get('header'), updated.get('body')
+    elements = body.get('elements') if isinstance(body, dict) else None
+    if not isinstance(config, dict) or not isinstance(header, dict) or not isinstance(elements, list):
+        raise ChannelError('invalid_payload')
+    decisions = [element for element in elements if isinstance(element, dict) and element.get('tag') == 'button']
+    button_ids = [button.get('element_id') for button in decisions]
+    if len(decisions) != 2 or 'approve' not in button_ids or 'reject' not in button_ids:
+        raise ChannelError('invalid_payload')
+    title, template = _FINAL_HEADERS[status]
+    config['update_multi'] = True
+    header.update(title=_plain(title), template=template)
+    for button in decisions:
+        button['disabled'] = True
+    return updated
 
 
 def card_decision(*, app_id, event_id, chat_id, user_id, message_id, value):

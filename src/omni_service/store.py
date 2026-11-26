@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS members (
  conversation_id TEXT NOT NULL REFERENCES conversations(id), user_id TEXT NOT NULL,
  PRIMARY KEY(conversation_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS verified_room_members (
+ conversation_id TEXT NOT NULL REFERENCES conversations(id), user_id TEXT NOT NULL,
+ PRIMARY KEY(conversation_id,user_id)
+);
 CREATE TABLE IF NOT EXISTS intake_sessions (
  conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
  facts TEXT NOT NULL DEFAULT '{}', source_messages TEXT NOT NULL DEFAULT '{}',
@@ -64,7 +68,17 @@ CREATE TABLE IF NOT EXISTS conversation_settings (
  reply_assist INTEGER CHECK(reply_assist IN (0,1)),
  show_labels INTEGER NOT NULL DEFAULT 0 CHECK(show_labels IN (0,1)),
  auto_reply INTEGER NOT NULL DEFAULT 0 CHECK(auto_reply IN (0,1)),
- approval_required INTEGER NOT NULL DEFAULT 1 CHECK(approval_required IN (0,1))
+ approval_required INTEGER NOT NULL DEFAULT 1 CHECK(approval_required IN (0,1)),
+ handoff_staff_id TEXT, welcome_version TEXT
+);
+CREATE TABLE IF NOT EXISTS management_config (
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1), settings TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS command_permissions (
+ command_id TEXT PRIMARY KEY, policy TEXT NOT NULL CHECK(policy IN ('room_member','staff','admin'))
+);
+CREATE TABLE IF NOT EXISTS welcome_versions (
+ version TEXT PRIMARY KEY, content TEXT NOT NULL, created_at REAL NOT NULL, published_at REAL
 );
 CREATE TABLE IF NOT EXISTS agent_reply_jobs (
  conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
@@ -100,6 +114,10 @@ class Store:
                 db.execute('ALTER TABLE conversation_settings ADD COLUMN auto_reply INTEGER NOT NULL DEFAULT 0 CHECK(auto_reply IN (0,1))')
             if 'approval_required' not in columns:
                 db.execute('ALTER TABLE conversation_settings ADD COLUMN approval_required INTEGER NOT NULL DEFAULT 1 CHECK(approval_required IN (0,1))')
+            if 'handoff_staff_id' not in columns:
+                db.execute('ALTER TABLE conversation_settings ADD COLUMN handoff_staff_id TEXT')
+            if 'welcome_version' not in columns:
+                db.execute('ALTER TABLE conversation_settings ADD COLUMN welcome_version TEXT')
             if 'automatic_allowed' not in {row[1] for row in db.execute('PRAGMA table_info(agent_reply_jobs)')}:
                 db.execute('ALTER TABLE agent_reply_jobs ADD COLUMN automatic_allowed INTEGER NOT NULL DEFAULT 0 CHECK(automatic_allowed IN (0,1))')
             db.execute("UPDATE outbox SET status='unknown', last_error='process_interrupted' WHERE status='inflight'")

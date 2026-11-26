@@ -103,6 +103,53 @@ class FeishuLiveTest(unittest.TestCase):
         self.assertEqual(args[args.index("--content") + 1], "-")
         self.assertEqual(json.loads(run.call_args.kwargs["input"]), card)
 
+    def test_patch_card_requires_exact_room_roster_and_uses_nested_content(self):
+        adapter = FeishuLive(None, ["ou_staff"], app_id="cli_test")
+        card = {"schema": "2.0", "body": {"elements": []}}
+        members = {**_MEMBERS, "users": [{"member_id": "ou_second"}]}
+        preflight = [_IDENTITY, _data(_GROUP), _data(members)]
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+            _cli_result, preflight
+        )) as run:
+            self.assertEqual(adapter.group_members("oc_test"), frozenset({"ou_second"}))
+            self.assertEqual(run.call_count, 3)
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+            _cli_result, preflight
+        )) as run:
+            with self.assertRaisesRegex(ChannelError, "^feishu_members_mismatch$"):
+                adapter.patch_card("om_card", card, chat_id="oc_test")
+            self.assertEqual(run.call_count, 3)
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+            _cli_result, [*preflight, _data({})]
+        )) as run:
+            self.assertEqual(adapter.patch_card("om_card", card, chat_id="oc_test", staff_ids=["ou_second"]),
+                             "om_card")
+        self.assertEqual(run.call_args.args[0][2:], ["im", "messages", "patch", "--message-id", "om_card",
+                                                   "--data", "-", "--as", "bot", "--format", "json"])
+        self.assertEqual(json.loads(json.loads(run.call_args.kwargs["input"])["content"]), card)
+        self.assertEqual(adapter.staff_ids, frozenset({"ou_staff"}))
+
+    def test_staff_override_validates_before_any_request_and_controls_create_or_send(self):
+        adapter = FeishuLive(None, ["ou_staff"], app_id="cli_test")
+        with patch("omni_service.feishu_live.subprocess.run") as run:
+            for invalid in ([], ["oc_staff"], ["ou_staff", "ou_staff"], [f"ou_staff_{i}" for i in range(51)]):
+                with self.assertRaisesRegex(ChannelError, "^feishu_invalid_staff$"):
+                    adapter.create_room("Synthetic room", "room:first", staff_ids=invalid)
+            with self.assertRaisesRegex(ChannelError, "^feishu_invalid_mention$"):
+                adapter.send("handoff", "note:first", chat_id="oc_test", staff_ids=["ou_second"],
+                             mention_user_id="ou_staff")
+            run.assert_not_called()
+        members = {**_MEMBERS, "users": [{"member_id": "ou_second"}]}
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(_cli_result, [
+            _IDENTITY, _data({**_GROUP, "chat_id": "oc_test"}),
+            _IDENTITY, _data(_GROUP), _data(members), _data({"chat_id": "oc_test", "message_id": "om_sent"}),
+        ])) as run:
+            self.assertEqual(adapter.create_room("Synthetic room", "room:first", staff_ids=["ou_second"]), "oc_test")
+            self.assertEqual(adapter.send("handoff", "note:first", chat_id="oc_test", staff_ids=["ou_second"],
+                                          mention_user_id="ou_second"), "om_sent")
+        self.assertEqual(json.loads(run.call_args_list[1].kwargs["input"])["user_id_list"], ["ou_second"])
+        self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"], '<at user_id="ou_second"></at> handoff')
+
     def test_raw_card_callback_requires_matching_app_and_button_payload(self):
         header = {"event_type": "card.action.trigger", "event_id": "ev_test", "app_id": "demo-feishu"}
         event = {"host": "im_message", "operator": {"open_id": "employee-1"},
@@ -319,6 +366,33 @@ class FeishuLiveTest(unittest.TestCase):
             DraftDecision("cli_test", "ev_test", "oc_test", "ou_staff", "om_card", _DRAFT_ID, _VERSION, "approve"),
             DraftDecision("cli_test", "ev_second", "oc_test", "ou_staff", "om_card", _DRAFT_ID, _VERSION, "reject"),
         ])
+
+    def test_per_room_membership_stream_keeps_identity_checks_and_requires_room_mapping(self):
+        card = {"type": "card.action.trigger", "host": "im_message", "action_tag": "button",
+                "event_id": "ev_test", "chat_id": "oc_test", "operator_id": "ou_new",
+                "message_id": "om_card", "action_value": json.dumps(_APPROVAL)}
+        with tempfile.TemporaryDirectory() as directory:
+            for record, method, actor in (
+                ({**_EVENT, "sender_id": "ou_new"}, "events", "sender_id"),
+                (card, "card_events", "operator_id"),
+            ):
+                with self.subTest(method=method):
+                    lines = "\n".join(json.dumps({**record, **change}) for change in (
+                        {"chat_id": "oc_unmapped"}, {actor: "employee-untrusted"}, {},
+                    ))
+                    adapter = self._stub_cli(directory, (
+                        "arg = sys.argv[sys.argv.index('--jq') + 1]\n"
+                        "assert 'ou_staff' not in arg and 'index(' not in arg\n"
+                        "print(f'[event] ready event_key={sys.argv[4]}', file=sys.stderr)\n"
+                        f"print({lines!r})\n"
+                        "print('[event] exited (reason: timeout)', file=sys.stderr)\n"
+                    ), managed=True)
+                    consume = getattr(adapter, method)
+                    with self.assertRaisesRegex(ChannelError, "^feishu_invalid_room_filter$"):
+                        list(consume(duration=1, managed_membership=True))
+                    accepted, = list(consume(duration=1, managed_membership=True,
+                                             room_allowed={"oc_test"}.__contains__))
+                    self.assertEqual(accepted.chat_id, "oc_test")
 
     def test_persistent_stream_stops_or_reports_unexpected_exit(self):
         with tempfile.TemporaryDirectory() as directory:

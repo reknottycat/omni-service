@@ -1,9 +1,11 @@
 """Opt-in Telegram Business Bot API transport and acknowledged polling."""
 
+import base64
 import http.client
 import ipaddress
 import json
 import re
+import secrets
 import socket
 import ssl
 import time
@@ -11,6 +13,13 @@ from urllib.parse import urlsplit
 
 from .models import ChannelError
 from .personal import Connection
+
+
+_MAX_WELCOME_PHOTO_BYTES = 8 * 1024 * 1024
+_WELCOME_PHOTOS = {
+    "image/png": ("welcome.png", b"\x89PNG\r\n\x1a\n", b"\x00\x00\x00\x00IEND\xaeB`\x82"),
+    "image/jpeg": ("welcome.jpg", b"\xff\xd8\xff", b"\xff\xd9"),
+}
 
 
 class TelegramAPI:
@@ -56,15 +65,56 @@ class TelegramAPI:
             body = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()
         except (TypeError, ValueError, UnicodeError):
             raise ChannelError("invalid_payload") from None
-        connection = http.client.HTTPSConnection(*(self._proxy or ("api.telegram.org",)),
-                                                  timeout=poll_timeout + 10)
+        return self._request(method, body, content_type="application/json", timeout=poll_timeout + 10)
+
+    def send_welcome_photo(self, connection_id, chat_id, photo, *, caption=''):
+        """Upload a validated image from a frozen welcome snapshot."""
+        if (not isinstance(connection_id, str) or not connection_id.strip() or len(connection_id) > 512
+                or any(ord(char) < 32 or ord(char) == 127 for char in connection_id)
+                or type(chat_id) is not int or not 0 < chat_id < 2**63 or not isinstance(caption, str)
+                or not isinstance(photo, dict) or set(photo) != {"type", "data", "mime", "alt"}
+                or photo["type"] != "image" or not isinstance(photo["alt"], str)):
+            raise ChannelError("invalid_payload")
+        mime, encoded = photo["mime"], photo["data"]
+        encoded_limit = 4 * ((_MAX_WELCOME_PHOTO_BYTES + 2) // 3)
+        if (not isinstance(mime, str) or mime not in _WELCOME_PHOTOS or not isinstance(encoded, str)
+                or not 0 < len(encoded) <= encoded_limit or len(caption) > 1024):
+            raise ChannelError("invalid_payload")
+        try:
+            connection_bytes = connection_id.encode()
+            caption_bytes = caption.encode()
+            caption_units = len(caption.encode("utf-16-le")) // 2
+            data = base64.b64decode(encoded, validate=True)
+        except (ValueError, UnicodeError):
+            raise ChannelError("invalid_payload") from None
+        filename, start, end = _WELCOME_PHOTOS[mime]
+        if (caption_units > 1024 or "\x00" in caption or not 0 < len(data) <= _MAX_WELCOME_PHOTO_BYTES
+                or not data.startswith(start) or not data.endswith(end)):
+            raise ChannelError("invalid_payload")
+
+        boundary = "omni-" + secrets.token_hex(24)
+        delimiter = ("--" + boundary).encode("ascii")
+        fields = [("business_connection_id", connection_bytes), ("chat_id", str(chat_id).encode("ascii"))]
+        if caption_bytes:
+            fields.append(("caption", caption_bytes))
+        parts = []
+        for name, value in fields:
+            parts.extend((delimiter, f'Content-Disposition: form-data; name="{name}"'.encode("ascii"),
+                          b"", value))
+        parts.extend((delimiter, f'Content-Disposition: form-data; name="photo"; filename="{filename}"'.encode("ascii"),
+                      f"Content-Type: {mime}".encode("ascii"), b"", data, delimiter + b"--", b""))
+        return self._request("sendPhoto", b"\r\n".join(parts),
+                             content_type="multipart/form-data; boundary=" + boundary, timeout=10)
+
+    def _request(self, method, body, *, content_type, timeout):
+        connection = http.client.HTTPSConnection(*(self._proxy or ("api.telegram.org",)), timeout=timeout)
         if self._proxy:
             connection.set_tunnel("api.telegram.org", 443)
         try:
             if self._tunnel_port is not None:
                 # The SSH forward carries the original Telegram TLS stream.
                 # Verify Telegram's certificate and send its hostname as SNI.
-                raw_socket = socket.create_connection(("127.0.0.1", self._tunnel_port), poll_timeout + 10)
+                raw_socket = socket.create_connection(("127.0.0.1", self._tunnel_port), timeout)
                 try:
                     connection.sock = ssl.create_default_context().wrap_socket(
                         raw_socket, server_hostname="api.telegram.org")
@@ -72,7 +122,7 @@ class TelegramAPI:
                     raw_socket.close()
                     raise
             connection.request("POST", f"/bot{self._token}/{method}", body=body,
-                               headers={"Content-Type": "application/json"})
+                               headers={"Content-Type": content_type})
             response = connection.getresponse()
             raw = response.read(8_000_001)
             status = response.status

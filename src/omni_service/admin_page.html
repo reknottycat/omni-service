@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OmniService 管理台</title>
+<style nonce="__OMNI_NONCE__">
+:root {
+  color-scheme: light; --bg:#f3f6f2; --surface:#fff; --ink:#182b24; --muted:#52685e;
+  --line:#dbe5df; --green:#215b44; --green-dark:#123c2e; --soft:#ebf5ed;
+  --radius:16px; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+* { box-sizing:border-box; }
+body { margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55; }
+[hidden] { display:none !important; }
+a { color:var(--green); }
+button,input,select,textarea { font:inherit; }
+button,select,input,textarea,a { outline-offset:4px; }
+button { cursor:pointer; }
+button:disabled { cursor:wait;opacity:.6; }
+.shell { display:grid;grid-template-columns:226px minmax(0,1fr);min-height:100vh; }
+.side { padding:34px 18px 24px;background:#142e25;color:#e2ede6;display:flex;flex-direction:column;gap:38px; }
+.brand { display:flex;align-items:center;gap:12px;padding:0 8px;white-space:nowrap; }
+.brand span { font-size:19px;font-weight:720;letter-spacing:-.45px; }
+.brand-mark { position:relative;width:35px;height:35px;display:grid;place-items:center;background:#d0e9d5;border-radius:10px;color:#1c543c; }
+.brand-mark::before { content:"";width:15px;height:12px;border:2px solid currentColor;border-radius:5px;transform:translateY(-1px); }
+.brand-mark::after { content:"";position:absolute;left:10px;top:20px;width:6px;height:6px;transform:rotate(-34deg);border-bottom:2px solid currentColor;background:#d0e9d5; }
+nav { display:grid;gap:6px; }
+.nav-button { position:relative;border:0;border-radius:9px;background:transparent;color:#c5d5cc;text-align:left;padding:12px 14px; }
+.nav-button:hover { background:#214034; }
+.nav-button[aria-current="page"] { color:#fff;background:#2a503e;font-weight:650; }
+.nav-button[aria-current="page"]::before { content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:4px;background:#aad7b5; }
+.side-bottom { margin-top:auto;padding:14px 8px 0;border-top:1px solid #3b5349;display:grid;gap:10px; }
+.logout { align-self:start;text-align:left;color:#d0dfd5;background:transparent;border:0;padding:3px 0; }
+.workspace { margin:0 auto;width:100%;max-width:1232px;padding:44px 42px 72px;min-width:0; }
+.top { display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:25px; }
+.top h1,.login h1 { margin:0;letter-spacing:-.045em;font-size:clamp(27px,4vw,36px);line-height:1.2; }
+.top p { margin:8px 0 0;color:var(--muted); }
+.role { flex:none;border:1px solid var(--line);border-radius:99px;padding:5px 11px;font-size:13px;color:#315946;background:#fff; }
+.grid { display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start;gap:18px; }
+.panel { background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:23px;min-width:0; }
+.panel h2 { margin:0 0 8px;font-size:19px;letter-spacing:-.02em; }
+.panel h3 { margin:0;font-size:16px; }
+.panel-intro { margin:0 0 18px;color:var(--muted);font-size:14px; }
+.field { display:grid;gap:6px;margin:14px 0; }
+.field label,.field-title { font-weight:650; }
+.field small,.muted { font-size:13px;color:var(--muted);overflow-wrap:anywhere; }
+input[type=url],select,textarea { width:100%;min-width:0;border:1px solid #cddad2;background:#fff;color:var(--ink);border-radius:9px;padding:9px 10px; }
+textarea { resize:vertical;min-height:88px; }
+.check { display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid #edf1ee; }
+.check:first-of-type { border-top:0; }
+.check input { appearance:none;position:relative;flex:none;width:36px;height:22px;margin:0;border:1px solid #a9bbb1;border-radius:18px;background:#dbe5df;cursor:pointer; }
+.check input::after { content:"";position:absolute;left:3px;top:3px;height:14px;width:14px;border-radius:50%;background:white;box-shadow:0 1px 3px #29493845; }
+.check input:checked { border-color:var(--green);background:var(--green); }
+.check input:checked::after { left:17px; }
+.check span { display:block; }
+.check small { display:block;color:var(--muted); }
+.button,.button:visited { text-decoration:none;border:1px solid #cddbd3;border-radius:9px;background:#fff;color:#24543e;padding:9px 13px;font-weight:630;display:inline-flex;align-items:center;justify-content:center;min-height:39px; }
+.button:hover { background:#f3f8f4; }
+.button.primary { border-color:var(--green);color:#fff;background:var(--green); }
+.button.primary:hover { background:var(--green-dark); }
+.actions { display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px; }
+.panel + .panel-stack,.panel-stack + .panel { margin-top:18px; }
+.list { display:grid;gap:10px;padding:0;list-style:none;margin:14px 0 0; }
+.list > li { min-width:0; }
+.conversation,.command,.version-item { border:1px solid var(--line);border-radius:12px;background:#fff; }
+.conversation summary { list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 17px;cursor:pointer; }
+.conversation summary::-webkit-details-marker { display:none; }
+.conversation summary::after { content:"";flex:none;border-right:2px solid var(--green);border-bottom:2px solid var(--green);width:7px;height:7px;transform:rotate(45deg);margin:0 3px 3px 5px; }
+.conversation[open] summary::after { transform:rotate(225deg);margin-bottom:0; }
+.conversation[open] summary { border-bottom:1px solid var(--line); }
+.conversation-form { padding:16px;display:grid;grid-template-columns:minmax(165px,1fr) repeat(4,max-content) auto;gap:8px 14px;align-items:end; }
+.conversation-form .field,.conversation-form .actions,.conversation-form .check { margin:0; }
+.conversation-name { font-weight:680;overflow-wrap:anywhere;min-width:0; }
+.mode { font-size:12px;color:#3d674f;background:var(--soft);padding:4px 8px;border-radius:7px;white-space:nowrap;margin-left:auto; }
+.command,.version-item { padding:13px;display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
+.command > div,.version-item > div { flex:1;min-width:110px; }
+.version-item h3 { overflow-wrap:anywhere; }
+.command select { width:auto; }
+.command button,.version-item button { white-space:nowrap; }
+.welcome-preview { border-radius:12px;border:1px solid #cddfd3;background:#f7faf7;padding:16px;max-height:420px;overflow:auto;overflow-wrap:anywhere; }
+.welcome-preview p { margin:.38em 0;white-space:pre-wrap; }
+.welcome-preview h2,.welcome-preview h3 { margin:.5em 0 .25em; }
+.welcome-preview li { margin:.2em 0; }
+.welcome-preview img { display:block;max-width:100%;max-height:240px;object-fit:contain;border-radius:8px; }
+.welcome-preview figure { margin:12px 0; }
+.welcome-preview figure figcaption { color:var(--muted);margin-top:3px; }
+.empty { text-align:center;background:#f3f7f4;border-radius:10px;padding:18px;color:var(--muted); }
+.notice { margin:0 0 15px;padding:10px 13px;border-radius:9px;background:var(--soft);color:#234b37;border:1px solid #d4e5d9; }
+.notice.error { background:#fdf0ed;color:#7e302a;border-color:#efd5cf; }
+.login { min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#e5f4e8 0,#f6f8f3 70%); }
+.login-box { width:min(100%,450px);padding:38px;border:1px solid var(--line);border-radius:22px;background:#fff;box-shadow:0 18px 55px #12342a13; }
+.login-box .brand { padding:0;margin-bottom:25px; }
+.login-box p { color:var(--muted);margin:12px 0 22px; }
+.login-box a.button { width:100%; }
+@media(max-width:1120px) { .conversation-form{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media(max-width:960px) { .workspace{padding:34px 22px 55px} .shell{grid-template-columns:182px 1fr}.grid{gap:12px}.panel{padding:17px} }
+@media(max-width:680px) { .shell{display:block}.side{padding:15px 16px;gap:15px}.brand{padding:0}.brand span{font-size:17px}nav{grid-template-columns:repeat(2,minmax(0,1fr))}.nav-button{padding:8px 10px;text-align:center}.nav-button[aria-current="page"]::before{display:none}.side-bottom{display:block;padding:4px 0 0;border-top:1px solid #3b5349}.workspace{padding:22px 14px 42px}.grid{grid-template-columns:1fr}.top{margin-bottom:18px}.top p{font-size:13px}.conversation-form{grid-template-columns:1fr}.conversation-form .field{margin-bottom:5px}.command select{width:auto} }
+</style>
+</head>
+<body>
+<main class="login" id="login" hidden>
+  <div class="login-box">
+    <div class="brand"><span>OmniService 管理台</span></div>
+    <h1>登录管理台</h1>
+    <p>用飞书身份登录后，查看你有权限管理的客服设置。</p>
+    <p id="login-error" class="notice error" role="alert" hidden>登录未完成。请确认你使用的飞书账号拥有管理台访问权限。</p>
+    <a class="button primary" href="/admin/auth/login">使用飞书登录</a>
+  </div>
+</main>
+<div class="shell" id="shell" hidden>
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <span>OmniService</span>
+    </div>
+    <nav aria-label="管理台导航" id="nav">
+      <button class="nav-button" data-view="defaults" type="button">系统默认</button>
+      <button class="nav-button" data-view="conversations" type="button">会话配置</button>
+      <button class="nav-button" data-view="welcome" type="button">欢迎语模板</button>
+      <button class="nav-button" data-view="commands" type="button">命令权限</button>
+    </nav>
+    <div class="side-bottom"><button class="logout" id="logout" type="button">退出登录</button></div>
+  </aside>
+  <main class="workspace" id="workspace">
+    <header class="top"><div><h1 id="heading"></h1><p id="subtitle"></p></div><span class="role" id="role"></span></header>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+    <section id="defaults" hidden>
+      <form id="defaults-form">
+        <div class="grid">
+          <article class="panel">
+            <h2>会话默认开关</h2><p class="panel-intro">用于以后新建的会话。</p>
+            <label class="check"><input id="default-assist" type="checkbox"><span>回复辅助<small>转人工后由客户新来信触发，草稿在飞书待审。</small></span></label>
+            <label class="check"><input id="default-labels" type="checkbox"><span>来源标签<small>在飞书展示消息来源标识。</small></span></label>
+          </article>
+          <article class="panel">
+            <h2>授权客服</h2>
+            <div class="field"><label for="default-staff">飞书 Open ID</label><textarea id="default-staff" rows="4" spellcheck="false"></textarea><small>每行填写一位客服。</small></div>
+            <div class="field"><label for="default-owner">默认交接负责人</label><select id="default-owner"></select></div>
+            <div class="field"><span class="field-title">管理员 Open ID</span><small id="admin-list"></small></div>
+          </article>
+        </div>
+        <div class="actions"><button class="button primary" type="submit">保存默认设置</button></div>
+      </form>
+    </section>
+
+    <section id="conversations" hidden>
+      <div class="panel"><h2>当前会话</h2><p class="panel-intro">负责人和开关只影响对应会话。</p><ul id="conversation-list" class="list"></ul></div>
+    </section>
+
+    <section id="welcome" hidden>
+      <div class="grid">
+        <div>
+          <article class="panel">
+            <h2>飞书文档</h2>
+            <form id="welcome-form"><div class="field"><label for="welcome-document">欢迎语文档地址</label><input id="welcome-document" type="url" placeholder="https://…" autocomplete="off"></div>
+              <div class="actions"><button class="button" type="submit">保存地址</button><button class="button" type="button" id="prepare-document">获取文档链接</button><a id="open-document" class="button" target="_blank" rel="noopener noreferrer" hidden>打开飞书文档</a></div>
+            </form>
+          </article>
+          <article class="panel panel-stack"><h2>发布记录</h2><ul id="versions" class="list"></ul></article>
+        </div>
+        <article class="panel">
+          <h2>欢迎语预览</h2><p class="panel-intro">从已保存的飞书文档读取草稿。发布后应用于后续新客户。</p>
+          <div class="welcome-preview empty" id="preview">读取文档后可在这里核对内容。</div>
+          <div class="actions"><button class="button" id="compile-preview" type="button">读取预览</button><button class="button primary" id="publish" type="button" hidden>发布该版本</button></div>
+          <div class="field" id="test-preview" hidden><label for="preview-conversation">测试会话</label><select id="preview-conversation"></select><div class="actions"><button class="button" id="send-preview" type="button">发送测试预览</button></div></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="commands" hidden>
+      <div class="panel"><h2>斜杠命令权限</h2><p class="panel-intro">决定飞书群中的哪些成员可以使用各条命令。</p><ul id="command-list" class="list"></ul></div>
+    </section>
+  </main>
+</div>
+<script nonce="__OMNI_NONCE__">
+'use strict';
+const ui = id => document.getElementById(id);
+const views = {
+  defaults: ['系统默认', '为客服团队和新会话配置默认设置。'],
+  conversations: ['会话配置', '查看并管理你有权限访问的客服会话。'],
+  welcome: ['欢迎语模板', '用飞书文档维护新客户的首次欢迎内容。'],
+  commands: ['命令权限', '按角色控制飞书群命令的使用范围。']
+};
+const policies = {room_member: '群成员', staff: '授权客服', admin: '管理员'};
+const channelNames = {telegram: 'Telegram', whatsapp: 'WhatsApp', max: 'MAX'};
+const errors = {forbidden: '当前身份没有这项管理权限。', invalid_csrf: '登录状态已变化，请刷新后重试。',
+  not_found: '这项设置已不存在，请刷新后重试。', invalid_payload: '请检查输入值后重试。',
+  invalid_admin_settings: '请检查飞书 Open ID、负责人或其他输入值。',
+  invalid_command_policy: '这条命令或所选权限无效。', welcome_document_missing: '请先设置欢迎语文档地址。'};
+let state, preview, currentView = 'defaults';
+
+function node(tag, css, text) {
+  const element = document.createElement(tag);
+  if (css) element.className = css;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+function setNotice(text, failed = false) {
+  const element = ui('notice');
+  element.textContent = text;
+  element.classList.toggle('error', failed);
+  element.hidden = !text;
+}
+function showLogin(failed = false) {
+  ui('shell').hidden = true;
+  ui('login').hidden = false;
+  ui('login-error').hidden = !failed;
+}
+async function api(path, body) {
+  const reply = await fetch('/admin/api/' + path, body === undefined ? {credentials:'same-origin'} : {
+    method:'POST', credentials:'same-origin', body:JSON.stringify(body),
+    headers:{'Content-Type':'application/json', 'X-Omni-CSRF':state.csrf_token}
+  });
+  if (reply.status === 204) return {};
+  const result = await reply.json();
+  if (!reply.ok) {
+    if (reply.status === 401) showLogin(false);
+    const error = new Error(errors[result.error] || '当前无法完成操作，请稍后重试。');
+    error.code = result.error;
+    throw error;
+  }
+  return result;
+}
+function action(button, work) {
+  return async event => {
+    event.preventDefault();
+    if (button.disabled) return;
+    button.disabled = true;
+    setNotice('');
+    try { await work(); } catch (error) { setNotice(error.message, true); }
+    finally { button.disabled = false; }
+  };
+}
+function showView(name) {
+  if (!state || !views[name] || (state.role !== 'admin' && name !== 'conversations')) name = 'conversations';
+  currentView = name;
+  const [title, description] = views[name];
+  ui('heading').textContent = title;
+  ui('subtitle').textContent = description;
+  for (const key of Object.keys(views)) ui(key).hidden = key !== name;
+  for (const button of ui('nav').children) button.setAttribute('aria-current', button.dataset.view === name ? 'page' : 'false');
+}
+function ids(value) {
+  return Array.isArray(value) ? value.filter(item => typeof item === 'string') : [];
+}
+function options(select, list, selected, placeholder) {
+  select.replaceChildren();
+  if (placeholder) select.add(new Option(placeholder, ''));
+  for (const item of list) {
+    const [id, label] = typeof item === 'string' ? [item, item] : item;
+    select.add(new Option(label, id, false, id === selected));
+  }
+  if (selected != null && [...select.options].some(item => item.value === selected)) select.value = selected;
+}
+function checkField(label, checked, disabled = false) {
+  const element = node('label', 'check');
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = Boolean(checked);
+  input.disabled = disabled;
+  element.append(input, node('span', 'field-title', label));
+  return [element, input];
+}
+function conversationLabel(conversation) {
+  return conversation.customer_name || channelNames[conversation.channel] || '客户会话';
+}
+function canChange(command) {
+  if (state.role === 'admin') return true;
+  const policy = state.commands?.find(item => item.id === command)?.policy || 'room_member';
+  return policy === 'room_member' || (policy === 'staff' && state.role === 'staff');
+}
+function renderConversations() {
+  const list = ui('conversation-list');
+  const open = new Set([...list.querySelectorAll('details[open]')].map(row => row.dataset.id));
+  list.replaceChildren();
+  for (const conversation of state.conversations || []) {
+    const row = node('li'), detail = node('details', 'conversation');
+    detail.dataset.id = conversation.id;
+    detail.open = open.has(conversation.id);
+    const heading = node('summary');
+    const line = node('div', 'conversation-name', conversationLabel(conversation));
+    line.append(node('div', 'muted', (channelNames[conversation.channel] || conversation.channel || '客服') + ' · ' +
+      (conversation.room_id || '尚未建群')));
+    heading.append(line, node('span', 'mode', conversation.mode === 'manual' ? '人工接待' :
+      conversation.room_status === 'ready' ? '基本接待' : '等待建群'));
+    const form = node('form', 'conversation-form'), field = node('label', 'field', '交接负责人');
+    const owner = document.createElement('select');
+    options(owner, ids(conversation.members), conversation.handoff_staff_id);
+    owner.disabled = !canChange('handoff_assignee') || !owner.options.length;
+    const currentOwner = owner.value;
+    field.append(owner);
+    const save = node('button', 'button primary', '保存');
+    form.append(field);
+    const switches = [['reply_assist', '回复辅助'], ['show_labels', '来源标签'],
+      ['auto_reply', '自动回复'], ['approval_required', '需要审批']].map(([key, label]) => {
+      const original = Boolean(conversation[key] ?? (key === 'approval_required'));
+      const [element, input] = checkField(label, original, !canChange(key));
+      form.append(element);
+      return {key, original, input};
+    });
+    save.hidden = owner.disabled && switches.every(item => item.input.disabled);
+    form.append(save);
+    form.addEventListener('submit', action(save, async () => {
+      const changes = {};
+      if (!owner.disabled && owner.value !== currentOwner) changes.handoff_staff_id = owner.value;
+      for (const {input, original, key} of switches) if (!input.disabled && input.checked !== original) changes[key] = input.checked;
+      if (!Object.keys(changes).length) { setNotice('该会话的设置没有变更。'); return; }
+      if ((changes.auto_reply === true || changes.approval_required === false) &&
+          (changes.auto_reply ?? conversation.auto_reply) &&
+          !(changes.approval_required ?? conversation.approval_required ?? true) &&
+          !window.confirm('开启自动回复且关闭审批后，Agent 可以向该客户直接外发。确认保存？')) return;
+      await api('conversations/' + encodeURIComponent(conversation.id), changes);
+      await refresh();
+      setNotice('会话配置已保存。');
+    }));
+    detail.append(heading, form); row.append(detail); list.append(row);
+  }
+  if (!list.children.length) list.append(node('li', 'empty', '目前没有可管理的会话。'));
+}
+function renderCommands() {
+  const list = ui('command-list'); list.replaceChildren();
+  for (const command of state.commands || []) {
+    const row = node('li', 'command'), text = node('div');
+    text.append(node('h3', '', command.label || command.id),
+      node('div', 'muted', '初始权限 ' + (policies[command.default_policy] || '未设置')));
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', (command.label || command.id) + '权限');
+    options(select, Object.entries(policies), command.policy);
+    const save = node('button', 'button', '保存');
+    save.addEventListener('click', action(save, async () => {
+      await api('command-policy', {command_id:command.id, policy:select.value});
+      await refresh();
+      setNotice('命令权限已保存。');
+    }));
+    row.append(text, select, save); list.append(row);
+  }
+  if (!list.children.length) list.append(node('li', 'empty', '没有可配置的命令。'));
+}
+function formattedDate(value) {
+  const date = typeof value === 'number' ? new Date(value < 1e12 ? value * 1000 : value) : new Date(value);
+  return value && Number.isFinite(date.getTime()) ? date.toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}) : '';
+}
+function safeLink(value) {
+  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.href : ''; }
+  catch { return ''; }
+}
+function setDocumentLink(value) {
+  const href = safeLink(value);
+  const link = ui('open-document');
+  link.hidden = !href;
+  if (href) link.href = href;
+  else link.removeAttribute('href');
+}
+function renderVersions() {
+  const list = ui('versions'); list.replaceChildren();
+  for (const version of state.welcome_versions || []) {
+    const current = version.version === state.published_welcome_version;
+    const row = node('li', 'version-item'), heading = node('div');
+    const title = node('h3', '', (current ? '当前发布 · ' : '版本 ') + version.version.slice(0, 12));
+    title.title = version.version;
+    heading.append(title, node('div', 'muted', formattedDate(version.created_at)));
+    row.append(heading);
+    if (!current && (version.published_once || version.published_at != null)) {
+      const restore = node('button', 'button', '回滚至此版');
+      restore.addEventListener('click', action(restore, async () => {
+        if (!window.confirm('将此版本恢复为当前欢迎语？')) return;
+        await api('welcome/rollback', {version:version.version});
+        await refresh(); setNotice('欢迎语已回滚至所选版本。');
+      }));
+      row.append(restore);
+    }
+    list.append(row);
+  }
+  if (!list.children.length) list.append(node('li', 'empty', '暂无发布记录。'));
+}
+const richTags = new Set(['P','BR','STRONG','B','EM','I','U','S','A','UL','OL','LI','H1','H2','H3','H4','BLOCKQUOTE','CODE','PRE']);
+function copyRich(fragment, receiver) {
+  for (const child of fragment.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) { receiver.append(document.createTextNode(child.textContent)); continue; }
+    if (child.nodeType !== Node.ELEMENT_NODE || ['SCRIPT','STYLE','TEMPLATE'].includes(child.tagName)) continue;
+    const href = child.tagName === 'A' ? safeLink(child.getAttribute('href')) : '';
+    if (!richTags.has(child.tagName) || (child.tagName === 'A' && !href)) { copyRich(child, receiver); continue; }
+    const element = document.createElement(child.tagName.toLowerCase());
+    if (href) { element.href = href; element.target = '_blank'; element.rel = 'noopener noreferrer'; }
+    copyRich(child, element); receiver.append(element);
+  }
+}
+function renderPreview() {
+  const target = ui('preview');
+  target.replaceChildren();
+  target.classList.toggle('empty', !preview);
+  ui('publish').hidden = !preview || state.published_welcome_version === preview.version;
+  const testRooms = (state.conversations || []).filter(item => item.preview_allowed && item.room_status === 'ready');
+  ui('test-preview').hidden = !preview || !testRooms.length;
+  if (!preview) { target.textContent = '读取文档后可在这里核对内容。'; return; }
+  target.append(node('h3', '', '版本 ' + preview.version));
+  for (const item of preview.items || []) {
+    if (item.type === 'text') {
+      const block = document.createElement('div');
+      if (typeof item.html === 'string' && item.html) {
+        const inert = document.createElement('template');
+        inert.innerHTML = item.html;
+        copyRich(inert.content, block);
+      }
+      if (!block.textContent.trim()) block.append(node('p', '', item.text || ''));
+      target.append(block);
+    } else if (item.type === 'image' && /^image\/(?:jpeg|png|gif|webp)$/.test(item.mime || '') &&
+               typeof item.data === 'string' && /^[A-Za-z0-9+/=]+$/.test(item.data)) {
+      const figure = document.createElement('figure'), image = document.createElement('img');
+      image.alt = item.alt || '欢迎语图片'; image.src = 'data:' + item.mime + ';base64,' + item.data;
+      figure.append(image); if (item.alt) figure.append(node('figcaption', '', item.alt)); target.append(figure);
+    }
+  }
+  options(ui('preview-conversation'), testRooms.map(item => [item.id, conversationLabel(item)]),
+    ui('preview-conversation').value, '选择测试会话');
+}
+async function refresh() {
+  state = await api('state');
+  ui('role').textContent = ({admin:'管理员', staff:'客服', member:'群成员'})[state.role] || '已登录';
+  for (const button of ui('nav').children) button.hidden = state.role !== 'admin' && button.dataset.view !== 'conversations';
+  renderConversations();
+  if (state.role === 'admin') {
+    const defaults = state.defaults || {};
+    ui('default-assist').checked = Boolean(defaults.reply_assist);
+    ui('default-labels').checked = Boolean(defaults.show_labels);
+    ui('default-staff').value = ids(defaults.staff_ids || state.staff_ids).join('\n');
+    options(ui('default-owner'), ids(defaults.staff_ids || state.staff_ids), defaults.handoff_staff_id);
+    ui('admin-list').textContent = ids(state.admin_ids).join('、') || '由服务端配置';
+    ui('welcome-document').value = defaults.welcome_document || '';
+    setDocumentLink(defaults.welcome_document);
+    renderVersions(); renderPreview(); renderCommands();
+  }
+  ui('login').hidden = true; ui('shell').hidden = false;
+  showView(currentView);
+}
+for (const button of ui('nav').children) button.addEventListener('click', () => { setNotice(''); showView(button.dataset.view); });
+const parsedStaff = () => [...new Set(ui('default-staff').value.trim().split(/[\s,，]+/).filter(Boolean))];
+ui('default-staff').addEventListener('input', () => options(ui('default-owner'), parsedStaff(), ui('default-owner').value));
+const defaultsForm = ui('defaults-form');
+defaultsForm.addEventListener('submit', action(defaultsForm.querySelector('button[type=submit]'), async () => {
+  if (!ui('default-owner').value) throw new Error('请选择默认交接负责人。');
+  await api('defaults', {staff_ids:parsedStaff(), handoff_staff_id:ui('default-owner').value,
+    reply_assist:ui('default-assist').checked, show_labels:ui('default-labels').checked});
+  await refresh(); setNotice('默认设置已保存。');
+}));
+const welcomeForm = ui('welcome-form');
+welcomeForm.addEventListener('submit', action(welcomeForm.querySelector('button[type=submit]'), async () => {
+  await api('defaults', {welcome_document:ui('welcome-document').value.trim()});
+  preview = null;
+  await refresh(); setNotice('飞书文档地址已保存。');
+}));
+ui('prepare-document').addEventListener('click', action(ui('prepare-document'), async () => {
+  const prepared = await api('welcome/prepare', {});
+  setDocumentLink(prepared.document_url);
+  setNotice('文档链接已准备好。');
+}));
+ui('compile-preview').addEventListener('click', action(ui('compile-preview'), async () => {
+  if (ui('welcome-document').value.trim() !== (state.defaults?.welcome_document || '')) {
+    throw new Error('请先保存修改后的飞书文档地址。');
+  }
+  preview = await api('welcome/preview', {});
+  await refresh(); setNotice('预览已生成，可以核对待发布的内容。');
+}));
+ui('publish').addEventListener('click', action(ui('publish'), async () => {
+  if (!preview || !window.confirm('确认发布预览中的欢迎语？')) return;
+  await api('welcome/publish', {version:preview.version});
+  await refresh(); setNotice('所选欢迎语已发布。');
+}));
+ui('send-preview').addEventListener('click', action(ui('send-preview'), async () => {
+  const conversation = ui('preview-conversation').value;
+  if (!preview || !conversation) throw new Error('请选择测试会话。');
+  if (!window.confirm('确认向所选测试会话发送预览？')) return;
+  await api('welcome/send-preview', {version:preview.version, conversation_id:conversation});
+  setNotice('测试预览已进入发送队列。');
+}));
+ui('logout').addEventListener('click', action(ui('logout'), async () => {
+  await api('logout', {});
+  window.location.replace('/admin/');
+}));
+refresh().catch(error => showLogin(error.code !== 'unauthorized' || new URLSearchParams(location.search).get('login') === 'failed'));
+</script>
+</body>
+</html>

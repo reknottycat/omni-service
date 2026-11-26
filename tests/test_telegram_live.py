@@ -1,3 +1,6 @@
+import base64
+from email.parser import BytesParser
+from email.policy import default
 import json
 from pathlib import Path
 import tempfile
@@ -8,6 +11,9 @@ from omni_service.models import ChannelError
 from omni_service.personal import TelegramPersonal
 from omni_service.store import Store
 from omni_service.telegram_live import TelegramAPI, TelegramPoller
+
+
+PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jFf8AAAAASUVORK5CYII="
 
 
 def message(update_id, *, chat=20, sender=20, connection_id="conn-1"):
@@ -159,3 +165,70 @@ class TelegramTransport(unittest.TestCase):
         tls.return_value.request.side_effect = OSError("request /bot123:synthetic/sendMessage")
         with self.assertRaisesRegex(ChannelError, "^delivery_unknown$"):
             TelegramAPI("123:synthetic").call("sendMessage", {"chat_id": 20})
+
+    @patch("omni_service.telegram_live.http.client.HTTPSConnection")
+    def test_welcome_photo_upload_preserves_proxy_and_exact_multipart(self, tls):
+        conn = tls.return_value
+        response = conn.getresponse.return_value
+        response.status = 200
+        response.read.return_value = b'{"ok":true,"result":{"message_id":7,"chat":{"id":20}}}'
+        api = TelegramAPI("123:synthetic", proxy_url="http://127.0.0.1:17890")
+        photo = {"type": "image", "mime": "image/png", "data": PNG_DATA, "alt": "Ignored alt"}
+        caption = "路线\nДобро пожаловать"
+        self.assertEqual(api.send_welcome_photo("conn-1", 20, photo, caption=caption),
+                         {"message_id": 7, "chat": {"id": 20}})
+        tls.assert_called_once_with("127.0.0.1", 17890, timeout=10)
+        conn.set_tunnel.assert_called_once_with("api.telegram.org", 443)
+        conn.close.assert_called_once()
+        request = conn.request.call_args
+        self.assertEqual(request.args, ("POST", "/bot123:synthetic/sendPhoto"))
+        content_type = request.kwargs["headers"]["Content-Type"]
+        envelope = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode()
+        multipart = BytesParser(policy=default).parsebytes(envelope + request.kwargs["body"])
+        self.assertEqual(multipart.get_content_type(), "multipart/form-data")
+        fields = {part.get_param("name", header="Content-Disposition"): part for part in multipart.iter_parts()}
+        self.assertEqual(set(fields), {"business_connection_id", "chat_id", "caption", "photo"})
+        self.assertEqual(fields["business_connection_id"].get_payload(decode=True), b"conn-1")
+        self.assertEqual(fields["chat_id"].get_payload(decode=True), b"20")
+        self.assertEqual(fields["caption"].get_payload(decode=True), caption.encode())
+        self.assertEqual(fields["photo"].get_content_type(), "image/png")
+        self.assertEqual(fields["photo"].get_filename(), "welcome.png")
+        self.assertEqual(fields["photo"].get_payload(decode=True), base64.b64decode(PNG_DATA))
+
+    @patch("omni_service.telegram_live.http.client.HTTPSConnection")
+    def test_welcome_photo_rejects_invalid_media_before_transport(self, tls):
+        api = TelegramAPI("123:synthetic")
+        photo = {"type": "image", "mime": "image/png", "data": PNG_DATA, "alt": ""}
+        invalid_uploads = (
+            (20, {**photo, "mime": "image/svg+xml"}, ""),
+            (20, {**photo, "mime": "image/jpeg"}, ""),
+            (20, {**photo, "data": "not base64!"}, ""),
+            (20, {**photo, "data": PNG_DATA[:-12]}, ""),
+            (20, photo, "🌐" * 513),
+            (True, photo, ""),
+        )
+        for chat_id, item, caption in invalid_uploads:
+            with self.subTest(item=item["mime"], chat_id=chat_id, caption_length=len(caption)):
+                with self.assertRaisesRegex(ChannelError, "^invalid_payload$"):
+                    api.send_welcome_photo("conn-1", chat_id, item, caption=caption)
+        with patch("omni_service.telegram_live._MAX_WELCOME_PHOTO_BYTES", len(base64.b64decode(PNG_DATA)) - 1):
+            with self.assertRaisesRegex(ChannelError, "^invalid_payload$"):
+                api.send_welcome_photo("conn-1", 20, photo)
+        tls.assert_not_called()
+
+    @patch("omni_service.telegram_live.http.client.HTTPSConnection")
+    def test_welcome_photo_keeps_rate_limit_and_sanitizes_unknown_delivery(self, tls):
+        api = TelegramAPI("123:synthetic")
+        photo = {"type": "image", "mime": "image/png", "data": PNG_DATA, "alt": ""}
+        response = tls.return_value.getresponse.return_value
+        response.status = 429
+        response.getheader.return_value = "1"
+        response.read.return_value = b'{"ok":false,"parameters":{"retry_after":32}}'
+        with self.assertRaisesRegex(ChannelError, "^rate_limited$") as limited:
+            api.send_welcome_photo("conn-1", 20, photo)
+        self.assertEqual(limited.exception.retry_after, 32)
+
+        tls.return_value.request.side_effect = OSError("request /bot123:synthetic/sendPhoto Private caption")
+        with self.assertRaisesRegex(ChannelError, "^delivery_unknown$") as unknown:
+            api.send_welcome_photo("conn-1", 20, photo, caption="Private caption")
+        self.assertTrue(unknown.exception.__suppress_context__)

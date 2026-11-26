@@ -391,6 +391,26 @@ def feishu_card_request(chat_id, card, token="simulation-token"):
     return _feishu_send_request(_id(chat_id, "chat_id"), "interactive", card, _headers("feishu", token))
 
 
+def feishu_card_patch_request(message_id, card, token="simulation-token"):
+    if not isinstance(card, dict) or card.get('schema') != '2.0':
+        raise ChannelError('invalid_payload')
+    identifier = quote(_id(message_id, 'message_id'), safe='')
+    return Request('PATCH', '/open-apis/im/v1/messages/' + identifier,
+                   {'content': json.dumps(card, ensure_ascii=False, separators=(',', ':'))}, _headers('feishu', token))
+
+
+def telegram_welcome_request(chat_id, payload, token='simulation-token'):
+    """Transport the frozen welcome through the loopback protocol simulator."""
+    target = _id(chat_id, 'chat_id')
+    if 'welcome_photo' in payload:
+        method = 'sendPhoto'
+        body = {'chat_id': target, 'photo': payload['welcome_photo'], 'caption': payload['text']}
+    else:
+        method = 'sendMessage'
+        body = {'chat_id': target, 'text': payload['welcome_html'], 'parse_mode': 'HTML'}
+    return Request('POST', f'/bot{quote(token, safe=":")}/{method}', body, _headers('telegram', token))
+
+
 def delete_request(channel, account_id, chat_id, message_id, *, token="simulation-token") -> Request:
     _channel(channel)
     _id(account_id, "account_id")
@@ -492,7 +512,7 @@ def parse_response(channel, operation: str, payload: dict) -> str:
             raise ChannelError("invalid_response", "Missing or invalid Feishu result code")
         if payload["code"] != 0:
             _provider_error(payload)
-        if operation == "delete":
+        if operation in ("delete", "update_card"):
             return ""
         data = _obj(payload.get("data"))
         if operation == "add_members":

@@ -6,6 +6,7 @@ import tempfile
 import threading
 import unittest
 
+from omni_service.approval_card import build_approval_card, finalize_approval_card
 from omni_service.intake import Intake
 from omni_service.server import DEFAULT_ACCOUNTS, create_server
 from omni_service.service import Service
@@ -113,6 +114,7 @@ class CardApprovalAcceptance(unittest.TestCase):
                   and request["body"].get("msg_type") == "interactive"]
         card = json.loads(bodies[-1]["content"])
         self.assertEqual(card["schema"], "2.0")
+        self.assertTrue(card["config"]["update_multi"])
         objects = tuple(card_objects(card))
         self.assertTrue(any(part.get("content") == draft["customer_text"] for part in objects))
         buttons = {part["text"]["content"]: part["behaviors"][0]["value"]
@@ -121,6 +123,24 @@ class CardApprovalAcceptance(unittest.TestCase):
                     for label, decision in (("可以发送", "approve"), ("不可以发送", "reject"))}
         self.assertEqual(buttons, expected)
         return state["room_id"], preview["external_id"], draft, buttons
+
+    def assert_final_card(self, room, receipt, draft, buttons, title):
+        messages = [item for item in self.platforms.messages
+                    if item["channel"] == "feishu" and item["target"] == room and item["message_id"] == receipt]
+        self.assertEqual(len(messages), 1)
+        card = messages[0]["card"]
+        self.assertEqual(card["header"]["title"]["content"], title)
+        self.assertTrue(card["config"]["update_multi"])
+        parts = tuple(card_objects(card))
+        self.assertTrue(any(part.get("content") == draft["customer_text"] for part in parts))
+        final_buttons = [part for part in parts if part.get("tag") == "button"]
+        self.assertEqual({part["text"]["content"]: part["behaviors"][0]["value"]
+                          for part in final_buttons}, buttons)
+        self.assertTrue(all(part["disabled"] is True for part in final_buttons))
+        patches = [request for request in self.platforms.requests
+                   if request["channel"] == "feishu" and request["method"] == "PATCH"
+                   and request["path"].endswith("/" + receipt)]
+        self.assertEqual(len(patches), 1)
 
     def test_only_signed_same_room_card_and_version_can_send_exactly_once(self):
         cid_a = self.customer(COMPANY)
@@ -151,9 +171,12 @@ class CardApprovalAcceptance(unittest.TestCase):
                 self.assertEqual(self.sent_to("102"), welcome_b)
 
         self.assertEqual(self.webhook("feishu", valid)[0], 200)
+        self.drain()
+        self.assert_final_card(room_a, receipt_a, draft_a, buttons_a, "已批准发送")
         self.assertEqual(self.webhook("feishu", valid)[0], 200)
         self.assertEqual(self.webhook("feishu", self.action(room_a, receipt_a, approve))[0], 200)
         self.drain()
+        self.assert_final_card(room_a, receipt_a, draft_a, buttons_a, "已批准发送")
         self.assertEqual(self.conversation(cid_a)["drafts"][-1]["status"], "approved")
         self.assertEqual(self.sent_to("101"), [*welcome_a, draft_a["customer_text"]])
         self.assertEqual(self.sent_to("102"), welcome_b)
@@ -161,15 +184,19 @@ class CardApprovalAcceptance(unittest.TestCase):
     def test_reject_and_replaced_card_never_send(self):
         cid = self.customer(COMPANY)
         self.drain()
-        room, old_receipt, _old_draft, old_buttons = self.card_for(cid)
+        room, old_receipt, old_draft, old_buttons = self.card_for(cid)
         self.customer("Нужна кукуруза.")
         self.drain()
         _, receipt, draft, buttons = self.card_for(cid)
         self.assertNotEqual(old_receipt, receipt)
+        self.assert_final_card(room, old_receipt, old_draft, old_buttons, "草稿已取消")
         self.assertEqual(self.webhook("feishu", self.action(room, old_receipt, old_buttons["可以发送"]))[0], 200)
         self.assertEqual(self.webhook("feishu", self.action(room, receipt, buttons["不可以发送"]))[0], 200)
+        self.drain()
+        self.assert_final_card(room, receipt, draft, buttons, "已拒绝发送")
         self.assertEqual(self.webhook("feishu", self.action(room, receipt, buttons["可以发送"]))[0], 200)
         self.drain()
+        self.assert_final_card(room, receipt, draft, buttons, "已拒绝发送")
         self.assertEqual(self.conversation(cid)["drafts"][-1]["status"], "rejected")
         self.assertNotIn(draft["customer_text"], self.sent_to("101"))
         self.assertEqual(len(self.sent_to("101")), 1)
@@ -271,3 +298,20 @@ class CardApprovalAcceptance(unittest.TestCase):
         self.customer("Как оформить следующий заказ?")
         self.drain()
         self.assertEqual(len(self.sent_to("101")), 2)
+
+
+class FinalizedApprovalCardTest(unittest.TestCase):
+    def test_cancelled_card_keeps_exact_preview_and_callback_version(self):
+        text = "[AI] Точная версия, <текст> и & символы."
+        version = "1234567890abcdef"
+        card = build_approval_card(draft_id="draft_" + "f" * 32, version=version,
+                                   customer_text=text, reference="Internal source")
+        before = json.dumps(card, ensure_ascii=False)
+        final = finalize_approval_card(card, "cancelled")
+        self.assertEqual(json.dumps(card, ensure_ascii=False), before)
+        self.assertEqual(final["header"]["title"]["content"], "草稿已取消")
+        self.assertEqual(final["header"]["template"], "grey")
+        self.assertTrue(final["config"]["update_multi"])
+        self.assertEqual(final["body"]["elements"][:2], card["body"]["elements"][:2])
+        for old, new in zip(card["body"]["elements"][2:], final["body"]["elements"][2:], strict=True):
+            self.assertEqual(new, {**old, "disabled": True})

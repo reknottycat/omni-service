@@ -8,8 +8,9 @@ import time
 import uuid
 
 from . import channels
-from .approval_card import build_approval_card
+from .approval_card import build_approval_card, finalize_approval_card
 from .language import SimulationLanguage
+from .management import Management
 from .models import ChannelError, DraftDecision
 from .store import Store
 
@@ -42,7 +43,7 @@ def _id(prefix):
     return prefix + uuid.uuid4().hex
 
 
-class Service:
+class Service(Management):
     def __init__(self, db_path, transport, *, clock=time.time,
                  members=tuple(f'employee-{n}' for n in range(1, 8)), language=None,
                  intake=None, intake_enabled=False, label_replies=False,
@@ -68,6 +69,8 @@ class Service:
         self.agent_enabled = agent_enabled
         self.label_replies = label_replies or intake is not None
         self._drain_lock = threading.Lock()
+        self._cards_reconciled = False
+        self.welcome_preview_peers = frozenset()
 
     def set_intake_enabled(self, enabled):
         if self.intake is None or self.approval_intake or type(enabled) is not bool:
@@ -200,11 +203,32 @@ class Service:
         db.execute("UPDATE messages SET status='cancelled' WHERE conversation_id=? AND author_id='AI' AND status='queued' AND id IN (SELECT message_id FROM outbox WHERE status='cancelled')", (cid,))
 
     def _cancel_drafts(self, db, cid, *, kind=None):
+        pending = db.execute('''SELECT id FROM reply_drafts WHERE conversation_id=?
+            AND status='pending' AND (? IS NULL OR kind=?)''', (cid, kind, kind)).fetchall() if self.approval_cards else ()
         db.execute("""UPDATE outbox SET status='cancelled' WHERE conversation_id=? AND status='pending'
             AND operation_key IN (SELECT 'notice:draft:' || id FROM reply_drafts
                                    WHERE conversation_id=? AND status='pending' AND (? IS NULL OR kind=?))""", (cid, cid, kind, kind))
         db.execute("UPDATE reply_drafts SET status='cancelled' WHERE conversation_id=? AND status='pending' AND (? IS NULL OR kind=?)",
                    (cid, kind, kind))
+        for row in pending:
+            self._queue_closed_card(db, cid, row['id'], 'cancelled')
+
+    def _queue_closed_card(self, db, cid, draft_id, status):
+        preview = db.execute('''SELECT external_id,payload FROM outbox WHERE operation_key=?
+            AND conversation_id=? AND status='sent' AND external_id IS NOT NULL''', ('notice:draft:' + draft_id, cid)).fetchone()
+        if preview is not None and (card := json.loads(preview['payload']).get('card')):
+            self._queue(db, cid, 'feishu', 'update_card', 'card-state:' + draft_id,
+                        {'card_message_id': preview['external_id'], 'card': finalize_approval_card(card, status)})
+
+    def _reconcile_closed_cards(self):
+        with self.store.transaction() as db:
+            rows = db.execute('''SELECT d.conversation_id,d.id,d.status FROM reply_drafts d
+                JOIN outbox preview ON preview.operation_key='notice:draft:' || d.id AND preview.status='sent'
+                LEFT JOIN outbox patch ON patch.operation_key='card-state:' || d.id
+                WHERE d.status IN ('approved','rejected','cancelled') AND patch.id IS NULL
+                AND json_type(preview.payload,'$.card')='object' ''').fetchall()
+            for row in rows:
+                self._queue_closed_card(db, row['conversation_id'], row['id'], row['status'])
 
     def _display_reply(self, text, language, author, sender_name=''):
         if author == 'AI':
@@ -247,6 +271,27 @@ class Service:
             self._notify(db, cid, 'media:' + mid, '媒体已保存，等待目的平台上传适配，尚未发送。消息 ' + mid)
         return mid, status
 
+    def _queue_welcome_version(self, db, conv, version, *, key):
+        if conv['channel'] != 'telegram':
+            return False
+        frozen = db.execute('SELECT content FROM welcome_versions WHERE version=?', (version,)).fetchone()
+        if frozen is None:
+            return False
+        cid = conv['id']
+        for index, item in enumerate(json.loads(frozen['content'])['items']):
+            photo = item['type'] == 'image'
+            text = item['alt'] if photo else item['text']
+            mid = self._message(db, cid, direction='outbound', source_channel='ai_welcome',
+                                source_id=f'{key}:{index}', author_id='AI', text=text,
+                                translated=text, language=conv['language'], kind='media' if photo else 'text', status='queued')
+            payload = {'text': text, 'mandatory_welcome': True, 'welcome_version': version}
+            if photo:
+                payload['welcome_photo'] = item
+            else:
+                payload['welcome_html'] = item['html']
+            self._queue(db, cid, 'telegram', 'send', 'out:' + mid, payload, mid)
+        return True
+
     def _mirror(self, db, conv, message):
         if conv['room_status'] == 'absent' or message['status'] == 'deleted':
             return
@@ -273,6 +318,8 @@ class Service:
         if db.execute('SELECT 1 FROM outbox WHERE operation_key=?', (key,)).fetchone():
             return
         customer_text = message['translated']
+        if message['source_channel'] == 'ai_welcome' and message['kind'] == 'media':
+            customer_text = '[欢迎语图片] ' + customer_text
         try:
             chinese = self.language.translate(customer_text, message['language'], 'zh')
         except ChannelError:
@@ -299,7 +346,11 @@ class Service:
 
     def _ensure_service_room(self, db, cid, staff_ids=None):
         conv = self._conversation(db, cid)
-        selected = tuple(dict.fromkeys(staff_ids if staff_ids is not None else self.default_members))
+        if staff_ids is None:
+            saved = [row['user_id'] for row in db.execute('SELECT user_id FROM members WHERE conversation_id=? ORDER BY rowid', (cid,))]
+            config = self._management(db)
+            staff_ids = saved or (config['staff_ids'] if config else self.default_members)
+        selected = tuple(dict.fromkeys(staff_ids))
         if not selected or any(not isinstance(s, str) or not s for s in selected):
             raise ChannelError('invalid_members', 'At least one staff identity is required.')
         for staff in selected:
@@ -340,8 +391,10 @@ class Service:
         self._audit(db, cid, 'intake_handoff', {'reason': reason})
 
     def _handoff_recipient(self, db, cid):
+        settings = db.execute('SELECT handoff_staff_id FROM conversation_settings WHERE conversation_id=?', (cid,)).fetchone()
+        assignee = (settings['handoff_staff_id'] if settings else None) or self.handoff_staff_id
         row = db.execute('''SELECT user_id FROM members WHERE conversation_id=?
-            ORDER BY (user_id=?) DESC, rowid LIMIT 1''', (cid, self.handoff_staff_id)).fetchone()
+            ORDER BY (user_id=?) DESC, rowid LIMIT 1''', (cid, assignee)).fetchone()
         return row['user_id'] if row else None
 
     def _handoff(self, db, cid, staff_ids=None, *, intake_reason='manual_handoff'):
@@ -489,6 +542,7 @@ class Service:
             cid = row['id']
             if not self.approval_cards:
                 return {'status': 'approval_invalid', 'conversation_id': cid}
+            self._require_command(db, cid, event.user_id, 'approve')
             prior = db.execute("SELECT digest,result FROM inbox WHERE channel='feishu-card' AND account_id=? AND event_id=?",
                                (event.app_id, event.event_id)).fetchone()
             if prior:
@@ -497,6 +551,8 @@ class Service:
                 return {**json.loads(prior['result']), 'status': 'duplicate'}
             result = self._review_draft(db, dict(row), event.draft_id, event.version, event.user_id,
                                         event.decision, card_message_id=event.message_id)
+            if result['status'] in ('approved', 'rejected'):
+                self._queue_closed_card(db, cid, event.draft_id, result['status'])
             self._approval_feedback(db, cid, 'card-decision:' + event.event_id, result['status'])
             db.execute("INSERT INTO inbox VALUES('feishu-card',?,?,?,?)",
                        (event.app_id, event.event_id, digest, _json(result)))
@@ -573,8 +629,11 @@ class Service:
         if session['handoff_reason'] is not None or not self.intake_enabled:
             return
         if first and self.approval_intake:
-            self._outgoing(db, conv, self.intake.welcome(language), source_channel='ai_welcome',
-                           already_translated=True)
+            settings = db.execute('SELECT welcome_version FROM conversation_settings WHERE conversation_id=?', (cid,)).fetchone()
+            version = settings['welcome_version'] if settings else None
+            if not version or not self._queue_welcome_version(db, conv, version, key='welcome:' + cid):
+                self._outgoing(db, conv, self.intake.welcome(language), source_channel='ai_welcome',
+                               already_translated=True)
         if event.attachments:
             self._handoff(db, cid, intake_reason='media')
             return
@@ -676,6 +735,7 @@ class Service:
         if self.intake is not None and event.event_type == 'message' and not conv['last_customer_at']:
             first_contact = db.execute('SELECT 1 FROM messages WHERE conversation_id=?', (cid,)).fetchone() is None
             if first_contact:
+                self._snapshot_defaults(db, cid)
                 self._ensure_service_room(db, cid)
                 mode = 'auto' if self.intake_enabled else 'manual'
                 db.execute('UPDATE conversations SET mode=? WHERE id=?', (mode, cid))
@@ -730,18 +790,25 @@ class Service:
             return 'agent_unavailable', '当前服务端没有配置 Agent 回复辅助。'
         if action != '状态':
             enabled = action == '开'
-            db.execute('INSERT OR IGNORE INTO conversation_settings(conversation_id) VALUES(?)', (cid,))
-            db.execute(f'UPDATE conversation_settings SET {key}=? WHERE conversation_id=?', (int(enabled), cid))
-            if key == 'reply_assist' and not enabled:
-                self._cancel_agent_work(db, cid)
-            if (key == 'auto_reply' and not enabled) or (key == 'approval_required' and enabled):
-                self._cancel_automatic_replies(db, cid)
+            self._set_room_setting(db, cid, key, enabled)
             self._audit(db, cid, 'room_setting_changed', {'setting': key, 'enabled': enabled})
         state = '开' if self._room_settings(db, cid)[key] else '关'
         feedback = f'{command[1:]}当前：{state}'
         if key in _APPROVAL_COMMANDS.values():
             feedback += '。Agent 自动外发当前：' + ('开' if self._auto_agent_allowed(db, cid) else '关')
         return ('settings_status' if action == '状态' else 'settings_updated'), feedback
+
+    def _set_room_setting(self, db, cid, key, enabled):
+        if key not in self._room_settings(db, cid) or type(enabled) is not bool:
+            raise ChannelError('invalid_admin_settings')
+        if key == 'reply_assist' and enabled and not callable(self.agent_advisor):
+            raise ChannelError('agent_unavailable')
+        db.execute('INSERT OR IGNORE INTO conversation_settings(conversation_id) VALUES(?)', (cid,))
+        db.execute(f'UPDATE conversation_settings SET {key}=? WHERE conversation_id=?', (int(enabled), cid))
+        if key == 'reply_assist' and not enabled:
+            self._cancel_agent_work(db, cid)
+        if (key == 'auto_reply' and not enabled) or (key == 'approval_required' and enabled):
+            self._cancel_automatic_replies(db, cid)
 
     def _approval_feedback(self, db, cid, key, status):
         feedback = {
@@ -764,12 +831,24 @@ class Service:
         if not self.approval_intake:
             return {'status': 'internal_only', 'conversation_id': cid}
         if command == '/approve':
+            if not db.execute('SELECT 1 FROM members WHERE conversation_id=? AND user_id=?', (cid, event.user_id)).fetchone():
+                raise ChannelError('forbidden')
+            self._require_command(db, cid, event.user_id, 'approve')
             result = self._approve(db, conv, event, args)
             self._approval_feedback(db, cid, 'approval:' + event.message_id, result['status'])
             return result
         if command in _PREFERENCE_COMMANDS or (self.approval_cards and command in _APPROVAL_COMMANDS):
+            self._require_command(db, cid, event.user_id, (_PREFERENCE_COMMANDS | _APPROVAL_COMMANDS)[command])
             status, feedback = self._change_room_setting(db, cid, command, args)
+        elif command == '/负责人':
+            self._require_command(db, cid, event.user_id, 'handoff_assignee')
+            if len(args) != 1:
+                status, feedback = 'settings_invalid', '用法 /负责人 <本群授权客服 Open ID>'
+            else:
+                self._assign_handoff(db, cid, args[0])
+                status, feedback = 'settings_updated', '已更新本会话负责人。'
         elif command == '/draft':
+            self._require_command(db, cid, event.user_id, 'draft')
             if args:
                 status, feedback = 'approval_invalid', '用法 /draft'
             elif conv['mode'] != 'manual' or not self._room_settings(db, cid)['reply_assist']:
@@ -794,13 +873,15 @@ class Service:
                 return {'status': 'unknown_message', 'conversation_id': conv['id']}
             actor = event.user_id or existing['author_id']
             return self._recall(db, existing['id'], conv['id'], actor)
-        if not db.execute('SELECT 1 FROM members WHERE conversation_id=? AND user_id=?', (conv['id'], event.user_id)).fetchone():
+        command_text = event.text.lstrip()
+        is_command = command_text.startswith(('/', '／'))
+        staff = db.execute('SELECT 1 FROM members WHERE conversation_id=? AND user_id=?', (conv['id'], event.user_id)).fetchone()
+        if not staff and (not is_command or not self._command_member(db, conv['id'], event.user_id)):
             raise ChannelError('forbidden', 'The sender is not a member of this conversation.')
         if event.has_mentions or '@' in event.text or '＠' in event.text:
             self._audit(db, conv['id'], 'staff_internal_mention', {'source_message_id': event.message_id})
             return {'status': 'internal_only', 'conversation_id': conv['id']}
-        command_text = event.text.lstrip()
-        if command_text.startswith(('/', '／')):
+        if is_command:
             return self._room_command(db, conv, event, '/' + command_text[1:])
         if existing and event.event_type != 'edit':
             return {'status': 'duplicate_message', 'conversation_id': conv['id'], 'message_id': existing['id']}
@@ -887,6 +968,10 @@ class Service:
         channel, operation = item['channel'], item['operation']
         if channel == 'feishu' and operation == 'send' and 'card' in payload:
             return channels.feishu_card_request(conv['room_id'], payload['card'])
+        if channel == 'feishu' and operation == 'update_card':
+            return channels.feishu_card_patch_request(payload['card_message_id'], payload['card'])
+        if channel == 'telegram' and operation == 'send' and payload.get('welcome_version'):
+            return channels.telegram_welcome_request(conv['chat_id'], payload)
         if operation == 'create_room':
             members = [r[0] for r in db.execute('SELECT user_id FROM members WHERE conversation_id=?', (conv['id'],))]
             return channels.feishu_create_room_request(payload['name'], members)
@@ -927,6 +1012,9 @@ class Service:
     def drain(self):
         outcomes = []
         with self._drain_lock:
+            if self.approval_cards and not self._cards_reconciled:
+                self._reconcile_closed_cards()
+                self._cards_reconciled = True
             while True:
                 with self.store.transaction() as db:
                     rows = db.execute("SELECT * FROM outbox WHERE status='pending' AND available_at<=? ORDER BY id", (self.clock(),)).fetchall()
@@ -935,7 +1023,10 @@ class Service:
                         c = self._conversation(db, candidate['conversation_id'])
                         if candidate['channel'] == 'feishu' and candidate['operation'] != 'create_room' and not c['room_id']:
                             continue
-                        earlier = db.execute("SELECT 1 FROM outbox WHERE conversation_id=? AND channel=? AND id<? AND status IN ('pending','inflight','unknown')", (candidate['conversation_id'], candidate['channel'], candidate['id'])).fetchone()
+                        earlier = None if candidate['operation'] == 'update_card' else db.execute('''SELECT 1 FROM outbox
+                            WHERE conversation_id=? AND channel=? AND id<? AND operation!='update_card'
+                            AND status IN ('pending','inflight','unknown')''',
+                            (candidate['conversation_id'], candidate['channel'], candidate['id'])).fetchone()
                         if earlier:
                             continue
                         item, conv = dict(candidate), c
@@ -1036,6 +1127,11 @@ class Service:
                             {'text': '[同事] 已发给客户：' + msg['translated']})
         elif item['operation'] == 'send':
             original_id = json.loads(item['payload']).get('original_message_id')
+            if self.approval_cards and item['operation_key'].startswith('notice:draft:'):
+                draft_id = item['operation_key'].removeprefix('notice:draft:')
+                draft = db.execute('SELECT status FROM reply_drafts WHERE id=?', (draft_id,)).fetchone()
+                if draft and draft['status'] == 'cancelled':
+                    self._queue_closed_card(db, item['conversation_id'], draft_id, 'cancelled')
             if original_id:
                 original = db.execute('SELECT status FROM messages WHERE id=?', (original_id,)).fetchone()
                 if original and original['status'] == 'deleted':

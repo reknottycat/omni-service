@@ -11,6 +11,8 @@ import queue
 import re
 import threading
 
+from .admin_auth import FeishuAdminAuth
+from .admin_web import create_admin_server
 from .feishu_live import FeishuLive
 from .intake import Intake
 from .language import SimulationLanguage
@@ -19,6 +21,7 @@ from .models import ChannelError
 from .personal import Connection, TelegramPersonal
 from .service import Service, _id
 from .telegram_live import TelegramAPI, TelegramPoller
+from .welcome_templates import FeishuWelcomeDocument
 
 
 class PersonalBridge(Service):
@@ -46,6 +49,7 @@ class PersonalBridge(Service):
         self.connection_id = connection_id
         self.peer_ids = frozenset(map(str, peers))
         super().__init__(db_path, None, members=sorted(feishu.staff_ids), label_replies=True, **kwargs)
+        self.room_members_provider = getattr(feishu, "group_members", None)
         try:
             policy = TelegramPersonal(expected_owner_id=owner, allowed_chat_ids=peers)
             self.telegram = TelegramPoller(api, policy, self.store, connection_id, clock=self.clock)
@@ -111,6 +115,19 @@ class PersonalBridge(Service):
                 "SELECT * FROM conversations WHERE room_id=? AND room_status='ready'", (room_id,)).fetchone()
             return row is not None and self._valid_conversation(row)
 
+    @property
+    def management_enabled(self):
+        with self.store.lock:
+            return self.store.db.execute("SELECT 1 FROM management_config WHERE singleton=1").fetchone() is not None
+
+    def _room_staff_member(self, chat_id, user_id):
+        if not self.management_enabled:
+            return user_id in self.feishu.staff_ids
+        with self.store.lock:
+            return self.store.db.execute("""SELECT 1 FROM members JOIN conversations
+                ON conversations.id=members.conversation_id
+                WHERE conversations.room_id=? AND members.user_id=?""", (chat_id, user_id)).fetchone() is not None
+
     def receive_telegram(self, payload):
         event = payload.event
         if (event.channel != "telegram" or event.account_id != self.connection_id or event.chat_id not in self.peer_ids
@@ -122,14 +139,23 @@ class PersonalBridge(Service):
 
     def receive_feishu(self, event):
         if (event.channel != "feishu" or event.account_id != self.feishu.app_id
-                or event.user_id not in self.feishu.staff_ids or event.event_type != "message"
+                or event.event_type != "message"
                 or event.timestamp < self.started_at or not self.room_allowed(event.chat_id)):
+            return
+        control = (event.text.lstrip().startswith(("/", "／")) and not event.has_mentions
+                   and "@" not in event.text and "＠" not in event.text)
+        if control and self.management_enabled:
+            actual = self.feishu.group_members(event.chat_id)
+            self.sync_room_members(event.chat_id, actual)
+            if event.user_id not in actual:
+                return
+        elif not self._room_staff_member(event.chat_id, event.user_id):
             return
         return self.ingest(replace(event, sender_name="OmniService"))
 
     def receive_card_action(self, event):
         if (not self.approval_cards or event.app_id != self.feishu.app_id
-                or event.user_id not in self.feishu.staff_ids or not self.room_allowed(event.chat_id)):
+                or not self.room_allowed(event.chat_id) or not self._room_staff_member(event.chat_id, event.user_id)):
             return
         return self.decide_draft(event)
 
@@ -162,12 +188,18 @@ class PersonalBridge(Service):
             raise ChannelError("unsupported")
         channel, operation = item["channel"], item["operation"]
         payload = json.loads(item["payload"])
+        management = self._management(db) is not None
+        if management or (self.managed and channel == "feishu" and operation == "create_room"):
+            members = frozenset(row[0] for row in db.execute(
+                "SELECT user_id FROM members WHERE conversation_id=?", (conv["id"],)))
+        if management:
+            payload["feishu_staff_ids"] = members
         if self.managed and channel == "feishu" and operation == "create_room":
-            members = {row[0] for row in db.execute(
-                "SELECT user_id FROM members WHERE conversation_id=?", (conv["id"],))}
-            if conv["room_id"] is None and conv["room_status"] == "pending" and members == self.feishu.staff_ids:
+            if (conv["room_id"] is None and conv["room_status"] == "pending"
+                    and (management or members == self.feishu.staff_ids)):
                 return payload
-        if operation == "send" and channel in ("telegram", "feishu"):
+        if (operation == "send" and channel in ("telegram", "feishu")
+                or operation == 'update_card' and channel == 'feishu'):
             if conv["room_id"] is not None and conv["room_status"] == "ready":
                 return payload
             if self.managed and channel == "telegram" and payload.get("mandatory_welcome") is True:
@@ -182,17 +214,22 @@ class PersonalBridge(Service):
         connection = self.telegram.refresh()
         if not connection.enabled or not connection.can_reply:
             raise ChannelError("authorization_failed")
+        staff_options = {"staff_ids": request["feishu_staff_ids"]} if "feishu_staff_ids" in request else {}
         if item["channel"] == "feishu":
             if item["operation"] == "create_room":
-                room = self.feishu.create_room(request["name"], item["operation_key"])
+                room = self.feishu.create_room(request["name"], item["operation_key"], **staff_options)
                 with self.store.lock:
                     if self.store.db.execute("SELECT 1 FROM conversations WHERE room_id=?", (room,)).fetchone():
                         raise ChannelError("delivery_unknown")
                 return room
-            options = {"chat_id": conv["room_id"]} if self.managed else {}
+            options = dict(staff_options)
+            if self.managed:
+                options["chat_id"] = conv["room_id"]
             if "card" in request:
                 if not self.approval_cards:
                     raise ChannelError("approval_cards_disabled")
+                if item['operation'] == 'update_card':
+                    return self.feishu.patch_card(request['card_message_id'], request['card'], **options)
                 return self.feishu.send_card(request["card"], item["operation_key"], **options)
             if request.get("mention_all") is True:
                 options["mention_all"] = True
@@ -200,13 +237,20 @@ class PersonalBridge(Service):
                 options["mention_user_id"] = request["mention_user_id"]
             return self.feishu.send(request["text"], item["operation_key"], **options)
         if self.managed and conv["room_id"] is not None:
-            self.feishu.preflight(conv["room_id"])
+            self.feishu.preflight(conv["room_id"], **staff_options)
         elif not self.managed:
-            self.feishu.preflight()
+            self.feishu.preflight(**staff_options)
+        text, photo = request["text"], request.get("welcome_photo")
         method, payload = self.telegram.policy.send_payload(
-            connection.connection_id, int(conv["chat_id"]), request["text"],
+            connection.connection_id, int(conv["chat_id"]), (text or ".") if photo is not None else text,
             last_incoming_at=conv["last_customer_at"], now=self.clock())
-        result = self.api.call(method, payload)
+        if photo is not None:
+            result = self.api.send_welcome_photo(payload["business_connection_id"], payload["chat_id"], photo,
+                                                 caption=text)
+        else:
+            if "welcome_html" in request:
+                payload.update(text=request["welcome_html"], parse_mode="HTML")
+            result = self.api.call(method, payload)
         chat = result.get("chat") if isinstance(result, dict) else None
         if (not isinstance(chat, dict) or chat.get("id") != payload["chat_id"]
                 or result.get("business_connection_id") != payload["business_connection_id"]
@@ -242,7 +286,7 @@ def discover_connections(api):
              "enabled": c.enabled, "can_reply": c.can_reply} for c in connections.values()]
 
 
-def run(bridge):
+def run(bridge, *, admin_server=None):
     stop = threading.Event()
     events = queue.Queue(maxsize=64)
 
@@ -260,14 +304,23 @@ def run(bridge):
                 print(f"Feishu {source}:", exc.code, flush=True)
                 stop.wait(3)
 
-    message_options = {"room_allowed": bridge.room_allowed} if bridge.managed else {}
+    managed_membership = bridge.management_enabled
+    message_options = {"room_allowed": bridge.room_allowed} if bridge.managed or managed_membership else {}
+    card_options = {"room_allowed": bridge.room_allowed}
+    if managed_membership:
+        message_options["managed_membership"] = card_options["managed_membership"] = True
     consumers = [("message", bridge.feishu.events, message_options)]
     if bridge.approval_cards:
-        consumers.append(("card", bridge.feishu.card_events, {"room_allowed": bridge.room_allowed}))
+        consumers.append(("card", bridge.feishu.card_events, card_options))
     threads = [threading.Thread(target=receive, args=consumer, daemon=True) for consumer in consumers]
-    for thread in threads:
-        thread.start()
+    admin_thread = None
     try:
+        for thread in threads:
+            thread.start()
+        if admin_server is not None:
+            admin_thread = threading.Thread(target=admin_server.serve_forever, name="omni-admin")
+            admin_thread.start()
+            print("OmniService management web started.", flush=True)
         print("OmniService Telegram–Feishu bridge started. Translation:", bridge.language.provider_name,
               "Intake:", "on" if bridge.intake_enabled else "off",
               "Approval cards:", "on" if bridge.approval_cards else "off",
@@ -288,19 +341,23 @@ def run(bridge):
                     source, event = events.get_nowait()
                 except queue.Empty:
                     break
-                if source == "card":
-                    try:
+                try:
+                    if source == "card":
                         bridge.receive_card_action(event)
-                    except ChannelError as exc:
-                        print("Feishu card action:", exc.code, flush=True)
-                else:
-                    bridge.receive_feishu(event)
+                    else:
+                        bridge.receive_feishu(event)
+                except ChannelError as exc:
+                    print(f"Feishu {source}:", exc.code, flush=True)
             for outcome in bridge.drain():
                 print("Delivery:", outcome["id"], outcome["status"], flush=True)
     finally:
         stop.set()
+        if admin_thread is not None and admin_thread.ident is not None:
+            admin_server.shutdown()
+            admin_thread.join()
         for thread in threads:
-            thread.join(timeout=4)
+            if thread.ident is not None:
+                thread.join(timeout=4)
 
 
 def translation_provider(config):
@@ -334,6 +391,33 @@ def agent_provider(config, language, *, approval_intake):
     if not callable(advisor):
         raise ChannelError("invalid_agent_config")
     return advisor, enabled
+
+
+def management_providers(config, feishu):
+    if config is None:
+        return None
+    if not isinstance(config, dict) or type(config.get("enabled", True)) is not bool:
+        raise ChannelError("invalid_management_config")
+    if not config.get("enabled", True):
+        return None
+    admins = config.get("admin_ids")
+    host, port = config.get("bind_host", "127.0.0.1"), config.get("port", 8081)
+    document = config.get("welcome_document", "")
+    secret_env, signing_env = config.get("app_secret_env"), config.get("signing_key_env")
+    if (not isinstance(admins, list) or not 1 <= len(admins) <= 50
+            or not all(isinstance(admin, str) and re.fullmatch(r"ou_[A-Za-z0-9_]{1,125}", admin)
+                       for admin in admins)
+            or len(set(admins)) != len(admins) or not isinstance(host, str)
+            or re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host) is None
+            or type(port) is not int or not 1 <= port <= 65535
+            or not isinstance(document, str) or len(document) > 1500
+            or any(not isinstance(name, str) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is None
+                   for name in (secret_env, signing_env)) or secret_env == signing_env):
+        raise ChannelError("invalid_management_config")
+    identity = FeishuAdminAuth(app_id=feishu.app_id, app_secret=os.environ.get(secret_env),
+                               tenant_key=config.get("tenant_key"), callback_url=config.get("callback_url"),
+                               signing_key=os.environ.get(signing_env))
+    return {"identity": identity, "admin_ids": admins, "host": host, "port": port, "welcome_document": document}
 
 
 def main():
@@ -399,6 +483,12 @@ def main():
                 or any(type(peer) is not int or peer <= 0 or peer == connection.owner_id for peer in peers)
                 or len(set(peers)) != len(peers)):
             raise ChannelError("invalid_test_contact")
+        preview_peers = telegram.get("welcome_preview_chat_ids", [])
+        if (not isinstance(preview_peers, list)
+                or any(type(peer) is not int or peer not in peers for peer in preview_peers)
+                or len(set(preview_peers)) != len(preview_peers)):
+            raise ChannelError("invalid_welcome_preview_contact")
+        management = management_providers(config.get("management"), feishu)
         language = translation_provider(config["translation"])
         intake, intake_enabled = intake_provider(config.get("intake", {}), language)
         intake_enabled = managed or intake_enabled
@@ -408,7 +498,8 @@ def main():
             audience = "Feishu application identity" if managed else "Feishu group"
             print("Telegram connection and", audience, "verified. Translation:", language.provider_name,
                   "Intake:", "on" if intake_enabled else "off", "Approval cards:", "on" if approval_cards else "off",
-                  "Agent default:", "on" if agent_enabled else "off")
+                  "Agent default:", "on" if agent_enabled else "off",
+                  "Management configuration:", "present" if management else "disabled")
             return 0
         os.umask(0o077)
         args.db.parent.mkdir(parents=True, exist_ok=True)
@@ -427,7 +518,16 @@ def main():
             try:
                 if not intake_enabled:
                     bridge.set_intake_enabled(False)
-                run(bridge)
+                if management is None:
+                    run(bridge)
+                else:
+                    templates = FeishuWelcomeDocument(feishu.app_id, profile=feishu_config.get("profile"))
+                    with create_admin_server(bridge, management["identity"], templates,
+                                             host=management["host"], port=management["port"]) as server:
+                        bridge.configure_management(management["admin_ids"],
+                                                    welcome_document=management["welcome_document"],
+                                                    preview_peers=preview_peers)
+                        run(bridge, admin_server=server)
             finally:
                 bridge.close()
         return 0

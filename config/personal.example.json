@@ -5,6 +5,7 @@
     "connection_id": "",
     "expected_owner_id": null,
     "allowed_chat_ids": [],
+    "welcome_preview_chat_ids": [],
     "bot_token_env": "TELEGRAM_BOT_TOKEN"
   },
   "feishu": {
@@ -15,6 +16,17 @@
     "handoff_staff_id": null,
     "approval_cards": true,
     "allowed_bot_app_ids": []
+  },
+  "management": {
+    "enabled": false,
+    "admin_ids": [],
+    "tenant_key": "",
+    "callback_url": "",
+    "app_secret_env": "OMNI_FEISHU_APP_SECRET",
+    "signing_key_env": "OMNI_ADMIN_SIGNING_KEY",
+    "bind_host": "127.0.0.1",
+    "port": 8081,
+    "welcome_document": ""
   },
   "translation": {
     "mode": "private-model",

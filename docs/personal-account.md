@@ -80,6 +80,16 @@ Mac arm64 / Python 3.12.16 通过上面的运行入口，使用真实 Telegram�
 
 真实托管入口默认启用 `feishu.approval_cards`。飞书后台需配置长连接回调 `card.action.trigger`，CLI 的卡片回调需 `im:message:readonly`。原 `/approve` 指令在卡片模式下只提示使用对应卡片。[卡片交互说明](https://open.feishu.cn/document/feishu-cards/configuring-card-interactions)
 
+批准、拒绝或取消后，OmniService 更新原卡片标题并禁用两个按钮。批准标题表示已决定发送，实际送达按平台回执记录。已保存的终态可在重启后补写；重复点击不会再产生外发或再更新一次。Mac 真实试点确认两种按钮都置灰，Telegram 只收到获准的同版俄文。本机证据见 `artifacts/personal-pilot/mac-card-approval-acceptance.json`。
+
+### 图形化管理台与逐命令权限
+
+个人桥接进程可同时提供 `/admin/` 管理页。按 `config/personal.example.json` 设置 `management.enabled`、初始管理员 Open ID、飞书租户标识、OAuth 回调地址和模板文档。监听默认 `127.0.0.1:8081`，`OMNI_FEISHU_APP_SECRET` 与 `OMNI_ADMIN_SIGNING_KEY` 从进程环境读取。独立浏览器和飞书工作台内的网页入口使用同一个 `/admin/`；工作台入口及 OAuth 回调需在同一飞书自建应用里登记，面向员工的地址用 HTTPS。 [飞书工作台接入](https://open.feishu.cn/document/embed-web-app-into-feishu-workbench/step-1-create-and-configure-an-app)
+
+管理员可维护新会话的默认员工名单、交接负责人、Agent 和标签开关，并单独设置每条命令适用本群成员、员工或仅管理员。命令默认允许当前群成员执行，网页和群内操作共用检查，普通成员只可操作核实过的对应群。普通对客发送和审批仍限定为该会话授权客服。新会话保存建群时的默认值、员工名单和已发布模板版本。之后编辑默认值或回退模板，只影响新会话。
+
+管理员可打开指定飞书文档、读取完整预览并冻结版本，发布时选该版本，回退时选已发布过的版本。预览可选显式列入 `telegram.welcome_preview_chat_ids` 的测试会话发送，预览名单必须是 Telegram 允许名单的子集。文本保留标题、列表、强调及链接的可映射格式，图片由应用从文档资源读取后通过 Telegram `sendPhoto` 发送。真实 Telegram 业务连接已收到合成测试图片及匹配的说明。完整管理台使用本地模拟飞书身份和平台验收，真实工作台入口、真实 OAuth 及目标飞书文档读权待配置。 [Telegram 图片接口](https://core.telegram.org/bots/api#sendphoto)
+
 `/标签 开`、`/标签 关`、`/标签 状态` 只控制飞书新消息的来源标识，默认关闭。开启后显示 `[用户]`、`[AI]` 或 `[同事]`。审批预览仍显示完整对客译文和 Telegram 标签，便于对照实际发出的版本。配置允许额外内部群机器人时，通过 `feishu.allowed_bot_app_ids` 指定并核对成员名单。
 
 每日主动推送、群晨报、飞书每日文档和会话知识库留在后续范围。[历史会话本体规划](intake-knowledge.md)

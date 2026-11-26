@@ -14,3 +14,4 @@ ts	phase	decision	why	evidence	result
 2026-11-26T10:58:52+08:00	ci	单独登记GitHub Actions执行前失败	Job未运行任何step且日志不存在，当前未获得注释不能猜测根因	https://github.com/reknottycat/omni-service/actions/runs/45745662203	CI blocked; Linux mock acceptance passed
 2026-11-26T11:00:05+08:00	delivery	创建ready-for-review PR #2并完成P0进度回链	用户需要可审查交付和单一工作追踪；合并与远端CI单独记录	https://github.com/reknottycat/omni-service/pull/2	P0 done; PR open; CI blocked
 2026-11-26T14:19:10+08:00	architecture	先验收单会话 Telegram–飞书文字桥接	指定会话隔离、复用队列和原账号投递	docs/personal-account.md	111 Linux tests passed; live contact binding pending
+2026-11-26T16:08:52+08:00	architecture	DGX 的 Telegram 请求使用美国 SSH 主机转发	DGX 直连 Telegram 超时且美国出口实测成功	docs/personal-account.md	Telegram API verified; live relay pending

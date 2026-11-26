@@ -63,3 +63,13 @@ DGX 私有模型 `qwen3-vl:4b-instruct` 已经通过桥接翻译入口实测两�
 备选官方 [Telegram Desktop 7.4.6](https://github.com/telegramdesktop/tdesktop/releases/tag/v7.4.6)。[该版本源码](https://github.com/telegramdesktop/tdesktop/blob/v7.4.6/Telegram/SourceFiles/settings/sections/settings_business.cpp#L506-L516)对免费用户开放 Telegram Business 菜单下的 Chatbots，和本机 App Store 原生 Telegram 的菜单实现不同。在两者都不可用时，[TDLib](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_business_connected_bot.html)可以通过由本人授权的临时用户会话完成一次账号绑定；该方案尚未在本机测试。
 
 [Vercel Chat SDK 的 Telegram 适配器](https://github.com/vercel/chat/blob/e490e84f01dbf477a5d1a9e7eec16c3fe72a31ac/packages/adapter-telegram/src/index.ts#L1172-L1225)按连接 ID 和聊天 ID 隔离会话并过滤机器人回环。[Chatwoot 开发分支](https://github.com/chatwoot/chatwoot/blob/38258d313d147657be00acb4a5d7f6060422e34d/app/services/telegram/incoming_message_service.rb#L105-L118)持久化连接 ID，[回复时将其放入请求](https://github.com/chatwoot/chatwoot/blob/38258d313d147657be00acb4a5d7f6060422e34d/app/models/channel/telegram.rb#L157-L169)。OmniService 采用同一 Bot API 协议，入站用本机长轮询，无需公网 Webhook。当前缺口是原个人账号完成首次授权。
+
+## DGX Linux 运行
+
+Web K 或桌面客户端只做一次 Telegram 账号授权。DGX 上同一个桥接进程负责 Telegram 长轮询、飞书长连接及双向消息队列；翻译使用 DGX 的 `http://127.0.0.1:11434/v1`。飞书在 Linux 上配置应用身份，按测试群名单预检。`lark-cli` 1.0.99 官方 Linux arm64 二进制已在隔离目录核对 SHA256、版本和消息事件 schema；Linux 应用凭据尚未配置。
+
+DGX 直连 Telegram 超时，飞书 HTTPS 和本机翻译已通。使用 DGX 已配置的美国 SSH 主机，以 `ssh -N -T -o ExitOnForwardFailure=yes -L 127.0.0.1:37892:api.telegram.org:443 <美国主机别名>` 建立转发，再给桥接进程设置 `TELEGRAM_TLS_TUNNEL_PORT=37892`。这是 Telegram 专用转发，程序仍校验 Telegram 的 TLS 证书。若部署改用私网 HTTP CONNECT 代理，可单独配置 `TELEGRAM_HTTPS_PROXY`，两个配置互斥。
+
+已实测从 DGX 经美国主机调用 `getMe` 和 `getWebhookInfo` 成功，且确认 Secretary Mode 开启。测试结束已关闭临时转发。待原账号授权和 Linux 飞书凭据配置后，先验证真实文字双向收发，再将隧道和桥接进程设为长期运行并复测重启。整个链路只运行一个 Telegram 长轮询实例。
+
+包含美国 SSH 转发支持的提交 `cdb3bfc` 在 DGX 完整模拟验收通过 118 项，源码指纹 `58d0416af863da4c277945077cd2e7ef68148613de75d9b0fc235beb63179a87`。原始报告与日志见本机 `artifacts/dgx-us-egress-20261126/`。

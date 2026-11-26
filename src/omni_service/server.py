@@ -26,6 +26,11 @@ def create_server(service, *, host="127.0.0.1", port=0,
     if not admin_token:
         raise ValueError("An admin token is required")
     account_secrets = dict(DEFAULT_ACCOUNTS if accounts is None else accounts)
+    feishu_accounts = [account for channel, account in account_secrets if channel == 'feishu']
+    if len(feishu_accounts) == 1:
+        service.feishu_account_id = feishu_accounts[0]
+    elif feishu_accounts and service.feishu_account_id not in feishu_accounts:
+        raise ValueError('Select an explicit configured Feishu account for room routing')
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "OmniServiceSimulation/0.1"

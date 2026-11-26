@@ -53,10 +53,15 @@ class RecordingResult(unittest.TextTestResult):
 
 def source_manifest():
     files = []
-    for folder in ("src", "tests", "scripts", "fixtures", ".github/workflows"):
+    for folder in ("src", "tests", "scripts", "fixtures", "config", "deploy", ".github/workflows"):
         for path in sorted((ROOT / folder).rglob("*")):
-            if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"}:
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"} and not path.name.endswith(".local.json"):
                 files.append({"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    for name in ("pyproject.toml", "requirements-live.txt", ".env.example"):
+        path = ROOT / name
+        if path.is_file():
+            files.append({"path": name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    files.sort(key=lambda item: item["path"])
     digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
     return digest, files
 
@@ -69,7 +74,7 @@ def main():
     if sys.version_info < (3, 12):
         print("Python 3.12 or newer is required.", file=sys.stderr)
         return 2
-    required = {"test_channels.py", "test_language.py", "test_service.py", "test_http.py", "test_transport.py"}
+    required = {"test_channels.py", "test_language.py", "test_service.py", "test_http.py", "test_transport.py", "test_personal_service.py", "test_personal_runtime.py", "test_personal_demo.py", "test_model_provider.py", "test_live_clients.py", "test_feishu_live.py"}
     missing = sorted(name for name in required if not (ROOT / "tests" / name).is_file())
     if missing:
         print(f"Missing acceptance modules: {missing}", file=sys.stderr)
@@ -86,17 +91,17 @@ def main():
     source_consistent = digest_before == digest
     success = result.wasSuccessful() and result.testsRun > 0 and not result.skipped and source_consistent
     report = {
-        "schema": 1, "scope": "P0-linux-mock", "mode": "simulation",
+        "schema": 2, "scope": "P0+P1-linux-offline", "mode": "simulation",
         "passed": success, "tests": result.testsRun,
         "failures": len(result.failures), "errors": len(result.errors), "skipped": len(result.skipped),
         "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "environment": {"system": platform.system(), "release": platform.release(),
                         "machine": platform.machine(), "python": platform.python_version(),
                         "sqlite": sqlite3.sqlite_version},
-        "source_commit": commit, "source_sha256": digest, "source_files": files,
+        "source_commit": commit, "worktree_dirty": bool(subprocess.run(["git", "status", "--porcelain"], cwd=ROOT, capture_output=True, text=True).stdout.strip()), "source_sha256": digest, "source_files": files,
         "source_consistent": source_consistent,
         "seconds": round(time.monotonic() - start, 3), "cases": result.cases,
-        "limits": ["No live platform credentials or customer messages", "Deterministic translation and AI fixtures",
+        "limits": ["No live platform credentials or customer messages", "Real model HTTP clients tested against synthetic responses; no M6/DGX quality claim", "Feishu official SDK smoke is separate from this standard-library gate", "WhatsApp/MAX personal-account live routes remain blocked",
                    "No production capacity or model quality claim", "Media binary relay remains a separate milestone"]}
     output = ROOT / "artifacts"
     output.mkdir(exist_ok=True)

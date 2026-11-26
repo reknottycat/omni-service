@@ -2,9 +2,9 @@
 
 ## 目标和优先级
 
-本仓库为用户的跨平台 AI 客服系统。当前阶段为 **P0 · Linux 三渠道模拟闭环**：Telegram、俄罗斯 MAX、WhatsApp 为客户入口；7 人团队使用飞书；自动识别客户语言并翻译员工普通消息；支持 AI/人工接管、持久会话、可靠路由和准确的撤回结果。
+本仓库为用户的跨平台 AI 客服系统。P0 三渠道模拟验收已交付；当前阶段为 **P1 · 个人账号桥接的可运行开发**：客户添加原有个人账号，7 人员工在飞书普通发言，自动识别客户语言并翻译，AI/人工接管、持久会话及准确撤回。
 
-用户已明确：**本轮使用模拟数据在 Linux 上通过即可完成验收。** 真实账号、生产部署、真实模型、翻译质量、完整媒体或 Chatwoot/NextBridge 正式联调不是本轮必要门禁。不得虚称这些后续范围已完成。
+用户最新授权：**把不依赖登录和密钥、当前能够开发的部分全部开发完成，直接更新仓库。** 以 Linux 模拟平台和模型完成开发验收。Telegram 原账号使用官方 connected-account 能力，飞书使用官方长连接。WhatsApp 普通个人账号未选择可用接入路线、MAX 原账号桥接受平台条件限制；不得用 Bot 模拟冒充私人账号接通。真实账号、模型质量、部署与二进制媒体仍须分别报告，不虚构完成。
 
 用户的新指令优先于本文件与参考技能。请直接推进已授权的可逆工作，不反复要求确认。
 
@@ -23,17 +23,20 @@
 - 模拟翻译/AI 必须显式标记；翻译失败不能静默以原文冒充目标语言成功。
 - 撤回状态区分 `cancelled`（发送前取消）、`deleted`、`unsupported`、`failed`、`unknown`。平台没有能力时不得虚构成功。
 - 对无法确定是否已投递的请求保留 `unknown`，不盲目重复发送。
+- 个人账号白名单默认拒绝，在入队、调用模型、外发及重试前检查；原账号本人回复暂停 AI，不再次代发；回调只做快速持久入队。
+- 已接收的撤回优先取消尚未发送的原消息；已知消息的删除不被其他消息的不确定发送阻塞。
+- 真实密钥只在本机环境变量或 0600 环境文件；不写入配置 JSON、数据库、日志、测试证据或 Git。
 - webhook 重放、批量事件、错误账号、成员权限、限流和重启按合同验证。
 
 ## 实现和验证
 
 先冻结数据契约，再并行不共享文件的任务。共享文件和 `docs/decisions.tsv` 由协调负责人写入；子代理只能修改分配的文件。
 
-完整复验为 `bash scripts/acceptance.sh`；HTTP 演示为 `python scripts/demo.py`。应真实运行 HTTP 入口、SQLite 队列与本地假平台。检查公开行为和外部假服务收到的请求，不能只检查 helper 调用或编译。
+完整复验为 `bash scripts/acceptance.sh`；P0 演示 `python scripts/demo.py`，P1 演示 `python scripts/demo_personal.py`。官方 SDK 单独检查为 `PYTHONPATH=src python tests/test_feishu_live.py --official-sdk-smoke`（先安装 `requirements-live.txt`）。应真实运行 HTTP 客户端、SQLite 队列与本地假平台。检查外部假服务实际收到的请求，不能只检查 helper 调用或编译。
 
-结果写入 `artifacts/acceptance.json`，归档到 `docs/evidence/linux-mock-acceptance.md`。证据绑定被测版本、环境、命令、结果和 AC ID。没有运行或结果不确定，不得勾选通过。只为具体风险或合同门禁增加测试，满足目标后收口。
+结果写入 `artifacts/acceptance.json`，P1 归档到 `docs/evidence/personal-acceptance.md`；保留 P0 历史证据。证据绑定被测源码摘要、环境、命令、结果和 AC ID。没有运行或结果不确定，不得勾选通过。只为具体风险或合同门禁增加测试，满足目标后收口。
 
-Chatwoot/NextBridge 为计划中的底座；当前独立 adapter runtime 是 Linux 协议验收台，不宣称已完成两者联调。保留 `docs/acceptance.md` 中的后续产品待办。
+当前交付使用独立 adapter runtime，不依赖 Chatwoot/NextBridge；不宣称已完成两者联调。保留 `docs/acceptance.md` 中未被本阶段覆盖的后续产品待办。
 
 ## 追踪与交付
 

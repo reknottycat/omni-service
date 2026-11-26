@@ -1,4 +1,4 @@
-name: Linux mock acceptance
+name: Linux bridge acceptance
 on:
   push:
     branches: [main, "feature/**"]
@@ -20,6 +20,12 @@ jobs:
           python-version: "3.12"
       - name: Run Linux mock acceptance
         run: bash scripts/acceptance.sh
+      - name: Verify pinned official Feishu SDK without external accounts
+        run: |
+          python -m pip install -r requirements-live.txt
+          PYTHONPATH=src python tests/test_feishu_live.py --official-sdk-smoke | tee artifacts/sdk-smoke.json
+      - name: Record personal account demonstration
+        run: python scripts/demo_personal.py > artifacts/personal-demo.json
       - name: Preserve report and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

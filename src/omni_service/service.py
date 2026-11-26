@@ -23,12 +23,14 @@ def _id(prefix):
 
 class Service:
     def __init__(self, db_path, transport, *, clock=time.time,
-                 members=tuple(f'employee-{n}' for n in range(1, 8)), language=None):
+                 members=tuple(f'employee-{n}' for n in range(1, 8)), language=None,
+                 feishu_account_id='team-1'):
         self.store = Store(db_path)
         self.transport = transport
         self.clock = clock
         self.default_members = tuple(dict.fromkeys(members))
         self.language = language or SimulationLanguage()
+        self.feishu_account_id = feishu_account_id
         self._drain_lock = threading.Lock()
 
     def close(self):
@@ -97,21 +99,23 @@ class Service:
                         {'text': display, 'recipient_type': conv['recipient_type']}, mid)
         elif status != 'media_pending':
             self._audit(db, cid, status, {'message_id': mid})
-            notice = ('模拟翻译未收录此短语，消息未发送，请修改内容后重试。'
+            notice = ('翻译未完成，消息未发送；请检查翻译服务后重试。'
                       if status == 'translation_unavailable' else 'WhatsApp 客服窗口已过期，消息未发送，需要获批模板。')
             self._notify(db, cid, status + ':' + mid, notice + ' 消息 ' + mid)
         else:
-            self._notify(db, cid, 'media:' + mid, '媒体已保存，等待目的平台上传适配，尚未发送。消息 ' + mid)
+            self._notify(db, cid, 'media:' + mid, '已记录媒体信息，当前版本尚未转发媒体文件。消息 ' + mid)
         return mid, status
 
     def _mirror(self, db, conv, message):
         if conv['room_status'] == 'absent' or message['status'] == 'deleted':
             return
+        if db.execute('SELECT 1 FROM outbox WHERE operation_key=?', ('mirror:' + message['id'],)).fetchone():
+            return
         text = message['original']
         try:
             translated = self.language.translate(text, message['language'], 'zh')
         except ChannelError:
-            translated = '[模拟翻译未收录此短语]'
+            translated = '[翻译暂不可用，请查看原文]'
         if message['kind'] == 'media':
             text = '[媒体待转码/上传] ' + text
         body = f"{message['sender_name'] or '客户'} ({conv['channel']}): {text}"
@@ -122,11 +126,13 @@ class Service:
     def _mirror_ai(self, db, conv, message):
         if conv['room_status'] == 'absent' or message['status'] != 'sent':
             return
+        if db.execute('SELECT 1 FROM outbox WHERE operation_key=?', ('history-ai:' + message['id'],)).fetchone():
+            return
         customer_text = message['translated']
         try:
             chinese = self.language.translate(customer_text, message['language'], 'zh')
         except ChannelError:
-            chinese = '[模拟翻译未收录此短语]'
+            chinese = '[翻译暂不可用，请查看原文]'
         body = 'AI → 客户: ' + customer_text
         if chinese and chinese != customer_text:
             body += '\n中文: ' + chinese
@@ -143,6 +149,14 @@ class Service:
                             {'external_id': mirror['external_id']})
 
     def _handoff(self, db, cid, staff_ids=None):
+        result = self._ensure_room(db, cid, staff_ids)
+        self._cancel_ai(db, cid)
+        db.execute("UPDATE conversations SET mode='manual' WHERE id=?", (cid,))
+        self._audit(db, cid, 'handoff', {'members': result['members']})
+        return {'status': 'manual', 'conversation_id': cid, 'room_status': result['room_status']}
+
+    def _ensure_room(self, db, cid, staff_ids=None):
+        """Create the staff room without changing the AI/manual conversation mode."""
         conv = self._conversation(db, cid)
         selected = tuple(dict.fromkeys(staff_ids if staff_ids is not None else self.default_members))
         if not selected or any(not isinstance(s, str) or not s for s in selected):
@@ -152,21 +166,21 @@ class Service:
             if inserted and conv['room_id']:
                 self._queue(db, cid, 'feishu', 'add_member', 'member:' + cid + ':' + staff,
                             {'members': [staff]})
-        self._cancel_ai(db, cid)
-        db.execute("UPDATE conversations SET mode='manual' WHERE id=?", (cid,))
         if conv['room_status'] == 'absent':
-            db.execute("UPDATE conversations SET room_status='pending' WHERE id=?", (cid,))
+            if not isinstance(self.feishu_account_id, str) or not self.feishu_account_id:
+                raise ChannelError('invalid_account', 'The Feishu account must be configured before creating a room.')
+            db.execute("UPDATE conversations SET room_status='pending',feishu_account_id=? WHERE id=?",
+                       (self.feishu_account_id, cid))
             self._queue(db, cid, 'feishu', 'create_room', 'room:' + cid,
                         {'name': 'OmniService ' + cid[-8:]})
         conv = self._conversation(db, cid)
         for row in db.execute('SELECT * FROM messages WHERE conversation_id=? ORDER BY rowid', (cid,)).fetchall():
             message = dict(row)
-            if message['direction'] == 'inbound':
+            if message['direction'] in ('inbound', 'owner'):
                 self._mirror(db, conv, message)
             elif message['author_id'] == 'AI':
                 self._mirror_ai(db, conv, message)
-        self._audit(db, cid, 'handoff', {'members': selected})
-        return {'status': 'manual', 'conversation_id': cid, 'room_status': conv['room_status']}
+        return {'members': selected, 'room_status': conv['room_status']}
 
     def handoff(self, conversation_id, staff_ids=None):
         with self.store.transaction() as db:
@@ -175,6 +189,24 @@ class Service:
     def add_member(self, conversation_id, staff_id):
         with self.store.transaction() as db:
             return self._handoff(db, conversation_id, [staff_id])
+
+    def retry_room(self, conversation_id):
+        """Explicitly retry a definitely failed room creation after setup fixes."""
+        with self.store.transaction() as db:
+            conv = self._conversation(db, conversation_id)
+            if conv['feishu_account_id'] != self.feishu_account_id:
+                raise ChannelError('forbidden')
+            if conv['room_status'] != 'failed' or conv['room_id']:
+                raise ChannelError('invalid_state', 'Only a definitely failed room creation may be retried.')
+            row = db.execute("SELECT * FROM outbox WHERE conversation_id=? AND operation='create_room'",
+                             (conversation_id,)).fetchone()
+            if row is None or row['status'] not in ('failed', 'cancelled'):
+                raise ChannelError('invalid_state')
+            db.execute("UPDATE outbox SET status='pending',attempts=0,available_at=?,last_error='' WHERE id=?",
+                       (self.clock(), row['id']))
+            db.execute("UPDATE conversations SET room_status='pending' WHERE id=?", (conversation_id,))
+            self._audit(db, conversation_id, 'room_retry_requested', {'outbox_id': row['id']})
+            return {'status': 'pending', 'conversation_id': conversation_id}
 
     def resume(self, conversation_id):
         with self.store.transaction() as db:
@@ -234,11 +266,15 @@ class Service:
         if event.event_type == 'delete':
             if existing is None:
                 return {'status': 'unknown_message', 'conversation_id': cid}
+            if existing['status'] == 'deleted' and existing['recall_status'] in ('deleted', 'cancelled'):
+                return {'status': 'deleted', 'conversation_id': cid, 'message_id': existing['id']}
             inflight = db.execute("SELECT 1 FROM outbox WHERE message_id=? AND operation='send' AND status='inflight'", (existing['id'],)).fetchone()
-            recall = 'pending' if (existing['external_id'] or inflight) else 'cancelled'
+            unknown = db.execute("SELECT 1 FROM outbox WHERE message_id=? AND operation='send' AND status='unknown'", (existing['id'],)).fetchone()
+            recall = ('delivery_unknown' if unknown and not existing['external_id'] else
+                      'pending' if (existing['external_id'] or inflight) else 'cancelled')
             db.execute("UPDATE messages SET status='deleted',recall_status=? WHERE id=?", (recall, existing['id']))
-            db.execute("UPDATE outbox SET status='cancelled' WHERE message_id=? AND status='pending'", (existing['id'],))
-            db.execute("UPDATE outbox SET status='cancelled' WHERE status='pending' AND message_id IN (SELECT id FROM messages WHERE parent_id=?)", (existing['id'],))
+            db.execute("UPDATE outbox SET status='cancelled' WHERE message_id=? AND operation='send' AND status='pending'", (existing['id'],))
+            db.execute("UPDATE outbox SET status='cancelled' WHERE operation='send' AND status='pending' AND message_id IN (SELECT id FROM messages WHERE parent_id=?)", (existing['id'],))
             db.execute("UPDATE messages SET status='cancelled' WHERE parent_id=? AND status='queued'", (existing['id'],))
             if existing['external_id'] and conv['room_id']:
                 self._queue(db, cid, 'feishu', 'delete', 'delete-mirror:' + existing['id'],
@@ -268,6 +304,9 @@ class Service:
             answer = self.language.reply(event.text, language) if not event.attachments else {'action': 'handoff'}
             if answer['action'] == 'reply':
                 self._outgoing(db, conv, answer['text'], parent_id=mid, already_translated=True)
+                grounding = {key: answer[key] for key in ('source_ids', 'knowledge_revision', 'synthetic_knowledge') if key in answer}
+                if grounding:
+                    self._audit(db, cid, 'ai_grounding', grounding)
             else:
                 self._handoff(db, cid)
         elif conv['mode'] == 'auto':
@@ -280,6 +319,8 @@ class Service:
         if row is None:
             raise ChannelError('unmapped_room', 'This Feishu room is not a customer conversation.')
         conv = dict(row)
+        if conv['feishu_account_id'] != event.account_id:
+            raise ChannelError('forbidden', 'The room belongs to a different Feishu account.')
         existing = db.execute("SELECT * FROM messages WHERE conversation_id=? AND source_channel='feishu' AND source_id=?",
                               (conv['id'], event.message_id)).fetchone()
         if event.event_type == 'delete':
@@ -312,7 +353,7 @@ class Service:
         if message['recall_status'] in ('pending', 'deleted', 'cancelled'):
             return {'status': message['recall_status'], 'message_id': mid, 'conversation_id': cid}
         inflight = db.execute("SELECT 1 FROM outbox WHERE message_id=? AND operation='send' AND status='inflight'", (mid,)).fetchone()
-        if message['status'] in ('queued', 'translation_unavailable', 'blocked_window', 'media_pending', 'failed') and not inflight:
+        if message['status'] in ('queued', 'cancelled', 'translation_unavailable', 'blocked_window', 'media_pending', 'failed') and not inflight:
             db.execute("UPDATE outbox SET status='cancelled' WHERE message_id=? AND status='pending'", (mid,))
             db.execute("UPDATE messages SET status='cancelled',recall_status='cancelled' WHERE id=?", (mid,))
             status = 'cancelled'
@@ -339,6 +380,54 @@ class Service:
     def recall(self, message_id, conversation_id, actor_id):
         with self.store.transaction() as db:
             return self._recall(db, message_id, conversation_id, actor_id)
+
+    def resolve_delivery(self, outbox_id, *, delivered, external_id='', evidence=''):
+        """Record an operator's checked outcome; never resend an unknown request.
+
+        The admin entrypoint must require authentication. ``delivered`` describes
+        the operation (including deletion), not merely message visibility.
+        """
+        if type(outbox_id) is not int or type(delivered) is not bool:
+            raise ChannelError('invalid_payload')
+        if (not isinstance(evidence, str) or not evidence.strip() or len(evidence) > 500
+                or any(c in evidence for c in ('\r', '\n', '\x00'))):
+            raise ChannelError('invalid_evidence', 'A short non-secret description of the checked result is required.')
+        with self.store.transaction() as db:
+            row = db.execute('SELECT * FROM outbox WHERE id=?', (outbox_id,)).fetchone()
+            if row is None:
+                raise ChannelError('not_found')
+            item = dict(row)
+            if item['status'] != 'unknown':
+                raise ChannelError('invalid_state', 'Only an unknown result can be manually resolved.')
+            if delivered:
+                if item['operation'] in ('send', 'create_room'):
+                    if (not isinstance(external_id, str) or not external_id or len(external_id) > 256
+                            or any(c.isspace() for c in external_id)):
+                        raise ChannelError('invalid_receipt')
+                    if item['channel'] == 'telegram' and (not external_id.isdecimal() or int(external_id) <= 0):
+                        raise ChannelError('invalid_receipt')
+                else:
+                    external_id = ''
+                self._success(db, item, external_id)
+                status = 'confirmed'
+            else:
+                db.execute("UPDATE outbox SET status='cancelled',last_error='operator_confirmed_no_effect' WHERE id=?", (outbox_id,))
+                if item['message_id']:
+                    if item['operation'] == 'delete':
+                        db.execute("UPDATE messages SET recall_status='failed' WHERE id=?", (item['message_id'],))
+                    elif item['operation'] == 'send':
+                        db.execute("""UPDATE messages SET
+                          status=CASE WHEN status='deleted' THEN status ELSE 'cancelled' END,
+                          recall_status=CASE WHEN recall_status='delivery_unknown' THEN 'cancelled' ELSE recall_status END
+                          WHERE id=?""", (item['message_id'],))
+                if item['operation'] == 'create_room':
+                    db.execute("UPDATE conversations SET room_status='failed' WHERE id=?", (item['conversation_id'],))
+                status = 'cancelled'
+            self._audit(db, item['conversation_id'], 'unknown_resolved',
+                        {'outbox_id': outbox_id, 'operation': item['operation'],
+                         'delivered': delivered, 'external_id': external_id,
+                         'evidence': evidence.strip(), 'automatic_retry': False})
+            return {'status': status, 'outbox_id': outbox_id, 'conversation_id': item['conversation_id']}
 
     def list_conversations(self):
         with self.store.lock:
@@ -371,19 +460,33 @@ class Service:
         return channels.send_request(channel, conv['account_id'], target, payload['text'],
                                      recipient_type=payload.get('recipient_type', 'chat'))
 
-    def drain(self):
+    def _response(self, item, conv, request, payload):
+        return channels.parse_response(item['channel'], item['operation'], payload)
+
+    def drain(self, *, limit=None, stop_event=None):
+        if limit is not None and (type(limit) is not int or limit < 1):
+            raise ChannelError('invalid_limit')
         outcomes = []
         with self._drain_lock:
             while True:
+                if ((limit is not None and len(outcomes) >= limit)
+                        or (stop_event is not None and stop_event.is_set())):
+                    break
                 with self.store.transaction() as db:
                     rows = db.execute("SELECT * FROM outbox WHERE status='pending' AND available_at<=? ORDER BY id", (self.clock(),)).fetchall()
                     item = conv = request = None
                     for candidate in rows:
+                        if ((limit is not None and len(outcomes) >= limit)
+                                or (stop_event is not None and stop_event.is_set())):
+                            break
                         c = self._conversation(db, candidate['conversation_id'])
                         if candidate['channel'] == 'feishu' and candidate['operation'] != 'create_room' and not c['room_id']:
                             continue
                         earlier = db.execute("SELECT 1 FROM outbox WHERE conversation_id=? AND channel=? AND id<? AND status IN ('pending','inflight','unknown')", (candidate['conversation_id'], candidate['channel'], candidate['id'])).fetchone()
-                        if earlier:
+                        # A known-receipt deletion is independent of an unrelated
+                        # uncertain send; do not leave a confirmed wrong message
+                        # visible while the operator investigates another item.
+                        if earlier and candidate['operation'] != 'delete':
                             continue
                         item, conv = dict(candidate), c
                         if item['channel'] == 'whatsapp' and item['operation'] == 'send' and self.clock() - c['last_customer_at'] >= 86400:
@@ -408,7 +511,7 @@ class Service:
                     break
                 try:
                     payload = self.transport.send(item['channel'], request)
-                    external_id = channels.parse_response(item['channel'], item['operation'], payload)
+                    external_id = self._response(item, conv, request, payload)
                 except ChannelError as exc:
                     with self.store.transaction() as db:
                         self._failure(db, item, exc)
@@ -456,7 +559,8 @@ class Service:
         elif item['operation'] == 'send' and item['message_id']:
             db.execute("UPDATE messages SET status=CASE WHEN status='deleted' THEN status ELSE 'sent' END,external_id=? WHERE id=?", (external_id, item['message_id']))
             msg = db.execute('SELECT * FROM messages WHERE id=?', (item['message_id'],)).fetchone()
-            if msg['recall_status'] == 'pending':
+            if msg['recall_status'] in ('pending', 'delivery_unknown'):
+                db.execute("UPDATE messages SET recall_status='pending' WHERE id=?", (msg['id'],))
                 key = ('delete-mirror:' if msg['direction'] == 'inbound' else 'recall:') + msg['id']
                 self._queue(db, item['conversation_id'], item['channel'], 'delete', key,
                             {'external_id': external_id}, msg['id'])

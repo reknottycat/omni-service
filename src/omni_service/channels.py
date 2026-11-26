@@ -376,9 +376,19 @@ def send_request(channel, account_id, chat_id, text, *, token="simulation-token"
         content = {"text": feishu_text(text, mention_all=mention_all, mention_user_id=mention_user_id)}
         if len(content["text"]) > 20000:
             raise ChannelError("invalid_payload", "Message exceeds platform text limit")
-    body = {"receive_id": chat_id, "msg_type": kind or "text",
+    return _feishu_send_request(chat_id, kind or "text", content, headers)
+
+
+def _feishu_send_request(chat_id, message_type, content, headers):
+    body = {"receive_id": chat_id, "msg_type": message_type,
             "content": json.dumps(content, ensure_ascii=False, separators=(",", ":"))}
     return Request("POST", "/open-apis/im/v1/messages?receive_id_type=chat_id", body, headers)
+
+
+def feishu_card_request(chat_id, card, token="simulation-token"):
+    if not isinstance(card, dict) or card.get("schema") != "2.0":
+        raise ChannelError("invalid_payload", "Expected a Feishu Card 2.0 document")
+    return _feishu_send_request(_id(chat_id, "chat_id"), "interactive", card, _headers("feishu", token))
 
 
 def delete_request(channel, account_id, chat_id, message_id, *, token="simulation-token") -> Request:

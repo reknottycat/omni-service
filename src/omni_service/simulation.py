@@ -151,6 +151,7 @@ class FakePlatforms:
             if method != "POST":
                 return 405, {"error": "wrong method"}, {}
             kind = "text"
+            card = None
             if channel == "telegram":
                 target = str(payload["chat_id"])
                 text = payload.get("text", payload.get("caption", ""))
@@ -185,6 +186,14 @@ class FakePlatforms:
                     return 400, {"code": 1, "msg": "unknown room"}, {}
                 kind = payload["msg_type"]
                 content = json.loads(payload["content"])
+                if not isinstance(content, dict):
+                    raise ValueError("Feishu message content must be an object")
+                if kind == "interactive":
+                    body = content.get("body")
+                    if (content.get("schema") != "2.0" or not isinstance(body, dict)
+                            or not isinstance(body.get("elements"), list)):
+                        raise ValueError("Feishu Card 2.0 payload required")
+                    card = content
                 text = content.get("text", "")
             if kind == "text" and (not isinstance(text, str) or not text):
                 raise ValueError("Nonempty text required")
@@ -192,8 +201,11 @@ class FakePlatforms:
             sequence = self.counter[channel]
             message_id = {"telegram": str(sequence), "max": f"mid.mock.{sequence}",
                           "whatsapp": f"wamid.mock.{sequence}", "feishu": f"om_mock_{sequence}"}[channel]
-            self.messages.append({"channel": channel, "target": str(target), "message_id": message_id,
-                                  "text": text, "kind": kind, "deleted": False})
+            record = {"channel": channel, "target": str(target), "message_id": message_id,
+                      "text": text, "kind": kind, "deleted": False}
+            if card is not None:
+                record["card"] = card
+            self.messages.append(record)
             results = {"telegram": {"ok": True, "result": {"message_id": int(sequence)}},
                        "max": {"message": {"body": {"mid": message_id}}},
                        "whatsapp": {"messages": [{"id": message_id}]},

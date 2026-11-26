@@ -33,6 +33,18 @@ class InboundEvent:
 
 
 @dataclass(frozen=True)
+class DraftDecision:
+    app_id: str
+    event_id: str
+    chat_id: str
+    user_id: str
+    message_id: str
+    draft_id: str
+    version: str
+    decision: str
+
+
+@dataclass(frozen=True)
 class Request:
     method: str
     path: str

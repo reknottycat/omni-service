@@ -6,6 +6,7 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlsplit
 
+from .approval_card import parse_feishu_card_action
 from .channels import parse_events, verify_webhook
 from .models import ChannelError
 
@@ -117,6 +118,11 @@ def create_server(service, *, host="127.0.0.1", port=0,
                         if not isinstance(challenge, str):
                             raise ChannelError("invalid_payload")
                         return self.respond(200, {"challenge": challenge})
+                    header = payload.get("header")
+                    if (channel == "feishu" and isinstance(header, dict)
+                            and header.get("event_type") == "card.action.trigger"):
+                        decision = parse_feishu_card_action(payload, app_id=account)
+                        return self.respond(200, {"accepted": 1, "results": [service.decide_draft(decision)]})
                     events = parse_events(channel, account, payload)
                     if any(e.channel != channel or e.account_id != account for e in events):
                         return self.respond(403, {"error": "account_mismatch"})
@@ -180,6 +186,7 @@ def main():
         intake = Intake(lambda _text, _fields: {}, max_replies=args.intake_max_replies, simulated=True)
     language = SimulationLanguage()
     service = Service(args.db, transport, language=language, intake=intake, approval_intake=intake is not None,
+                      approval_cards=intake is not None,
                       agent_advisor=language.suggest_reply if intake is not None else None)
     server = create_server(service, port=args.port)
     print(f"Simulation API: http://127.0.0.1:{server.server_port}; POST /api/drain to process queue", flush=True)

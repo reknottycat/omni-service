@@ -9,8 +9,10 @@ from pathlib import Path
 from unittest.mock import patch
 from uuid import UUID
 
+from omni_service.approval_card import build_approval_card, parse_feishu_card_action
+from omni_service.channels import feishu_card_request
 from omni_service.feishu_live import FeishuLive
-from omni_service.models import ChannelError
+from omni_service.models import ChannelError, DraftDecision
 
 
 _IDENTITY = {"appId": "cli_test", "brand": "feishu", "identity": "bot", "available": True}
@@ -20,6 +22,9 @@ _MEMBERS = {"chat_id": "oc_test", "users": [{"member_id": "ou_staff"}],
 _EVENT = {"type": "im.message.receive_v1", "chat_id": "oc_test", "chat_type": "group",
           "sender_id": "ou_staff", "sender_type": "user", "message_type": "text",
           "message_id": "om_test", "create_time": "1700000000000", "content": "收到"}
+_DRAFT_ID = "draft_" + "a" * 32
+_VERSION = "1234567890abcdef"
+_APPROVAL = {"omni_action": "approve", "draft_id": _DRAFT_ID, "version": _VERSION}
 
 
 def _data(value):
@@ -71,6 +76,48 @@ class FeishuLiveTest(unittest.TestCase):
             self.assertEqual(adapter.send("交接给客服", "handoff", mention_user_id="ou_staff"), "om_handoff")
         self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"],
                          '<at user_id="ou_staff"></at> 交接给客服')
+
+    def test_approval_card_preserves_preview_and_sends_interactive_message(self):
+        text = '[AI] Exact **plain preview**\nSecond line'
+        reference = '群内参考'
+        card = build_approval_card(draft_id=_DRAFT_ID, version=_VERSION, customer_text=text, reference=reference)
+        preview, context, *buttons = card["body"]["elements"]
+        self.assertEqual(preview["text"], {"tag": "plain_text", "content": text})
+        self.assertEqual(context["text"]["content"], reference)
+        self.assertEqual([button["text"]["content"] for button in buttons], ["可以发送", "不可以发送"])
+        self.assertEqual([button["behaviors"] for button in buttons], [
+            [{"type": "callback", "value": _APPROVAL}],
+            [{"type": "callback", "value": {**_APPROVAL, "omni_action": "reject"}}],
+        ])
+        request = feishu_card_request("oc_test", card)
+        self.assertEqual(request.body["msg_type"], "interactive")
+        self.assertEqual(json.loads(request.body["content"]), card)
+
+        receipt = _data({"chat_id": "oc_test", "message_id": "om_card"})
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+            _cli_result, [_IDENTITY, _data(_GROUP), _data(_MEMBERS), receipt]
+        )) as run:
+            self.assertEqual(self.setup_adapter().send_card(card, "review:first"), "om_card")
+        args = run.call_args.args[0]
+        self.assertEqual(args[args.index("--msg-type") + 1], "interactive")
+        self.assertEqual(args[args.index("--content") + 1], "-")
+        self.assertEqual(json.loads(run.call_args.kwargs["input"]), card)
+
+    def test_raw_card_callback_requires_matching_app_and_button_payload(self):
+        header = {"event_type": "card.action.trigger", "event_id": "ev_test", "app_id": "demo-feishu"}
+        event = {"host": "im_message", "operator": {"open_id": "employee-1"},
+                 "context": {"open_message_id": "om_card", "open_chat_id": "oc_test"},
+                 "action": {"tag": "button", "value": _APPROVAL}}
+        payload = {"schema": "2.0", "header": header, "event": event}
+        self.assertEqual(parse_feishu_card_action(payload, app_id="demo-feishu"),
+                         DraftDecision("demo-feishu", "ev_test", "oc_test", "employee-1", "om_card",
+                                       _DRAFT_ID, _VERSION, "approve"))
+        with self.assertRaisesRegex(ChannelError, "^invalid_payload$"):
+            parse_feishu_card_action(payload, app_id="demo-other")
+        for action in ({"tag": "select_static", "value": _APPROVAL},
+                       {"tag": "button", "value": {**_APPROVAL, "customer_text": "swap"}}):
+            with self.subTest(action=action), self.assertRaisesRegex(ChannelError, "^invalid_payload$"):
+                parse_feishu_card_action({**payload, "event": {**event, "action": action}}, app_id="demo-feishu")
 
     def test_unapproved_members_block_the_send_before_issuing_the_command(self):
         adapter = self.setup_adapter()
@@ -244,6 +291,34 @@ class FeishuLiveTest(unittest.TestCase):
                 second, = list(stream)
                 self.assertEqual(second.chat_id, "oc_second")
                 self.assertTrue(second.has_mentions)
+
+    def test_card_stream_limits_clicks_to_mapped_rooms_and_authorized_staff(self):
+        event = {"type": "card.action.trigger", "host": "im_message", "action_tag": "button",
+                 "event_id": "ev_test", "chat_id": "oc_test", "operator_id": "ou_staff",
+                 "message_id": "om_card", "action_value": json.dumps(_APPROVAL),
+                 "token": "omitted-token", "card_content": "omitted-card"}
+        events = [{**event, **mutation} for mutation in (
+            {"chat_id": "oc_unmapped"}, {"operator_id": "ou_other"}, {"operator_id": "employee-1"},
+            {"host": "im_top_notice"}, {"action_tag": "select_static"}, {"form_value": '{"field":"text"}'},
+            {"action_value": json.dumps({**_APPROVAL, "version": "bad"})}, {},
+            {"event_id": "ev_second", "action_value": json.dumps({**_APPROVAL, "omni_action": "reject"})},
+        )]
+        lines = "\n".join(json.dumps(row) for row in events)
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = self._stub_cli(directory, (
+                "assert sys.argv[4] == 'card.action.trigger'\n"
+                "arg = sys.argv[sys.argv.index('--jq') + 1]\n"
+                "assert 'ou_staff' in arg and 'action_value' in arg and 'im_message' in arg\n"
+                "assert 'token' not in arg and 'card_content' not in arg\n"
+                "print('[event] ready event_key=card.action.trigger', file=sys.stderr)\n"
+                f"print({lines!r})\n"
+                "print('[event] exited (reason: timeout)', file=sys.stderr)\n"
+            ), managed=True)
+            accepted = list(adapter.card_events(duration=1, room_allowed={"oc_test"}.__contains__))
+        self.assertEqual(accepted, [
+            DraftDecision("cli_test", "ev_test", "oc_test", "ou_staff", "om_card", _DRAFT_ID, _VERSION, "approve"),
+            DraftDecision("cli_test", "ev_second", "oc_test", "ou_staff", "om_card", _DRAFT_ID, _VERSION, "reject"),
+        ])
 
     def test_persistent_stream_stops_or_reports_unexpected_exit(self):
         with tempfile.TemporaryDirectory() as directory:

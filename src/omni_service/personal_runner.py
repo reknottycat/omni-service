@@ -127,6 +127,12 @@ class PersonalBridge(Service):
             return
         return self.ingest(replace(event, sender_name="OmniService"))
 
+    def receive_card_action(self, event):
+        if (not self.approval_cards or event.app_id != self.feishu.app_id
+                or event.user_id not in self.feishu.staff_ids or not self.room_allowed(event.chat_id)):
+            return
+        return self.decide_draft(event)
+
     def _customer_event(self, db, event):
         if event.user_id != str(self.telegram.policy.owner_id):
             return super()._customer_event(db, event)
@@ -184,6 +190,10 @@ class PersonalBridge(Service):
                         raise ChannelError("delivery_unknown")
                 return room
             options = {"chat_id": conv["room_id"]} if self.managed else {}
+            if "card" in request:
+                if not self.approval_cards:
+                    raise ChannelError("approval_cards_disabled")
+                return self.feishu.send_card(request["card"], item["operation_key"], **options)
             if request.get("mention_all") is True:
                 options["mention_all"] = True
             if "mention_user_id" in request:
@@ -236,26 +246,31 @@ def run(bridge):
     stop = threading.Event()
     events = queue.Queue(maxsize=64)
 
-    def receive():
-        options = {"room_allowed": bridge.room_allowed} if bridge.managed else {}
+    def receive(source, consumer, options):
         while not stop.is_set():
             try:
-                for event in bridge.feishu.events(stop, **options):
+                for event in consumer(stop, **options):
                     while not stop.is_set():
                         try:
-                            events.put(event, timeout=0.25)
+                            events.put((source, event), timeout=0.25)
                             break
                         except queue.Full:
                             continue
             except ChannelError as exc:
-                print("Feishu:", exc.code, flush=True)
+                print(f"Feishu {source}:", exc.code, flush=True)
                 stop.wait(3)
 
-    thread = threading.Thread(target=receive, daemon=True)
-    thread.start()
+    message_options = {"room_allowed": bridge.room_allowed} if bridge.managed else {}
+    consumers = [("message", bridge.feishu.events, message_options)]
+    if bridge.approval_cards:
+        consumers.append(("card", bridge.feishu.card_events, {"room_allowed": bridge.room_allowed}))
+    threads = [threading.Thread(target=receive, args=consumer, daemon=True) for consumer in consumers]
+    for thread in threads:
+        thread.start()
     try:
         print("OmniService Telegram–Feishu bridge started. Translation:", bridge.language.provider_name,
               "Intake:", "on" if bridge.intake_enabled else "off",
+              "Approval cards:", "on" if bridge.approval_cards else "off",
               "Agent default:", "on" if bridge.agent_enabled else "off", flush=True)
         while not stop.is_set():
             try:
@@ -270,15 +285,22 @@ def run(bridge):
                 continue
             while True:
                 try:
-                    event = events.get_nowait()
+                    source, event = events.get_nowait()
                 except queue.Empty:
                     break
-                bridge.receive_feishu(event)
+                if source == "card":
+                    try:
+                        bridge.receive_card_action(event)
+                    except ChannelError as exc:
+                        print("Feishu card action:", exc.code, flush=True)
+                else:
+                    bridge.receive_feishu(event)
             for outcome in bridge.drain():
                 print("Delivery:", outcome["id"], outcome["status"], flush=True)
     finally:
         stop.set()
-        thread.join(timeout=4)
+        for thread in threads:
+            thread.join(timeout=4)
 
 
 def translation_provider(config):
@@ -350,6 +372,9 @@ def main():
             raise ChannelError("pilot_mode_required")
         managed = mode == "personal-managed"
         feishu_config = config["feishu"]
+        cards_configured = feishu_config.get("approval_cards", managed)
+        if type(cards_configured) is not bool:
+            raise ChannelError("feishu_invalid_config")
         room = feishu_config.get("chat_id")
         if (managed and room not in (None, "")) or (not managed and not room):
             raise ChannelError("feishu_invalid_config")
@@ -377,11 +402,13 @@ def main():
         language = translation_provider(config["translation"])
         intake, intake_enabled = intake_provider(config.get("intake", {}), language)
         intake_enabled = managed or intake_enabled
+        approval_cards = cards_configured and intake_enabled
         advisor, agent_enabled = agent_provider(config.get("agent", {}), language, approval_intake=intake_enabled)
         if args.action == "check":
             audience = "Feishu application identity" if managed else "Feishu group"
             print("Telegram connection and", audience, "verified. Translation:", language.provider_name,
-                  "Intake:", "on" if intake_enabled else "off", "Agent default:", "on" if agent_enabled else "off")
+                  "Intake:", "on" if intake_enabled else "off", "Approval cards:", "on" if approval_cards else "off",
+                  "Agent default:", "on" if agent_enabled else "off")
             return 0
         os.umask(0o077)
         args.db.parent.mkdir(parents=True, exist_ok=True)
@@ -395,7 +422,7 @@ def main():
                 args.db, api, feishu, owner=connection.owner_id, **scope,
                 connection_id=connection.connection_id, bot_id=bot["id"],
                 language=language, intake=intake, intake_enabled=intake_enabled,
-                approval_intake=intake_enabled, agent_advisor=advisor,
+                approval_intake=intake_enabled, approval_cards=approval_cards, agent_advisor=advisor,
                 agent_enabled=agent_enabled, handoff_staff_id=handoff_staff_id)
             try:
                 if not intake_enabled:

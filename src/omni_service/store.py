@@ -62,11 +62,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS pending_reply_draft ON reply_drafts(conversati
 CREATE TABLE IF NOT EXISTS conversation_settings (
  conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
  reply_assist INTEGER CHECK(reply_assist IN (0,1)),
- show_labels INTEGER NOT NULL DEFAULT 0 CHECK(show_labels IN (0,1))
+ show_labels INTEGER NOT NULL DEFAULT 0 CHECK(show_labels IN (0,1)),
+ auto_reply INTEGER NOT NULL DEFAULT 0 CHECK(auto_reply IN (0,1)),
+ approval_required INTEGER NOT NULL DEFAULT 1 CHECK(approval_required IN (0,1))
 );
 CREATE TABLE IF NOT EXISTS agent_reply_jobs (
  conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
- request_id TEXT NOT NULL, requested_at REAL NOT NULL
+ request_id TEXT NOT NULL, requested_at REAL NOT NULL,
+ automatic_allowed INTEGER NOT NULL DEFAULT 0 CHECK(automatic_allowed IN (0,1))
 );
 CREATE TABLE IF NOT EXISTS audit (
  id INTEGER PRIMARY KEY AUTOINCREMENT, created_at REAL NOT NULL,
@@ -92,6 +95,13 @@ class Store:
         if 'external_id' not in {row[1] for row in self.db.execute('PRAGMA table_info(outbox)')}:
             self.db.execute('ALTER TABLE outbox ADD COLUMN external_id TEXT')
         with self.transaction() as db:
+            columns = {row[1] for row in db.execute('PRAGMA table_info(conversation_settings)')}
+            if 'auto_reply' not in columns:
+                db.execute('ALTER TABLE conversation_settings ADD COLUMN auto_reply INTEGER NOT NULL DEFAULT 0 CHECK(auto_reply IN (0,1))')
+            if 'approval_required' not in columns:
+                db.execute('ALTER TABLE conversation_settings ADD COLUMN approval_required INTEGER NOT NULL DEFAULT 1 CHECK(approval_required IN (0,1))')
+            if 'automatic_allowed' not in {row[1] for row in db.execute('PRAGMA table_info(agent_reply_jobs)')}:
+                db.execute('ALTER TABLE agent_reply_jobs ADD COLUMN automatic_allowed INTEGER NOT NULL DEFAULT 0 CHECK(automatic_allowed IN (0,1))')
             db.execute("UPDATE outbox SET status='unknown', last_error='process_interrupted' WHERE status='inflight'")
             db.execute("UPDATE messages SET status='delivery_unknown' WHERE id IN (SELECT message_id FROM outbox WHERE status='unknown' AND operation='send')")
             db.execute("UPDATE messages SET recall_status='delivery_unknown' WHERE id IN (SELECT message_id FROM outbox WHERE status='unknown' AND operation='delete')")

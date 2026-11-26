@@ -10,12 +10,12 @@ from contextlib import suppress
 from hashlib import sha256
 from uuid import NAMESPACE_URL, uuid5
 
+from .approval_card import CARD_ACTION, card_decision
 from .channels import feishu_text
 from .models import ChannelError, InboundEvent
 
 
 _EVENT = "im.message.receive_v1"
-_READY = f"[event] ready event_key={_EVENT}".encode()
 _MAX_LINE = 256 * 1024
 _CLI_TIMEOUT = 15
 _EVENT_LOSS_PREFIXES = (b"WARN: event seq gap", b"WARN: consume backpressure",
@@ -139,16 +139,30 @@ class FeishuLive:
         chat_id = self._target(chat_id)
         if chat_id is None:
             raise ChannelError("feishu_invalid_chat")
-        if not isinstance(text, str) or not text.strip() or not isinstance(operation_id, str) or not operation_id:
+        if not isinstance(text, str) or not text.strip():
             raise ChannelError("feishu_invalid_payload")
         if mention_user_id is not None and (not _id(mention_user_id, "ou_") or mention_user_id not in self.staff_ids):
             raise ChannelError("feishu_invalid_mention")
         content = feishu_text(text, mention_all=mention_all, mention_user_id=mention_user_id)
+        return self._send_message(chat_id, "text", {"text": content}, operation_id)
+
+    def send_card(self, card, operation_id, *, chat_id=None):
+        """Send an official interactive card to the scoped service group."""
+        chat_id = self._target(chat_id)
+        if chat_id is None:
+            raise ChannelError("feishu_invalid_chat")
+        if not isinstance(card, dict) or card.get("schema") != "2.0":
+            raise ChannelError("feishu_invalid_payload")
+        return self._send_message(chat_id, "interactive", card, operation_id)
+
+    def _send_message(self, chat_id, kind, content, operation_id):
+        if not isinstance(operation_id, str) or not operation_id:
+            raise ChannelError("feishu_invalid_payload")
         self.preflight(chat_id)
         key = sha256(f"{self.app_id}:{chat_id}:{operation_id}".encode()).hexdigest()[:48]
         receipt = self._bot_data(["im", "+messages-send", "--chat-id", chat_id,
-                                  "--content", "-", "--msg-type", "text", "--idempotency-key", key],
-                                 input_text=json.dumps({"text": content}, ensure_ascii=False),
+                                  "--content", "-", "--msg-type", kind, "--idempotency-key", key],
+                                 input_text=json.dumps(content, ensure_ascii=False),
                                  error="delivery_unknown")
         if receipt.get("chat_id") != chat_id or not _id(receipt.get("message_id"), "om_"):
             raise ChannelError("delivery_unknown")
@@ -188,14 +202,52 @@ class FeishuLive:
                             message_id, text=text, timestamp=int(created) / 1000,
                             has_mentions=event.get("has_mentions", False) is not False)
 
+    def _card_filter(self):
+        chat_filter = f" and .chat_id == {json.dumps(self.chat_id)}" if self.chat_id is not None else ""
+        staff = json.dumps(sorted(self.staff_ids))
+        return (
+            f'select(.type == "{CARD_ACTION}"{chat_filter} and .host == "im_message" '
+            'and .action_tag == "button" and (.form_value // "") == "" '
+            f'and (.operator_id as $operator | {staff} | index($operator) != null)) | '
+            '{type, event_id, chat_id, operator_id, message_id, host, action_tag, action_value}'
+        )
+
+    def _parse_card_event(self, line, room_allowed=None):
+        try:
+            event = json.loads(line)
+        except (ValueError, UnicodeError):
+            raise ChannelError("feishu_invalid_event_stream") from None
+        if (not isinstance(event, dict) or event.get("type") != CARD_ACTION or event.get("host") != "im_message"
+                or event.get("action_tag") != "button" or event.get("form_value")
+                or not _id(event.get("operator_id"), "ou_") or event["operator_id"] not in self.staff_ids):
+            return None
+        chat_id = event.get("chat_id")
+        if (not _id(chat_id, "oc_") or self.chat_id not in (None, chat_id)
+                or (room_allowed is not None and not room_allowed(chat_id))):
+            return None
+        try:
+            return card_decision(app_id=self.app_id, event_id=event.get("event_id"), chat_id=chat_id,
+                                 user_id=event["operator_id"], message_id=event.get("message_id"),
+                                 value=json.loads(event.get("action_value", "")))
+        except (ChannelError, TypeError, ValueError, RecursionError):
+            return None
+
     def events(self, stop=None, *, duration=0, room_allowed=None):
         """Consume approved text events until stopped, or for a bounded CLI session."""
+        yield from self._events(_EVENT, self._event_filter(), self._parse_event, stop, duration, room_allowed)
+
+    def card_events(self, stop=None, *, room_allowed=None, duration=0):
+        """Consume only staff click decisions for cards in an authorized group."""
+        yield from self._events(CARD_ACTION, self._card_filter(), self._parse_card_event,
+                                stop, duration, room_allowed)
+
+    def _events(self, event_key, projection, parser, stop, duration, room_allowed):
         if type(duration) is not int or not 0 <= duration <= 3600:
             raise ChannelError("feishu_invalid_duration")
         if stop is not None and stop.is_set():
             return
         self.preflight()
-        args = ["event", "consume", _EVENT, "--as", "bot", "--jq", self._event_filter()]
+        args = ["event", "consume", event_key, "--as", "bot", "--jq", projection]
         if duration:
             args += ["--timeout", f"{duration}s"]
         try:
@@ -205,7 +257,7 @@ class FeishuLive:
             raise ChannelError("feishu_stream_unavailable") from None
         with process:
             try:
-                yield from self._read_stream(process, stop, duration, room_allowed)
+                yield from self._read_stream(process, event_key, parser, stop, duration, room_allowed)
             finally:
                 if process.poll() is None:
                     with suppress(ProcessLookupError):
@@ -213,11 +265,12 @@ class FeishuLive:
                     try:
                         process.wait(timeout=3)
                     except subprocess.TimeoutExpired:
-                        # This IM consumer has no server-side subscription to clean up.
+                        # Neither consumer creates a server-side subscription.
                         process.kill()
 
-    def _read_stream(self, process, stop, duration, room_allowed):
+    def _read_stream(self, process, event_key, parser, stop, duration, room_allowed):
         ready = timed_out = False
+        ready_marker = f"[event] ready event_key={event_key}".encode()
         started = time.monotonic()
         with selectors.DefaultSelector() as selector:
             selector.register(process.stdout, selectors.EVENT_READ, bytearray())
@@ -242,12 +295,12 @@ class FeishuLive:
                         if len(line) > _MAX_LINE:
                             raise ChannelError("feishu_event_too_large")
                         if key.fileobj == process.stderr:
-                            ready |= line.rstrip() == _READY
+                            ready |= line.rstrip() == ready_marker
                             timed_out |= line.startswith(b"[event] exited") and line.rstrip().endswith(b"(reason: timeout)")
                             if line.startswith(_EVENT_LOSS_PREFIXES) or (line.startswith(b"WARN: event ") and b" dropped:" in line):
                                 raise ChannelError("feishu_event_loss")
                         else:
-                            event = self._parse_event(line, room_allowed)
+                            event = parser(line, room_allowed)
                             if event is not None:
                                 yield event
                     if len(key.data) > _MAX_LINE:

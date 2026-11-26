@@ -28,6 +28,7 @@ _VERSION = "1234567890abcdef"
 _APPROVAL = {"omni_action": "approve", "draft_id": _DRAFT_ID, "version": _VERSION}
 _PDF = b"%PDF-1.7\nfixture"
 _PNG = b"\x89PNG\r\n\x1a\nfixture"
+_INVITE_URL = "https://ops.example/admin/#invite=" + "s" * 43
 
 
 def _data(value):
@@ -79,6 +80,54 @@ class FeishuLiveTest(unittest.TestCase):
             self.assertEqual(adapter.send("交接给客服", "handoff", mention_user_id="ou_staff"), "om_handoff")
         self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"],
                          '<at user_id="ou_staff"></at> 交接给客服')
+
+    def test_staff_invite_is_addressed_to_one_user_and_requires_a_p2p_receipt(self):
+        adapter = self.setup_adapter()
+        receipt = _data({"message_id": "om_invite", "chat_id": "oc_employee_dm"})
+        confirmed = _data({"chat_mode": "p2p", "external": False})
+        checks = [_IDENTITY, receipt, confirmed] * 2
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(_cli_result, checks)) as run:
+            for _ in range(2):
+                self.assertEqual(adapter.send_staff_invite("ou_selected", _INVITE_URL, "invite_123"), "om_invite")
+        first, second = run.call_args_list[1], run.call_args_list[4]
+        self.assertEqual(first, second)
+        args = first.args[0]
+        self.assertEqual(args[args.index("--user-id") + 1], "ou_selected")
+        self.assertNotIn("--chat-id", args)
+        self.assertNotIn(_INVITE_URL, " ".join(args))
+        self.assertEqual(args[args.index("--content") + 1], "-")
+        self.assertEqual(json.loads(first.kwargs["input"])["text"].splitlines()[-1], _INVITE_URL)
+        self.assertEqual(run.call_args.args[0][2:], ["im", "chats", "get", "--chat-id", "oc_employee_dm",
+                                                   "--as", "bot", "--format", "json"])
+
+    def test_staff_invite_rejects_bad_target_and_url_without_a_cli_call(self):
+        invalid = [
+            ("oc_group", _INVITE_URL), ("ou_selected", "http://" + _INVITE_URL.removeprefix("https://")),
+            ("ou_selected", _INVITE_URL.replace("ops.example", "admin@ops.example")),
+            ("ou_selected", _INVITE_URL.replace("/admin/", "/admin/auth/login")),
+            ("ou_selected", _INVITE_URL.replace("#invite=", "?invite=")),
+            ("ou_selected", _INVITE_URL + "a"),
+        ]
+        with patch("omni_service.feishu_live.subprocess.run") as run:
+            for user_id, url in invalid:
+                with self.subTest(user_id=user_id, url=url), self.assertRaisesRegex(ChannelError, "feishu_invalid_payload"):
+                    self.setup_adapter().send_staff_invite(user_id, url, "invite_123")
+            run.assert_not_called()
+
+    def test_staff_invite_with_unverifiable_chat_or_receipt_is_not_reported_sent(self):
+        receipt = _data({"message_id": "om_invite", "chat_id": "oc_employee_dm"})
+        for result in (_data({"chat_mode": "group"}), _data({"chat_mode": "p2p", "external": True}),
+                       _data({"chat_mode": "p2p"}), _data({})):
+            with self.subTest(result=result), patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+                    _cli_result, [_IDENTITY, receipt, result])) as run:
+                with self.assertRaisesRegex(ChannelError, "delivery_unknown"):
+                    self.setup_adapter().send_staff_invite("ou_selected", _INVITE_URL, "invite_123")
+                self.assertEqual(run.call_count, 3)
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+                _cli_result, [_IDENTITY, _data({"chat_id": "oc_employee_dm"})])) as run:
+            with self.assertRaisesRegex(ChannelError, "delivery_unknown"):
+                self.setup_adapter().send_staff_invite("ou_selected", _INVITE_URL, "invite_123")
+            self.assertEqual(run.call_count, 2)
 
     def test_approval_card_preserves_preview_and_sends_interactive_message(self):
         text = '[AI] Exact **plain preview**\nSecond line'

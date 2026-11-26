@@ -20,11 +20,14 @@ _ERROR_STATUS = {
     "forbidden": 403,
     "unauthorized": 401,
     "not_found": 404,
+    "staff_invite_limit": 409,
+    "staff_roster_full": 409,
+    "staff_invite_unavailable": 410,
     "payload_too_large": 413,
 }
 
 
-def create_admin_server(service, identity, templates, *, host="127.0.0.1", port=0):
+def create_admin_server(service, identity, templates, *, host="127.0.0.1", port=0, invite_delivery=None):
     """Bind an admin listener. Feishu identity and the welcome compiler are injected."""
     callback = urlsplit(identity.redirect_uri)
     if (callback.scheme not in ("http", "https") or not callback.hostname
@@ -149,6 +152,14 @@ def create_admin_server(service, identity, templates, *, host="127.0.0.1", port=
                     return self.redirect(_BASE, session, state_clear)
                 except (ChannelError, ValueError):
                     return self.redirect(_BASE + "?login=failed", identity.clear_state_cookie())
+            if route.path == _BASE + "api/session":
+                try:
+                    session = self.session()
+                except ChannelError:
+                    return self.json(200, {"authenticated": False})
+                return self.json(200, {"authenticated": True, "user_id": session.user_id,
+                                       "csrf_token": session.csrf_token,
+                                       "display_name": getattr(session, "display_name", "")})
             if route.path == _BASE + "api/state":
                 try:
                     session = self.session()
@@ -171,14 +182,35 @@ def create_admin_server(service, identity, templates, *, host="127.0.0.1", port=
                     raise ChannelError("invalid_csrf")
                 if action == "logout":
                     return self.respond(204, headers=[("Set-Cookie", identity.clear_session_cookie())])
-                value = self.dispatch(session.user_id, action, self.body())
+                value = self.dispatch(session, action, self.body())
                 return self.json(200, value)
             except (ChannelError, KeyError, ValueError) as exc:
                 if getattr(exc, "code", None) == "invalid_csrf":
                     return self.json(403, {"error": "invalid_csrf"})
                 return self.fail(exc)
 
-        def dispatch(self, user, action, body):
+        def dispatch(self, session, action, body):
+            user = session.user_id
+            if action == "staff/invite":
+                expected, send = body.get('expected_user_id'), body.get('send', False)
+                if type(send) is not bool or (send and not expected):
+                    raise ChannelError('invalid_staff_invite')
+                created = service.admin_create_staff_invite(user, expected)
+                if send:
+                    delivered = False
+                    if invite_delivery is not None:
+                        url = f"{origin}{_BASE}#invite={created['token']}"
+                        try:
+                            delivered = bool(invite_delivery(expected, url, created['invite']['id']))
+                        except ChannelError:
+                            pass  # Keep the same invite available to copy; do not retry an uncertain send.
+                    created['delivery'] = 'sent' if delivered else 'unconfirmed'
+                return created
+            if action == "staff/claim":
+                return service.claim_staff_invite(user, body["token"],
+                                                  display_name=getattr(session, "display_name", ""))
+            if action in ("staff/approve", "staff/revoke"):
+                return service.admin_decide_staff_invite(user, body["invite_id"], approve=action == "staff/approve")
             if action == "defaults":
                 return service.admin_update_defaults(user, body)
             if action == "command-policy":

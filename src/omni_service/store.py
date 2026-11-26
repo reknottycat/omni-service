@@ -74,6 +74,13 @@ CREATE TABLE IF NOT EXISTS conversation_settings (
 CREATE TABLE IF NOT EXISTS management_config (
  singleton INTEGER PRIMARY KEY CHECK(singleton=1), settings TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS staff_invites (
+ id TEXT PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('open','pending','approved','revoked')),
+ expected_user_id TEXT, user_id TEXT, display_name TEXT NOT NULL DEFAULT '',
+ created_at REAL NOT NULL, expires_at REAL NOT NULL,
+ CHECK(expires_at > created_at), CHECK(status NOT IN ('pending','approved') OR user_id IS NOT NULL)
+);
 CREATE TABLE IF NOT EXISTS command_permissions (
  command_id TEXT PRIMARY KEY, policy TEXT NOT NULL CHECK(policy IN ('room_member','staff','admin'))
 );

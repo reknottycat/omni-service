@@ -4,6 +4,7 @@
     "bot_username": "ExampleOmniServiceBot",
     "connection_id": "",
     "expected_owner_id": null,
+    "peer_scope": "allowlist",
     "allowed_chat_ids": [],
     "welcome_preview_chat_ids": [],
     "bot_token_env": "TELEGRAM_BOT_TOKEN"

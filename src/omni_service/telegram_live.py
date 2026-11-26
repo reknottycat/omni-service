@@ -22,6 +22,44 @@ _WELCOME_PHOTOS = {
     "image/jpeg": ("welcome.jpg", b"\xff\xd8\xff", b"\xff\xd9"),
 }
 _FILE_PATH = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
+_BOT_USERNAME = re.compile(r"[A-Za-z0-9_]{5,32}")
+_SETUP_NONCE = re.compile(r"[A-Za-z0-9_-]{22,64}")
+
+
+def telegram_ready(api, username=None):
+    """Resolve the bot's identity and ensure its long-polling setup is available."""
+    if username is not None and (not isinstance(username, str) or not _BOT_USERNAME.fullmatch(username)):
+        raise ChannelError("invalid_bot_username")
+    bot = api.call("getMe")
+    if (not isinstance(bot, dict) or bot.get("is_bot") is not True
+            or type(bot.get("id")) is not int or not 0 < bot["id"] < 2**52
+            or not isinstance(bot.get("username"), str) or not _BOT_USERNAME.fullmatch(bot["username"])
+            or username is not None and bot["username"].casefold() != username.casefold()):
+        raise ChannelError("telegram_bot_identity_mismatch")
+    webhook = api.call("getWebhookInfo")
+    if not isinstance(webhook, dict) or webhook.get("url") != "":
+        raise ChannelError("telegram_webhook_in_use")
+    return bot
+
+
+def enable_secretary(api, bot):
+    """Enable a dedicated bot resolved by telegram_ready and verify its new settings."""
+    if bot.get("can_connect_to_business") is True:
+        return bot
+    if api.call("setMySettings", {"can_connect_to_business": True, "can_join_groups": False}) is not True:
+        raise ChannelError("telegram_secretary_not_confirmed")
+    current = telegram_ready(api, bot["username"])
+    if current["id"] != bot["id"] or current.get("can_connect_to_business") is not True:
+        raise ChannelError("telegram_secretary_not_confirmed")
+    return current
+
+
+def telegram_setup_link(username, nonce):
+    """Build a Telegram /start link for a short-lived setup challenge."""
+    if (not isinstance(username, str) or not _BOT_USERNAME.fullmatch(username)
+            or not isinstance(nonce, str) or not _SETUP_NONCE.fullmatch(nonce)):
+        raise ChannelError("invalid_telegram_setup_link")
+    return f"https://t.me/{username}?start={nonce}"
 
 
 class TelegramAPI:
@@ -258,7 +296,7 @@ class TelegramPoller:
     def __init__(self, api, policy, store, connection_id, *, clock=time.time):
         if not isinstance(connection_id, str) or not connection_id.strip():
             raise ChannelError("invalid_connection")
-        if not policy.allowed.difference({policy.owner_id}):
+        if not policy.connection_scope and not policy.allowed.difference({policy.owner_id}):
             raise ChannelError("empty_telegram_allowlist")
         self.api = api
         self.policy = policy

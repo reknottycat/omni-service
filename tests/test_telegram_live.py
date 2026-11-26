@@ -11,7 +11,9 @@ from omni_service.media import MAX_FILE_BYTES, MAX_IMAGE_BYTES, MediaBlob
 from omni_service.models import ChannelError
 from omni_service.personal import TelegramPersonal
 from omni_service.store import Store
-from omni_service.telegram_live import TelegramAPI, TelegramPoller
+from omni_service.telegram_live import (
+    TelegramAPI, TelegramPoller, enable_secretary, telegram_ready, telegram_setup_link,
+)
 
 
 PNG_DATA = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jFf8AAAAASUVORK5CYII="
@@ -40,6 +42,57 @@ class FakeTelegram:
         if method == "getUpdates":
             return [update for update in self.updates if update["update_id"] >= payload["offset"]]
         raise AssertionError(method)
+
+
+class TelegramSetup(unittest.TestCase):
+    def setUp(self):
+        self.original_bot = {"id": 219, "is_bot": True, "username": "ExampleOmniBot"}
+        self.enabled_bot = {**self.original_bot, "can_connect_to_business": True}
+        self.no_webhook = {"url": ""}
+        self.api = Mock(spec=TelegramAPI)
+
+    def test_resolves_verified_name_and_checks_an_expected_name_case_insensitively(self):
+        self.api.call.side_effect = [self.original_bot, self.no_webhook, self.original_bot, self.no_webhook]
+        self.assertEqual(telegram_ready(self.api), self.original_bot)
+        self.assertEqual(telegram_ready(self.api, "exampleomnibot"), self.original_bot)
+        self.assertEqual(self.api.call.call_args_list, [call("getMe"), call("getWebhookInfo")] * 2)
+
+    def test_identity_and_existing_webhook_stop_setup_without_writing(self):
+        self.api.call.return_value = self.original_bot
+        with self.assertRaisesRegex(ChannelError, "telegram_bot_identity_mismatch"):
+            telegram_ready(self.api, "OtherOmniBot")
+        self.api.call.assert_called_once_with("getMe")
+        self.api.reset_mock()
+        self.api.call.side_effect = [self.original_bot, {"url": "https://example.test/hooks"}]
+        with self.assertRaisesRegex(ChannelError, "telegram_webhook_in_use"):
+            telegram_ready(self.api)
+        self.assertEqual(self.api.call.call_args_list, [call("getMe"), call("getWebhookInfo")])
+
+    def test_secretary_changes_only_a_bot_that_needs_it_and_requires_readback(self):
+        self.assertEqual(enable_secretary(self.api, self.enabled_bot), self.enabled_bot)
+        self.api.call.assert_not_called()
+        self.api.call.side_effect = [True, self.enabled_bot, self.no_webhook]
+        self.assertEqual(enable_secretary(self.api, self.original_bot), self.enabled_bot)
+        self.assertEqual(self.api.call.call_args_list, [
+            call("setMySettings", {"can_connect_to_business": True, "can_join_groups": False}),
+            call("getMe"), call("getWebhookInfo"),
+        ])
+        for bad in (self.original_bot, {**self.enabled_bot, "id": 220}):
+            with self.subTest(bad=bad):
+                self.api.call.side_effect = [True, bad, self.no_webhook]
+                with self.assertRaisesRegex(ChannelError, "telegram_secretary_not_confirmed"):
+                    enable_secretary(self.api, self.original_bot)
+
+    def test_setup_url_only_encodes_a_valid_name_and_challenge(self):
+        challenge = "ABCDEF0123456789abcdef_wxyz"
+        self.assertEqual(telegram_setup_link("ExampleOmniBot", challenge),
+                         "https://t.me/ExampleOmniBot?start=" + challenge)
+        for username, nonce in (("ExampleOmniBot", "12345:aaBBccDDeeFFggHHiiJJ"),
+                                ("ExampleOmniBot", "x" * 65), ("ExampleOmniBot", "short"),
+                                ("example.org/bot", challenge), ("ExampleBot?x=1", challenge)):
+            with self.subTest(username=username, size=len(nonce)):
+                with self.assertRaisesRegex(ChannelError, "invalid_telegram_setup_link"):
+                    telegram_setup_link(username, nonce)
 
 
 class TelegramPolling(unittest.TestCase):

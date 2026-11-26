@@ -53,10 +53,14 @@ class RecordingResult(unittest.TextTestResult):
 
 def source_manifest():
     files = []
-    for folder in ("src", "tests", "scripts", "fixtures", ".github/workflows"):
+    for folder in ("src", "tests", "scripts", "deploy", "config", "fixtures", ".github/workflows"):
         for path in sorted((ROOT / folder).rglob("*")):
             if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"}:
                 files.append({"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    for name in ("requirements-onboarding.txt",):
+        path = ROOT / name
+        if path.is_file():
+            files.append({"path": name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
     digest = hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
     return digest, files
 

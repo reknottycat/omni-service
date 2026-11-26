@@ -10,6 +10,7 @@ import json
 import re
 import secrets
 import time
+import unicodedata
 from urllib.parse import urlencode, urlsplit
 
 from .models import ChannelError
@@ -31,6 +32,7 @@ _OPEN_ID = re.compile(r'ou_[A-Za-z0-9_]{1,125}')
 class AdminSession:
     user_id: str
     csrf_token: str
+    display_name: str = ''
 
 
 def _base64(value):
@@ -39,6 +41,12 @@ def _base64(value):
 
 def _matches(pattern, value):
     return isinstance(value, str) and re.fullmatch(pattern, value) is not None
+
+
+def _display_name(value):
+    if not isinstance(value, str):
+        return ''
+    return ''.join(char for char in value[:256] if not unicodedata.category(char).startswith('C')).strip()[:80]
 
 
 def _callback_security(redirect_uri):
@@ -157,14 +165,18 @@ class FeishuAdminAuth:
             raise ChannelError('admin_oauth_unavailable')
         if user.get('tenant_key') != self._tenant_key or not _matches(_OPEN_ID, user.get('open_id')):
             raise ChannelError('admin_oauth_forbidden')
-        session = self._sign('session', {'open_id': user['open_id'], 'csrf': secrets.token_urlsafe(32)}, _SESSION_TTL)
+        session_claims = {'open_id': user['open_id'], 'csrf': secrets.token_urlsafe(32)}
+        name = _display_name(user.get('name'))
+        if name:
+            session_claims['name'] = name
+        session = self._sign('session', session_claims, _SESSION_TTL)
         return self._cookie(self.session_cookie_name, session, _SESSION_TTL), self.clear_state_cookie()
 
     def read_session(self, value):
         claims = self._verify('session', value)
         if not claims or not _matches(_OPEN_ID, claims.get('open_id')) or not _matches(_BROWSER_TOKEN, claims.get('csrf')):
             return None
-        return AdminSession(claims['open_id'], claims['csrf'])
+        return AdminSession(claims['open_id'], claims['csrf'], _display_name(claims.get('name')))
 
     def clear_state_cookie(self):
         return self._cookie(self.state_cookie_name, '', 0)

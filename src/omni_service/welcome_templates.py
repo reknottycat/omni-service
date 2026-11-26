@@ -11,6 +11,7 @@ import tempfile
 import time
 from urllib.parse import unquote, urlsplit
 
+from .feishu_live import cli_environment
 from .models import ChannelError
 
 
@@ -155,14 +156,13 @@ def _image_mime(data):
 class FeishuWelcomeDocument:
     """Read only the specified bot-visible document and its inline image tokens."""
 
-    def __init__(self, app_id, *, profile=None, cli="lark-cli"):
+    def __init__(self, app_id, *, profile=None, cli="lark-cli", excluded_env=()):
         if (not isinstance(app_id, str) or not _APP_ID.fullmatch(app_id)
                 or (profile is not None and (not isinstance(profile, str) or not profile))):
             raise ChannelError("welcome_document_invalid_config")
         self.app_id = app_id
         self._command = [cli, f"--profile={profile or app_id}"]
-        self._env = {**os.environ, "LARKSUITE_CLI_NO_UPDATE_NOTIFIER": "1",
-                     "LARKSUITE_CLI_NO_SKILLS_NOTIFIER": "1"}
+        self._env = cli_environment(excluded_env)
 
     def _run(self, args, *, deadline, cwd=None, error="welcome_document_unavailable"):
         remaining = deadline - time.monotonic()

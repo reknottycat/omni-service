@@ -21,7 +21,7 @@ from .media import MEDIA_KINDS, normalize_blob, safe_filename
 from .models import Attachment, ChannelError
 from .personal import Connection, TelegramPersonal
 from .service import Service, _id
-from .telegram_live import TelegramAPI, TelegramPoller
+from .telegram_live import TelegramAPI, TelegramPoller, enable_secretary, telegram_ready
 from .welcome_templates import FeishuWelcomeDocument
 
 
@@ -34,7 +34,7 @@ class PersonalBridge(Service):
     """Reuse the durable service for explicitly authorized Telegram contacts."""
 
     def __init__(self, db_path, api, feishu, *, owner, connection_id, bot_id,
-                 peer=None, peer_ids=None, **kwargs):
+                 peer=None, peer_ids=None, connection_scope=False, **kwargs):
         self.managed = feishu.chat_id is None
         if self.managed:
             if peer is not None or not isinstance(peer_ids, (list, tuple)):
@@ -44,7 +44,9 @@ class PersonalBridge(Service):
             if peer_ids is not None:
                 raise ChannelError("invalid_test_contact")
             peers = (peer,)
-        if (not peers or any(type(value) is not int or value <= 0 or value == owner for value in peers)
+        if (type(connection_scope) is not bool or (connection_scope and (not self.managed or peers))
+                or (not connection_scope and not peers)
+                or any(type(value) is not int or value <= 0 or value == owner for value in peers)
                 or len(set(peers)) != len(peers)):
             raise ChannelError("invalid_test_contact")
         if self.managed and (kwargs.get("approval_intake") is not True
@@ -54,10 +56,12 @@ class PersonalBridge(Service):
         self.feishu = feishu
         self.connection_id = connection_id
         self.peer_ids = frozenset(map(str, peers))
+        self.connection_scope = connection_scope
+        self.owner_id = str(owner)
         super().__init__(db_path, None, members=sorted(feishu.staff_ids), label_replies=True, **kwargs)
         self.room_members_provider = getattr(feishu, "group_members", None)
         try:
-            policy = TelegramPersonal(expected_owner_id=owner, allowed_chat_ids=peers)
+            policy = TelegramPersonal(expected_owner_id=owner, allowed_chat_ids=peers, connection_scope=connection_scope)
             self.telegram = TelegramPoller(api, policy, self.store, connection_id, clock=self.clock)
             with self.store.transaction() as db:
                 db.execute("""CREATE TABLE IF NOT EXISTS personal_binding (
@@ -78,6 +82,8 @@ class PersonalBridge(Service):
             "peers": sorted(peers), "connection_id": self.connection_id, "app_id": self.feishu.app_id,
             "staff_ids": sorted(self.feishu.staff_ids), "bot_app_ids": sorted(self.feishu.bot_app_ids),
         }
+        if self.connection_scope:
+            binding['peer_scope'] = 'connection'
         if saved is None and not rows:
             self.started_at = int(self.clock())
             db.execute("INSERT INTO personal_binding VALUES(1, ?)",
@@ -108,9 +114,13 @@ class PersonalBridge(Service):
             self.cid = rows[0]["id"]
             self.started_at = rows[0]["created_at"]
 
+    def _peer_allowed(self, chat_id):
+        return (chat_id in self.peer_ids or (self.connection_scope and chat_id != self.owner_id
+                                            and re.fullmatch(r'[1-9][0-9]{0,18}', chat_id) is not None))
+
     def _valid_conversation(self, conv):
         return (conv["channel"] == "telegram" and conv["account_id"] == self.connection_id
-                and conv["chat_id"] in self.peer_ids and conv["user_id"] == conv["chat_id"]
+                and self._peer_allowed(conv["chat_id"]) and conv["user_id"] == conv["chat_id"]
                 and conv["recipient_type"] == "chat")
 
     def room_allowed(self, room_id):
@@ -136,7 +146,7 @@ class PersonalBridge(Service):
 
     def receive_telegram(self, payload):
         event = payload.event
-        if (event.channel != "telegram" or event.account_id != self.connection_id or event.chat_id not in self.peer_ids
+        if (event.channel != "telegram" or event.account_id != self.connection_id or not self._peer_allowed(event.chat_id)
                 or event.event_type != "message" or event.timestamp < self.started_at):
             return
         expected = event.chat_id if payload.role == "customer" else str(self.telegram.policy.owner_id)
@@ -164,6 +174,18 @@ class PersonalBridge(Service):
                 or not self.room_allowed(event.chat_id) or not self._room_staff_member(event.chat_id, event.user_id)):
             return
         return self.decide_draft(event)
+
+    def admin_state(self, actor):
+        state = super().admin_state(actor)
+        if state['role'] == 'admin':
+            current = self.telegram.policy.connections.get(self.connection_id)
+            state['integrations'] = {
+                'telegram': bool(current and current.enabled and current.can_reply),
+                'chat_scope': 'connection' if self.connection_scope else 'allowlist',
+                'feishu': True,
+                'model': self.language.provider_name,
+            }
+        return state
 
     def _room_rules(self, db, cid):
         return (super()._room_rules(db, cid) + '\n普通图片和文件也会转发给客户。'
@@ -341,17 +363,6 @@ class PersonalBridge(Service):
         return str(result["message_id"])
 
 
-def telegram_ready(api, username):
-    me = api.call("getMe")
-    if (not isinstance(me, dict) or me.get("is_bot") is not True or type(me.get("id")) is not int
-            or not isinstance(me.get("username"), str) or me["username"].lower() != username.lower()):
-        raise ChannelError("telegram_bot_identity_mismatch")
-    hook = api.call("getWebhookInfo")
-    if not isinstance(hook, dict) or hook.get("url") != "":
-        raise ChannelError("telegram_webhook_in_use")
-    return me
-
-
 def discover_connections(api):
     # Telegram retains allowed_updates between calls. Keep business messages enabled
     # before the first test message arrives, and leave all updates unacknowledged.
@@ -509,13 +520,13 @@ def management_providers(config, feishu):
     return {"identity": identity, "admin_ids": admins, "host": host, "port": port, "welcome_document": document}
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["check", "discover", "enable-secretary", "run"])
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--db", type=Path)
     parser.add_argument("--ask-token", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
         config = json.loads(args.config.read_text())
         telegram = config["telegram"]
@@ -529,10 +540,7 @@ def main():
                           tunnel_port=int(tunnel_port) if tunnel_port is not None else None)
         bot = telegram_ready(api, username)
         if args.action == "enable-secretary":
-            if bot.get("can_connect_to_business") is not True:
-                result = api.call("setMySettings", {"can_connect_to_business": True, "can_join_groups": False})
-                if result is not True or telegram_ready(api, username).get("can_connect_to_business") is not True:
-                    raise ChannelError("telegram_secretary_not_confirmed")
+            enable_secretary(api, bot)
             print("Telegram Secretary Mode verified.")
             return 0
         if bot.get("can_connect_to_business") is not True:
@@ -552,9 +560,13 @@ def main():
         if (managed and room not in (None, "")) or (not managed and not room):
             raise ChannelError("feishu_invalid_config")
         staff_ids = feishu_config["staff_ids"]
+        excluded_env = frozenset(filter(None, (telegram['bot_token_env'],
+            config['translation'].get('api_key_env'), (config.get('llm') or {}).get('api_key_env'),
+            (config.get('management') or {}).get('signing_key_env'),
+            (config.get('management') or {}).get('app_secret_env'))))
         feishu = FeishuLive(None if managed else room, staff_ids,
                             app_id=feishu_config["app_id"], profile=feishu_config.get("profile"),
-                            allowed_bot_app_ids=feishu_config.get("allowed_bot_app_ids", []))
+                            allowed_bot_app_ids=feishu_config.get("allowed_bot_app_ids", []), excluded_env=excluded_env)
         handoff_staff_id = feishu_config.get("handoff_staff_id")
         if handoff_staff_id is None:
             handoff_staff_id = staff_ids[0]
@@ -568,7 +580,12 @@ def main():
                 or not connection.enabled or not connection.can_reply):
             raise ChannelError("telegram_connection_not_ready")
         peers = telegram["allowed_chat_ids"]
-        if (not isinstance(peers, list) or not peers or (not managed and len(peers) != 1)
+        scope_mode = telegram.get('peer_scope', 'allowlist')
+        if scope_mode not in ('allowlist', 'connection'):
+            raise ChannelError('invalid_telegram_scope')
+        connection_scope = scope_mode == 'connection'
+        if (not isinstance(peers, list) or (connection_scope and (not managed or peers))
+                or (not connection_scope and (not peers or (not managed and len(peers) != 1)))
                 or any(type(peer) is not int or peer <= 0 or peer == connection.owner_id for peer in peers)
                 or len(set(peers)) != len(peers)):
             raise ChannelError("invalid_test_contact")
@@ -605,16 +622,20 @@ def main():
                 connection_id=connection.connection_id, bot_id=bot["id"],
                 language=language, intake=intake, intake_enabled=intake_enabled,
                 approval_intake=intake_enabled, approval_cards=approval_cards, agent_advisor=advisor,
-                agent_enabled=agent_enabled, handoff_staff_id=handoff_staff_id, customer_prompt_guard=prompt_guard)
+                agent_enabled=agent_enabled, handoff_staff_id=handoff_staff_id, customer_prompt_guard=prompt_guard,
+                connection_scope=connection_scope)
+            bridge.telegram.policy.connections[connection.connection_id] = connection
             try:
                 if not intake_enabled:
                     bridge.set_intake_enabled(False)
                 if management is None:
                     run(bridge)
                 else:
-                    templates = FeishuWelcomeDocument(feishu.app_id, profile=feishu_config.get("profile"))
+                    templates = FeishuWelcomeDocument(feishu.app_id, profile=feishu_config.get("profile"),
+                                                     excluded_env=excluded_env)
                     with create_admin_server(bridge, management["identity"], templates,
-                                             host=management["host"], port=management["port"]) as server:
+                                             host=management["host"], port=management["port"],
+                                             invite_delivery=feishu.send_staff_invite) as server:
                         bridge.configure_management(management["admin_ids"],
                                                     welcome_document=management["welcome_document"],
                                                     preview_peers=preview_peers)

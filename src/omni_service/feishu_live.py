@@ -12,6 +12,7 @@ import time
 from contextlib import suppress
 from hashlib import sha256
 from pathlib import Path
+from urllib.parse import urlsplit
 from uuid import NAMESPACE_URL, uuid5
 
 from .approval_card import CARD_ACTION, card_decision
@@ -43,6 +44,11 @@ _EVENT_LOSS_PREFIXES = (b"WARN: event seq gap", b"WARN: consume backpressure",
 
 def _id(value, prefix):
     return isinstance(value, str) and re.fullmatch(prefix + r"[A-Za-z0-9_]+", value) is not None
+
+
+def cli_environment(excluded=()):
+    env = {key: value for key, value in os.environ.items() if key not in excluded}
+    return {**env, "LARKSUITE_CLI_NO_UPDATE_NOTIFIER": "1", "LARKSUITE_CLI_NO_SKILLS_NOTIFIER": "1"}
 
 
 def _resource_id(value, kind):
@@ -102,7 +108,8 @@ def _downloaded_blob(directory, receipt, kind, name):
 
 
 class FeishuLive:
-    def __init__(self, chat_id, staff_ids, *, app_id, profile=None, cli="lark-cli", allowed_bot_app_ids=()):
+    def __init__(self, chat_id, staff_ids, *, app_id, profile=None, cli="lark-cli", allowed_bot_app_ids=(),
+                 excluded_env=()):
         staff = tuple(staff_ids) if isinstance(staff_ids, (list, tuple, set, frozenset)) else ()
         if ((chat_id is not None and not _id(chat_id, "oc_")) or not _id(app_id, "cli_") or not staff
                 or not all(_id(staff_id, "ou_") for staff_id in staff)
@@ -120,8 +127,7 @@ class FeishuLive:
         self._command = [
             os.path.abspath(executable) if os.sep in executable else executable, f"--profile={profile or app_id}",
         ]
-        self._env = {**os.environ, "LARKSUITE_CLI_NO_UPDATE_NOTIFIER": "1",
-                     "LARKSUITE_CLI_NO_SKILLS_NOTIFIER": "1"}
+        self._env = cli_environment(excluded_env)
 
     def _run_json(self, args, *, error, input_text=None, cwd=None, timeout=_CLI_TIMEOUT):
         # Never include stderr or command input in errors. The CLI can echo content.
@@ -255,6 +261,36 @@ class FeishuLive:
         if not isinstance(card, dict) or card.get("schema") != "2.0":
             raise ChannelError("feishu_invalid_payload")
         return self._send_message(chat_id, "interactive", card, operation_id, staff_ids=staff_ids)
+
+    def send_staff_invite(self, user_id, invite_url, operation_id):
+        """Send the administrator-selected enrollment link as a direct app message."""
+        if (not _id(user_id, "ou_") or len(user_id) > 128
+                or not isinstance(invite_url, str) or not re.fullmatch(r"[!-~]{1,768}", invite_url)
+                or not isinstance(operation_id, str) or not operation_id or len(operation_id) > 128):
+            raise ChannelError("feishu_invalid_payload")
+        try:
+            target = urlsplit(invite_url)
+            loopback = target.hostname in ("127.0.0.1", "localhost", "::1")
+            if (not target.hostname or target.username is not None or target.password is not None
+                    or target.port == 0 or "\\" in invite_url or "?" in invite_url
+                    or (target.scheme != "https" and (target.scheme != "http" or not loopback))
+                    or target.path != "/admin/" or not re.fullmatch(r"invite=[A-Za-z0-9_-]{43}", target.fragment)):
+                raise ValueError
+        except ValueError:
+            raise ChannelError("feishu_invalid_payload") from None
+        self._verify_identity()
+        key = sha256(f"{self.app_id}:{user_id}:{operation_id}".encode()).hexdigest()[:48]
+        text = "你收到一份 OmniService 客服邀请。请使用本组织的飞书账号打开链接并接受：\n" + invite_url
+        receipt = self._bot_data(["im", "+messages-send", "--user-id", user_id,
+                                  "--content", "-", "--msg-type", "text", "--idempotency-key", key],
+                                 input_text=json.dumps({"text": text}, ensure_ascii=False), error="delivery_unknown")
+        chat_id, message_id = receipt.get("chat_id"), receipt.get("message_id")
+        if not _id(chat_id, "oc_") or not _id(message_id, "om_"):
+            raise ChannelError("delivery_unknown")
+        chat = self._bot_data(["im", "chats", "get", "--chat-id", chat_id], error="delivery_unknown")
+        if chat.get("chat_mode") != "p2p" or chat.get("external") is not False:
+            raise ChannelError("delivery_unknown")
+        return message_id
 
     def download_attachment(self, chat_id, message_id, attachment, *, staff_ids=None):
         """Fetch a native resource bound to the accepted Feishu message ID."""

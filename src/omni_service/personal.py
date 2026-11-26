@@ -64,12 +64,14 @@ class TelegramPersonal:
     allowed_updates = ("business_connection", "business_message",
                        "edited_business_message", "deleted_business_messages")
 
-    def __init__(self, *, expected_owner_id, allowed_chat_ids=()):
+    def __init__(self, *, expected_owner_id, allowed_chat_ids=(), connection_scope=False):
         allowed_chat_ids = tuple(allowed_chat_ids)
-        if not _positive(expected_owner_id) or not all(_positive(x) for x in allowed_chat_ids):
+        if (not _positive(expected_owner_id) or not all(_positive(x) for x in allowed_chat_ids)
+                or type(connection_scope) is not bool or (connection_scope and allowed_chat_ids)):
             raise ChannelError("invalid_policy")
         self.owner_id = expected_owner_id
         self.allowed = frozenset(allowed_chat_ids)
+        self.connection_scope = connection_scope
         self.connections = {}
 
     def apply_connection(self, data):
@@ -82,7 +84,7 @@ class TelegramPersonal:
     def _allowed(self, cid, chat_id):
         connection = self.connections.get(cid) if isinstance(cid, str) else None
         return connection if (connection and connection.enabled
-                              and _positive(chat_id) and chat_id in self.allowed
+                              and _positive(chat_id) and (self.connection_scope or chat_id in self.allowed)
                               and chat_id != self.owner_id) else None
 
     def parse(self, update):

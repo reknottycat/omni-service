@@ -6,37 +6,37 @@
 <title>OmniService 管理台</title>
 <style nonce="__OMNI_NONCE__">
 :root {
-  color-scheme: light; --bg:#f3f6f2; --surface:#fff; --ink:#182b24; --muted:#52685e;
-  --line:#dbe5df; --green:#215b44; --green-dark:#123c2e; --soft:#ebf5ed;
+  color-scheme: light; --bg:#f5f7fb; --surface:#fff; --ink:#182235; --muted:#52617a;
+  --line:#dde4ee; --primary:#2655bc; --primary-dark:#17439e; --soft:#eaf0fe;
   --radius:16px; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
 }
 * { box-sizing:border-box; }
 body { margin:0;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55; }
 [hidden] { display:none !important; }
-a { color:var(--green); }
+a { color:var(--primary); }
 button,input,select,textarea { font:inherit; }
 button,select,input,textarea,a { outline-offset:4px; }
 button { cursor:pointer; }
 button:disabled { cursor:wait;opacity:.6; }
 .shell { display:grid;grid-template-columns:226px minmax(0,1fr);min-height:100vh; }
-.side { padding:34px 18px 24px;background:#142e25;color:#e2ede6;display:flex;flex-direction:column;gap:38px; }
+.side { padding:34px 18px 24px;background:#fff;color:#25334c;display:flex;flex-direction:column;gap:38px;border-right:1px solid var(--line); }
 .brand { display:flex;align-items:center;gap:12px;padding:0 8px;white-space:nowrap; }
 .brand span { font-size:19px;font-weight:720;letter-spacing:-.45px; }
-.brand-mark { position:relative;width:35px;height:35px;display:grid;place-items:center;background:#d0e9d5;border-radius:10px;color:#1c543c; }
+.brand-mark { position:relative;width:35px;height:35px;display:grid;place-items:center;background:#dce8ff;border-radius:10px;color:#2655bc; }
 .brand-mark::before { content:"";width:15px;height:12px;border:2px solid currentColor;border-radius:5px;transform:translateY(-1px); }
-.brand-mark::after { content:"";position:absolute;left:10px;top:20px;width:6px;height:6px;transform:rotate(-34deg);border-bottom:2px solid currentColor;background:#d0e9d5; }
+.brand-mark::after { content:"";position:absolute;left:10px;top:20px;width:6px;height:6px;transform:rotate(-34deg);border-bottom:2px solid currentColor;background:#dce8ff; }
 nav { display:grid;gap:6px; }
-.nav-button { position:relative;border:0;border-radius:9px;background:transparent;color:#c5d5cc;text-align:left;padding:12px 14px; }
-.nav-button:hover { background:#214034; }
-.nav-button[aria-current="page"] { color:#fff;background:#2a503e;font-weight:650; }
-.nav-button[aria-current="page"]::before { content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:4px;background:#aad7b5; }
-.side-bottom { margin-top:auto;padding:14px 8px 0;border-top:1px solid #3b5349;display:grid;gap:10px; }
-.logout { align-self:start;text-align:left;color:#d0dfd5;background:transparent;border:0;padding:3px 0; }
+.nav-button { position:relative;border:0;border-radius:9px;background:transparent;color:#475771;text-align:left;padding:12px 14px; }
+.nav-button:hover { background:#eff3fa; }
+.nav-button[aria-current="page"] { color:#234797;background:#e6edfc;font-weight:650; }
+.nav-button[aria-current="page"]::before { content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:4px;background:#3260c8; }
+.side-bottom { margin-top:auto;padding:14px 8px 0;border-top:1px solid #e3e9f2;display:grid;gap:10px; }
+.logout { align-self:start;text-align:left;color:#4e5d77;background:transparent;border:0;padding:3px 0; }
 .workspace { margin:0 auto;width:100%;max-width:1232px;padding:44px 42px 72px;min-width:0; }
 .top { display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:25px; }
 .top h1,.login h1 { margin:0;letter-spacing:-.045em;font-size:clamp(27px,4vw,36px);line-height:1.2; }
 .top p { margin:8px 0 0;color:var(--muted); }
-.role { flex:none;border:1px solid var(--line);border-radius:99px;padding:5px 11px;font-size:13px;color:#315946;background:#fff; }
+.role { flex:none;border:1px solid var(--line);border-radius:99px;padding:5px 11px;font-size:13px;color:#435575;background:#fff; }
 .grid { display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start;gap:18px; }
 .panel { background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:23px;min-width:0; }
 .panel h2 { margin:0 0 8px;font-size:19px;letter-spacing:-.02em; }
@@ -45,20 +45,20 @@ nav { display:grid;gap:6px; }
 .field { display:grid;gap:6px;margin:14px 0; }
 .field label,.field-title { font-weight:650; }
 .field small,.muted { font-size:13px;color:var(--muted);overflow-wrap:anywhere; }
-input[type=url],select,textarea { width:100%;min-width:0;border:1px solid #cddad2;background:#fff;color:var(--ink);border-radius:9px;padding:9px 10px; }
+input[type=url],input[type=text],select,textarea { width:100%;min-width:0;border:1px solid #cdd7e5;background:#fff;color:var(--ink);border-radius:9px;padding:9px 10px; }
 textarea { resize:vertical;min-height:88px; }
-.check { display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid #edf1ee; }
+.check { display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid #edf1f7; }
 .check:first-of-type { border-top:0; }
-.check input { appearance:none;position:relative;flex:none;width:36px;height:22px;margin:0;border:1px solid #a9bbb1;border-radius:18px;background:#dbe5df;cursor:pointer; }
-.check input::after { content:"";position:absolute;left:3px;top:3px;height:14px;width:14px;border-radius:50%;background:white;box-shadow:0 1px 3px #29493845; }
-.check input:checked { border-color:var(--green);background:var(--green); }
+.check input { appearance:none;position:relative;flex:none;width:36px;height:22px;margin:0;border:1px solid #a6b4c7;border-radius:18px;background:#dde4ee;cursor:pointer; }
+.check input::after { content:"";position:absolute;left:3px;top:3px;height:14px;width:14px;border-radius:50%;background:white;box-shadow:0 1px 3px #293b6545; }
+.check input:checked { border-color:var(--primary);background:var(--primary); }
 .check input:checked::after { left:17px; }
 .check span { display:block; }
 .check small { display:block;color:var(--muted); }
-.button,.button:visited { text-decoration:none;border:1px solid #cddbd3;border-radius:9px;background:#fff;color:#24543e;padding:9px 13px;font-weight:630;display:inline-flex;align-items:center;justify-content:center;min-height:39px; }
-.button:hover { background:#f3f8f4; }
-.button.primary { border-color:var(--green);color:#fff;background:var(--green); }
-.button.primary:hover { background:var(--green-dark); }
+.button,.button:visited { text-decoration:none;border:1px solid #cdd8e8;border-radius:9px;background:#fff;color:#2655bc;padding:9px 13px;font-weight:630;display:inline-flex;align-items:center;justify-content:center;min-height:39px; }
+.button:hover { background:#f0f5fe; }
+.button.primary { border-color:var(--primary);color:#fff;background:var(--primary); }
+.button.primary:hover { background:var(--primary-dark); }
 .actions { display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:16px; }
 .panel + .panel-stack,.panel-stack + .panel { margin-top:18px; }
 .list { display:grid;gap:10px;padding:0;list-style:none;margin:14px 0 0; }
@@ -66,36 +66,52 @@ textarea { resize:vertical;min-height:88px; }
 .conversation,.command,.version-item { border:1px solid var(--line);border-radius:12px;background:#fff; }
 .conversation summary { list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 17px;cursor:pointer; }
 .conversation summary::-webkit-details-marker { display:none; }
-.conversation summary::after { content:"";flex:none;border-right:2px solid var(--green);border-bottom:2px solid var(--green);width:7px;height:7px;transform:rotate(45deg);margin:0 3px 3px 5px; }
+.conversation summary::after { content:"";flex:none;border-right:2px solid var(--primary);border-bottom:2px solid var(--primary);width:7px;height:7px;transform:rotate(45deg);margin:0 3px 3px 5px; }
 .conversation[open] summary::after { transform:rotate(225deg);margin-bottom:0; }
 .conversation[open] summary { border-bottom:1px solid var(--line); }
 .conversation-form { padding:16px;display:grid;grid-template-columns:minmax(165px,1fr) repeat(4,max-content) auto;gap:8px 14px;align-items:end; }
 .conversation-form .field,.conversation-form .actions,.conversation-form .check { margin:0; }
 .conversation-name { font-weight:680;overflow-wrap:anywhere;min-width:0; }
-.mode { font-size:12px;color:#3d674f;background:var(--soft);padding:4px 8px;border-radius:7px;white-space:nowrap;margin-left:auto; }
+.mode { font-size:12px;color:#35518c;background:var(--soft);padding:4px 8px;border-radius:7px;white-space:nowrap;margin-left:auto; }
 .command,.version-item { padding:13px;display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
 .command > div,.version-item > div { flex:1;min-width:110px; }
 .version-item h3 { overflow-wrap:anywhere; }
 .command select { width:auto; }
 .command button,.version-item button { white-space:nowrap; }
-.welcome-preview { border-radius:12px;border:1px solid #cddfd3;background:#f7faf7;padding:16px;max-height:420px;overflow:auto;overflow-wrap:anywhere; }
+.welcome-preview { border-radius:12px;border:1px solid #d6e0f0;background:#f7f9fd;padding:16px;max-height:420px;overflow:auto;overflow-wrap:anywhere; }
 .welcome-preview p { margin:.38em 0;white-space:pre-wrap; }
 .welcome-preview h2,.welcome-preview h3 { margin:.5em 0 .25em; }
 .welcome-preview li { margin:.2em 0; }
 .welcome-preview img { display:block;max-width:100%;max-height:240px;object-fit:contain;border-radius:8px; }
 .welcome-preview figure { margin:12px 0; }
 .welcome-preview figure figcaption { color:var(--muted);margin-top:3px; }
-.empty { text-align:center;background:#f3f7f4;border-radius:10px;padding:18px;color:var(--muted); }
-.notice { margin:0 0 15px;padding:10px 13px;border-radius:9px;background:var(--soft);color:#234b37;border:1px solid #d4e5d9; }
+.empty { text-align:center;background:#f1f4fa;border-radius:10px;padding:18px;color:var(--muted); }
+.notice { margin:0 0 15px;padding:10px 13px;border-radius:9px;background:var(--soft);color:#214476;border:1px solid #d6e2f8; }
 .notice.error { background:#fdf0ed;color:#7e302a;border-color:#efd5cf; }
-.login { min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(135deg,#e5f4e8 0,#f6f8f3 70%); }
-.login-box { width:min(100%,450px);padding:38px;border:1px solid var(--line);border-radius:22px;background:#fff;box-shadow:0 18px 55px #12342a13; }
+.login { min-height:100vh;display:grid;place-items:center;padding:24px;background:#f2f5fb; }
+.login-box { width:min(100%,450px);padding:38px;border:1px solid var(--line);border-radius:22px;background:#fff;box-shadow:0 18px 55px #14275413; }
 .login-box .brand { padding:0;margin-bottom:25px; }
 .login-box p { color:var(--muted);margin:12px 0 22px; }
 .login-box a.button { width:100%; }
+.setup-summary { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 18px; }
+.setup-card h2 { font-size:17px;margin-bottom:12px; }
+.setup-card p { font-size:13px;color:var(--muted);margin:9px 0 0; }
+.badge { border-radius:20px;padding:4px 9px;font-size:12px;display:inline-block;color:#35518c;background:var(--soft);font-weight:650; }
+.badge.ready { color:#176644;background:#e6f4ed; }
+.badge.waiting { color:#87540b;background:#fff3da; }
+.invites { display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:18px;align-items:start; }
+.invite-entry { padding:12px 0;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px; }
+.invite-entry .actions { margin:0;flex-shrink:0; }
+.invite-entry h3 { overflow-wrap:anywhere; }
+.invite-entry:first-child { border-top:0; }
+.invite-token { margin:16px 0 0; }
+.invite-token input { font-size:13px; }
+.invite-extra { margin:0 0 13px; }
+.invite-extra summary { cursor:pointer;color:var(--muted);font-size:13px; }
 @media(max-width:1120px) { .conversation-form{grid-template-columns:repeat(2,minmax(0,1fr))} }
 @media(max-width:960px) { .workspace{padding:34px 22px 55px} .shell{grid-template-columns:182px 1fr}.grid{gap:12px}.panel{padding:17px} }
-@media(max-width:680px) { .shell{display:block}.side{padding:15px 16px;gap:15px}.brand{padding:0}.brand span{font-size:17px}nav{grid-template-columns:repeat(2,minmax(0,1fr))}.nav-button{padding:8px 10px;text-align:center}.nav-button[aria-current="page"]::before{display:none}.side-bottom{display:block;padding:4px 0 0;border-top:1px solid #3b5349}.workspace{padding:22px 14px 42px}.grid{grid-template-columns:1fr}.top{margin-bottom:18px}.top p{font-size:13px}.conversation-form{grid-template-columns:1fr}.conversation-form .field{margin-bottom:5px}.command select{width:auto} }
+@media(max-width:680px) { .shell{display:block}.side{padding:15px 16px;gap:15px}.brand{padding:0}.brand span{font-size:17px}nav{grid-template-columns:repeat(2,minmax(0,1fr))}.nav-button{padding:8px 10px;text-align:center}.nav-button[aria-current="page"]::before{display:none}.side-bottom{display:block;padding:4px 0 0;border-top:1px solid #e3e9f2}.workspace{padding:22px 14px 42px}.grid{grid-template-columns:1fr}.top{margin-bottom:18px}.top p{font-size:13px}.conversation-form{grid-template-columns:1fr}.conversation-form .field{margin-bottom:5px}.command select{width:auto} }
+@media(max-width:760px) { .setup-summary,.invites { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -108,6 +124,17 @@ textarea { resize:vertical;min-height:88px; }
     <a class="button primary" href="/admin/auth/login">使用飞书登录</a>
   </div>
 </main>
+<main class="login" id="invite-claim" hidden>
+  <div class="login-box">
+    <div class="brand"><div class="brand-mark" aria-hidden="true"></div><span>OmniService</span></div>
+    <h1>接受客服邀请</h1>
+    <p>使用受邀的飞书账号确认身份。加入后可参与授权给你的新客户群。</p>
+    <p class="notice" id="invite-claim-notice" role="status" hidden></p>
+    <a class="button primary" id="invite-login" href="/admin/auth/login" hidden>使用飞书登录</a>
+    <button class="button primary" id="accept-invite" type="button" hidden>接受邀请</button>
+    <div class="actions"><a href="/admin/" id="leave-invite">返回管理台</a></div>
+  </div>
+</main>
 <div class="shell" id="shell" hidden>
   <aside class="side">
     <div class="brand">
@@ -115,6 +142,7 @@ textarea { resize:vertical;min-height:88px; }
       <span>OmniService</span>
     </div>
     <nav aria-label="管理台导航" id="nav">
+      <button class="nav-button" data-view="setup" type="button">接入与团队</button>
       <button class="nav-button" data-view="defaults" type="button">系统默认</button>
       <button class="nav-button" data-view="conversations" type="button">会话配置</button>
       <button class="nav-button" data-view="welcome" type="button">欢迎语模板</button>
@@ -126,6 +154,33 @@ textarea { resize:vertical;min-height:88px; }
     <header class="top"><div><h1 id="heading"></h1><p id="subtitle"></p></div><span class="role" id="role"></span></header>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
 
+    <section id="setup" hidden>
+      <div class="setup-summary" id="setup-summary" aria-label="接入状态"></div>
+      <div class="invites">
+        <article class="panel">
+          <h2>邀请客服</h2>
+          <p class="panel-intro">员工用飞书身份接受邀请。系统核验账号后，管理员可以批准加入客服名单。</p>
+          <form id="invite-form">
+            <details class="invite-extra"><summary>绑定指定飞书账号</summary>
+              <label class="field" for="expected-invite">应用内的飞书 Open ID<input id="expected-invite" type="text" autocomplete="off" maxlength="128"><small>指定后，此账号接受邀请即可加入。</small></label>
+              <button class="button" id="send-invite" type="button">通过飞书发送邀请</button>
+            </details>
+            <button class="button primary" type="submit">生成邀请链接</button>
+          </form>
+          <div class="invite-token" id="invite-token" hidden>
+            <label class="field" for="invite-url">一次性链接，有效期 24 小时<input id="invite-url" type="text" readonly></label>
+            <button class="button" id="copy-invite" type="button">复制链接</button>
+          </div>
+          <p class="muted">此版本可验证本组织飞书身份。外部身份与外部群接入待验证。</p>
+        </article>
+        <article class="panel">
+          <h2>邀请记录</h2>
+          <p class="panel-intro">通过邀请加入的员工进入新会话的默认客服名单。</p>
+          <ul class="list" id="invite-list"></ul>
+        </article>
+      </div>
+    </section>
+
     <section id="defaults" hidden>
       <form id="defaults-form">
         <div class="grid">
@@ -136,7 +191,8 @@ textarea { resize:vertical;min-height:88px; }
           </article>
           <article class="panel">
             <h2>授权客服</h2>
-            <div class="field"><label for="default-staff">飞书 Open ID</label><textarea id="default-staff" rows="4" spellcheck="false"></textarea><small>每行填写一位客服。</small></div>
+            <div class="field"><label for="default-staff">客服名单</label><textarea id="default-staff" rows="4" spellcheck="false"></textarea><small>可在「接入与团队」邀请员工自动加入名单，也可直接维护已知的飞书 Open ID。</small></div>
+            <div class="field"><label for="handoff-strategy">新会话分配</label><select id="handoff-strategy"><option value="fixed">固定负责人</option><option value="round_robin">客服按顺序轮流负责</option></select></div>
             <div class="field"><label for="default-owner">默认交接负责人</label><select id="default-owner"></select></div>
             <div class="field"><span class="field-title">管理员 Open ID</span><small id="admin-list"></small></div>
           </article>
@@ -178,6 +234,7 @@ textarea { resize:vertical;min-height:88px; }
 'use strict';
 const ui = id => document.getElementById(id);
 const views = {
+  setup: ['接入与团队', '核对渠道连接，并把客服邀请发给同组织员工。'],
   defaults: ['系统默认', '为客服团队和新会话配置默认设置。'],
   conversations: ['会话配置', '查看并管理你有权限访问的客服会话。'],
   welcome: ['欢迎语模板', '用飞书文档维护新客户的首次欢迎内容。'],
@@ -187,9 +244,11 @@ const policies = {room_member: '群成员', staff: '授权客服', admin: '管�
 const channelNames = {telegram: 'Telegram', whatsapp: 'WhatsApp', max: 'MAX'};
 const errors = {forbidden: '当前身份没有这项管理权限。', invalid_csrf: '登录状态已变化，请刷新后重试。',
   not_found: '这项设置已不存在，请刷新后重试。', invalid_payload: '请检查输入值后重试。',
+  invalid_staff_invite: '请检查邀请链接或指定的飞书账号。', staff_invite_unavailable: '邀请已失效，请向管理员获取新链接。',
   invalid_admin_settings: '请检查飞书 Open ID、负责人或其他输入值。',
   invalid_command_policy: '这条命令或所选权限无效。', welcome_document_missing: '请先设置欢迎语文档地址。'};
-let state, preview, currentView = 'defaults';
+let state, preview, currentView = 'setup';
+const inviteKey = 'omni-staff-invite';
 
 function node(tag, css, text) {
   const element = document.createElement(tag);
@@ -253,6 +312,50 @@ function options(select, list, selected, placeholder) {
     select.add(new Option(label, id, false, id === selected));
   }
   if (selected != null && [...select.options].some(item => item.value === selected)) select.value = selected;
+}
+function renderSetup() {
+  const summary = ui('setup-summary');
+  const integrations = state.integrations || {};
+  summary.replaceChildren();
+  const cards = [
+    ['Telegram', integrations.telegram ? '连接已验证' : '等待验证', Boolean(integrations.telegram),
+      integrations.chat_scope === 'connection' ? '使用原账号在 Telegram 选择的授权范围。' : '使用本实例核准的测试联系人。'],
+    ['飞书', integrations.feishu ? '应用身份已验证' : '身份已登录', true, '新客户使用独立的飞书服务群。'],
+    ['翻译', integrations.model === 'private-model' ? '模型已配置' : '待验证',
+      integrations.model === 'private-model', '发送一条测试消息可检查实际翻译和转发。']
+  ];
+  for (const [name, status, ready, hint] of cards) {
+    const card = node('article', 'panel setup-card');
+    card.append(node('h2', '', name), node('span', 'badge ' + (ready ? 'ready' : 'waiting'), status), node('p', '', hint));
+    summary.append(card);
+  }
+  const list = ui('invite-list');
+  const labels = {open:'待接受', pending:'待批准', approved:'已加入', revoked:'已作废', expired:'已过期'};
+  list.replaceChildren();
+  for (const invite of state.staff_invites || []) {
+    const entry = node('li', 'invite-entry'), info = node('div'), controls = node('div', 'actions');
+    const label = invite.display_name || invite.user_id || invite.expected_user_id || '未指定账号';
+    const status = labels[invite.status] || '待核对';
+    info.append(node('h3', '', label), node('span', 'badge ' +
+      (invite.status === 'approved' ? 'ready' : invite.status === 'pending' ? 'waiting' : ''), status));
+    if (invite.status === 'pending' && invite.display_name && invite.user_id) {
+      info.append(node('div', 'muted', invite.user_id));
+    }
+    if (invite.user_id) info.append(node('div', 'muted', '本组织身份已验证'));
+    for (const [operation, text] of (invite.status === 'pending' ? [['approve','批准'],['revoke','作废']] :
+      invite.status === 'open' ? [['revoke','作废']] : [])) {
+      const button = node('button', 'button ' + (operation === 'approve' ? 'primary' : ''), text);
+      button.type = 'button';
+      button.addEventListener('click', action(button, async () => {
+        await api('staff/' + operation, {invite_id:invite.id});
+        await refresh();
+        setNotice(operation === 'approve' ? '客服已加入新会话默认名单。' : '邀请已作废。');
+      }));
+      controls.append(button);
+    }
+    entry.append(info, controls); list.append(entry);
+  }
+  if (!list.children.length) list.append(node('li', 'empty', '暂无客服邀请。'));
 }
 function checkField(label, checked, disabled = false) {
   const element = node('label', 'check');
@@ -426,22 +529,47 @@ async function refresh() {
     ui('default-assist').checked = Boolean(defaults.reply_assist);
     ui('default-labels').checked = Boolean(defaults.show_labels);
     ui('default-staff').value = ids(defaults.staff_ids || state.staff_ids).join('\n');
+    ui('handoff-strategy').value = defaults.handoff_strategy || 'fixed';
     options(ui('default-owner'), ids(defaults.staff_ids || state.staff_ids), defaults.handoff_staff_id);
     ui('admin-list').textContent = ids(state.admin_ids).join('、') || '由服务端配置';
     ui('welcome-document').value = defaults.welcome_document || '';
     setDocumentLink(defaults.welcome_document);
-    renderVersions(); renderPreview(); renderCommands();
+    renderVersions(); renderPreview(); renderCommands(); renderSetup();
   }
-  ui('login').hidden = true; ui('shell').hidden = false;
+  ui('login').hidden = true; ui('invite-claim').hidden = true; ui('shell').hidden = false;
   showView(currentView);
 }
 for (const button of ui('nav').children) button.addEventListener('click', () => { setNotice(''); showView(button.dataset.view); });
+const inviteForm = ui('invite-form');
+async function createInvite(send) {
+  const expected = ui('expected-invite').value.trim();
+  if (send && !expected) throw new Error('请指定要接收邀请的飞书账号。');
+  const created = await api('staff/invite', expected ? {expected_user_id:expected, send} : {});
+  const link = new URL('/admin/', window.location.origin);
+  link.hash = 'invite=' + encodeURIComponent(created.token);
+  ui('invite-url').value = link.href;
+  ui('invite-token').hidden = false;
+  await refresh();
+  if (send) setNotice(created.delivery === 'sent' ? '已通过飞书发送邀请。' : '飞书发送未确认。可以复制同一条邀请链接。');
+}
+inviteForm.addEventListener('submit', action(inviteForm.querySelector('button[type=submit]'), () => createInvite(false)));
+ui('send-invite').addEventListener('click', action(ui('send-invite'), () => createInvite(true)));
+ui('copy-invite').addEventListener('click', action(ui('copy-invite'), async () => {
+  try {
+    await navigator.clipboard.writeText(ui('invite-url').value);
+    setNotice('邀请链接已复制。');
+  } catch {
+    ui('invite-url').select();
+    setNotice('请复制已选中的链接。');
+  }
+}));
 const parsedStaff = () => [...new Set(ui('default-staff').value.trim().split(/[\s,，]+/).filter(Boolean))];
 ui('default-staff').addEventListener('input', () => options(ui('default-owner'), parsedStaff(), ui('default-owner').value));
 const defaultsForm = ui('defaults-form');
 defaultsForm.addEventListener('submit', action(defaultsForm.querySelector('button[type=submit]'), async () => {
   if (!ui('default-owner').value) throw new Error('请选择默认交接负责人。');
   await api('defaults', {staff_ids:parsedStaff(), handoff_staff_id:ui('default-owner').value,
+    handoff_strategy:ui('handoff-strategy').value,
     reply_assist:ui('default-assist').checked, show_labels:ui('default-labels').checked});
   await refresh(); setNotice('默认设置已保存。');
 }));
@@ -479,7 +607,51 @@ ui('logout').addEventListener('click', action(ui('logout'), async () => {
   await api('logout', {});
   window.location.replace('/admin/');
 }));
-refresh().catch(error => showLogin(error.code !== 'unauthorized' || new URLSearchParams(location.search).get('login') === 'failed'));
+function claimNotice(text, failed = false) {
+  const notice = ui('invite-claim-notice');
+  notice.textContent = text;
+  notice.classList.toggle('error', failed);
+  notice.hidden = false;
+}
+async function openInvite(token) {
+  ui('login').hidden = true;
+  ui('shell').hidden = true;
+  ui('invite-claim').hidden = false;
+  const session = await api('session');
+  if (!session.authenticated) {
+    ui('invite-login').hidden = false;
+    if (new URLSearchParams(location.search).get('login') === 'failed') {
+      claimNotice('登录未完成。请确认飞书账号与邀请属于同一组织。', true);
+    }
+    return;
+  }
+  state = session;
+  if (session.display_name) claimNotice('当前飞书账号 ' + session.display_name);
+  const button = ui('accept-invite');
+  button.hidden = false;
+  button.addEventListener('click', async () => {
+    button.disabled = true;
+    try {
+      const result = await api('staff/claim', {token});
+      sessionStorage.removeItem(inviteKey);
+      button.hidden = true;
+      claimNotice(result.status === 'approved' ? '已加入客服团队。' : '已提交，等待管理员核对。');
+    } catch (error) {
+      ui('login').hidden = true;
+      claimNotice(error.message, true);
+      button.disabled = false;
+    }
+  });
+}
+ui('leave-invite').addEventListener('click', () => sessionStorage.removeItem(inviteKey));
+const fromLink = /^#invite=([A-Za-z0-9_-]{43})$/.exec(location.hash);
+if (fromLink) {
+  sessionStorage.setItem(inviteKey, fromLink[1]);
+  history.replaceState(null, '', location.pathname + location.search);
+}
+const invitation = sessionStorage.getItem(inviteKey);
+if (invitation) openInvite(invitation).catch(error => claimNotice(error.message, true));
+else refresh().catch(error => showLogin(error.code !== 'unauthorized' || new URLSearchParams(location.search).get('login') === 'failed'));
 </script>
 </body>
 </html>

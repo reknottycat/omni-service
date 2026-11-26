@@ -1,0 +1,1 @@
+{"ack_codes": [200, 200, 500], "actual_sdk_dispatch": true, "actual_sdk_start_stop": true, "durable_events": 2, "external_network_calls": 0, "loopback_discovery_requests": 1, "sdk_version": "1.9.0"}

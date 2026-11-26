@@ -529,7 +529,7 @@ async function refresh() {
     ui('default-assist').checked = Boolean(defaults.reply_assist);
     ui('default-labels').checked = Boolean(defaults.show_labels);
     ui('default-staff').value = ids(defaults.staff_ids || state.staff_ids).join('\n');
-    ui('handoff-strategy').value = defaults.handoff_strategy || 'fixed';
+    ui('handoff-strategy').value = state.handoff_strategy || 'fixed';
     options(ui('default-owner'), ids(defaults.staff_ids || state.staff_ids), defaults.handoff_staff_id);
     ui('admin-list').textContent = ids(state.admin_ids).join('、') || '由服务端配置';
     ui('welcome-document').value = defaults.welcome_document || '';

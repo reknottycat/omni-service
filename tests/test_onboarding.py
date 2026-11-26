@@ -1,3 +1,4 @@
+import getpass
 import json
 from pathlib import Path
 import tempfile
@@ -5,7 +6,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from omni_service.models import ChannelError
-from omni_service.onboarding import _feishu_owner, main, paired_connection, read_credentials
+from omni_service.onboarding import _ask, _feishu_owner, main, paired_connection, read_credentials
 from omni_service.personal import Connection
 from omni_service.personal_runner import PersonalBridge
 from omni_service.intake import Intake
@@ -58,6 +59,11 @@ class OnboardingContracts(unittest.TestCase):
             symlink.symlink_to(path)
             with self.assertRaises(OSError):
                 read_credentials(symlink)
+
+    def test_secret_prompt_rejects_echo_fallback(self):
+        with patch('omni_service.onboarding.getpass.getpass', side_effect=getpass.GetPassWarning):
+            with self.assertRaisesRegex(ChannelError, 'secret_input_requires_terminal'):
+                _ask({}, 'TELEGRAM_BOT_TOKEN', 'Telegram Bot Token: ')
 
     def test_feishu_profile_must_match_and_only_bootstrap_identity_is_retained(self):
         app = "cli_example"

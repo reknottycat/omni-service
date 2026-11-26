@@ -15,6 +15,7 @@ import stat
 import subprocess
 import tempfile
 import time
+import warnings
 from urllib.parse import urlsplit
 
 from .admin_auth import FeishuAdminAuth
@@ -35,6 +36,14 @@ _APP_ID = re.compile(r"cli_[A-Za-z0-9_]{1,125}")
 _OPEN_ID = re.compile(r"ou_[A-Za-z0-9_]{1,125}")
 _TENANT = re.compile(r"[A-Za-z0-9_-]{1,128}")
 _USER_INFO = "/open-apis/authen/v1/user_info"
+_SETUP_HINTS = {
+    'secret_input_requires_terminal': '请从交互终端输入密钥，或使用仅当前用户可读的凭据文件。',
+    'feishu_provision_sdk_missing': '请安装 requirements-onboarding.txt，或用 --feishu-app 复用现有应用。',
+    'feishu_setup_unavailable': '请检查此飞书应用已发布、登录身份在可见范围内，并重试。',
+    'telegram_pairing_timed_out': '请用原账号扫码点「开始」并重新保存聊天自动化授权，然后重试。',
+    'telegram_pairing_backlog': '专用机器人的待处理队列已满。请核对这枚 Token 是否属于新的专用机器人。',
+    'model_key_requires_tls': '使用 API Key 时，非本机模型网关需要 HTTPS。',
+}
 
 
 def _secret_value(value):
@@ -223,7 +232,14 @@ def _telegram_pair(api, env):
 
 
 def _ask(credentials, key, title, *, optional=False):
-    value = credentials.get(key) or getpass.getpass(title)
+    value = credentials.get(key)
+    if not value:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', getpass.GetPassWarning)
+            try:
+                value = getpass.getpass(title)
+            except getpass.GetPassWarning:
+                raise ChannelError('secret_input_requires_terminal') from None
     if (not value and not optional) or not _secret_value(value):
         raise ChannelError("invalid_credentials_file")
     credentials[key] = value
@@ -350,7 +366,8 @@ def main(argv=None):
     except KeyboardInterrupt:
         return 130
     except (ChannelError, OSError, ValueError, AttributeError, TypeError, KeyError) as exc:
-        print("OmniService setup:", getattr(exc, "code", "setup_config_or_local_io"))
+        code = getattr(exc, 'code', 'setup_config_or_local_io')
+        print('OmniService setup:', code, _SETUP_HINTS.get(code, ''))
         return 1
 
 

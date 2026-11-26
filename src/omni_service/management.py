@@ -179,9 +179,9 @@ class Management:
             return {'role': role, 'conversations': rooms,
                     'admin_ids': config['admin_ids'] if role == 'admin' else [],
                     'staff_ids': config['staff_ids'] if role == 'admin' else [],
-                    'defaults': {**{key: config[key] for key in ('staff_ids','handoff_staff_id','reply_assist','show_labels','welcome_document')},
-                                 'handoff_strategy': config.get('handoff_strategy', 'fixed')}
+                    'defaults': {key: config[key] for key in ('staff_ids','handoff_staff_id','reply_assist','show_labels','welcome_document')}
                     if role == 'admin' else {},
+                    'handoff_strategy': config.get('handoff_strategy', 'fixed') if role == 'admin' else None,
                     'commands': [{'id': key, 'label': label, 'policy': self._command_policy(db, key), 'default_policy': 'room_member'}
                                  for key, label in COMMANDS.items()],
                     **({'staff_invites': [_public_invite(row, self.clock()) for row in db.execute(

@@ -80,6 +80,12 @@ Mac arm64 / Python 3.12.16 通过上面的运行入口，使用真实 Telegram�
 
 先前版本 `425b646` 的 Mac 双向与提及隔离验收见本机 `artifacts/personal-pilot/mac-intake-acceptance.json`，DGX 模拟报告为 `artifacts/dgx-intake-20261126/acceptance.json`。这些记录对应当时的自动接待流程。
 
+### 2026-11-26 审批式接待验收
+
+使用一个已获准 Telegram 测试客户和一个已获准飞书员工做真实试点。首次俄语来信建独立内部群，看到追踪机器人、一次规则公告和对客译文预览。审批前客户只收到固定欢迎语。员工在原群提交预览中的版本指令，Telegram 收到逐字一致的俄语问询，并返回平台回执。使用 `52f7674` 重启同一试点数据库后，客户补齐资料，群内 @所有人 交接附带公司、货量、路线及客户原话，客户端只再收到一条普通人工俄语回复。Agent 保持关闭。原始证据在本机 `artifacts/personal-pilot/mac-managed-acceptance.json`。双客户真实平台验收待第二个获准测试联系人。
+
+`52f7674` 在 DGX Linux aarch64 / Python 3.12.3 执行 `bash scripts/acceptance.sh`，151 项通过，0 失败、0 错误、0 跳过。覆盖两客户独立群、跨群和旧版本审批拒绝、未审批禁止发送、按发送回执累计五轮和 Agent 开关。源码 SHA256 为 `36b1079c91b3841c89a506196a6f2ba1067b4a6138fc4c54e821061989a45d86`。报告在本机 `artifacts/dgx-approval-20261126/acceptance.json`。
+
 ## 普通账号找不到连接入口时
 
 已实测 [Telegram Web K](https://web.telegram.org/k/) 可使用已登录的普通账号完成连接。在编辑个人资料中打开 Chat Automation，选择 Only Selected、指定测试联系人、开启 Reply。[客户端源码](https://github.com/morethanwords/tweb/blob/master/src/components/sidebarLeft/tabs/editProfile.tsx#L422-L472)

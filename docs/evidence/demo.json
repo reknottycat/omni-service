@@ -1,0 +1,415 @@
+{
+  "mode": "simulation",
+  "passed": true,
+  "conversations": [
+    {
+      "channel": "telegram",
+      "customer_text": "Здравствуйте",
+      "language": "ru",
+      "employees": 7,
+      "employee_original": "您好，我来帮您处理。",
+      "customer_received": "employee-1: Здравствуйте! Я помогу вам.",
+      "recall": "deleted",
+      "customer_messages": [
+        {
+          "channel": "telegram",
+          "target": "10001",
+          "message_id": "1",
+          "text": "Здравствуйте! Чем я могу вам помочь?",
+          "kind": "text",
+          "deleted": false
+        },
+        {
+          "channel": "telegram",
+          "target": "10001",
+          "message_id": "2",
+          "text": "employee-1: Здравствуйте! Я помогу вам.",
+          "kind": "text",
+          "deleted": true
+        }
+      ]
+    },
+    {
+      "channel": "max",
+      "customer_text": "Здравствуйте",
+      "language": "ru",
+      "employees": 7,
+      "employee_original": "您好，我来帮您处理。",
+      "customer_received": "employee-1: Здравствуйте! Я помогу вам.",
+      "recall": "deleted",
+      "customer_messages": [
+        {
+          "channel": "max",
+          "target": "10001",
+          "message_id": "mid.mock.1",
+          "text": "Здравствуйте! Чем я могу вам помочь?",
+          "kind": "text",
+          "deleted": false
+        },
+        {
+          "channel": "max",
+          "target": "10001",
+          "message_id": "mid.mock.2",
+          "text": "employee-1: Здравствуйте! Я помогу вам.",
+          "kind": "text",
+          "deleted": true
+        }
+      ]
+    },
+    {
+      "channel": "whatsapp",
+      "customer_text": "Здравствуйте",
+      "language": "ru",
+      "employees": 7,
+      "employee_original": "您好，我来帮您处理。",
+      "customer_received": "employee-1: Здравствуйте! Я помогу вам.",
+      "recall": "unsupported",
+      "customer_messages": [
+        {
+          "channel": "whatsapp",
+          "target": "10001",
+          "message_id": "wamid.mock.1",
+          "text": "Здравствуйте! Чем я могу вам помочь?",
+          "kind": "text",
+          "deleted": false
+        },
+        {
+          "channel": "whatsapp",
+          "target": "10001",
+          "message_id": "wamid.mock.2",
+          "text": "employee-1: Здравствуйте! Я помогу вам.",
+          "kind": "text",
+          "deleted": false
+        }
+      ]
+    }
+  ],
+  "platform_http_requests": [
+    {
+      "channel": "telegram",
+      "method": "POST",
+      "path": "/telegram/bot<redacted>/sendMessage",
+      "query": {},
+      "body": {
+        "chat_id": "10001",
+        "text": "Здравствуйте! Чем я могу вам помочь?"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/chats",
+      "query": {
+        "user_id_type": [
+          "open_id"
+        ]
+      },
+      "body": {
+        "name": "OmniService 1992a2c4",
+        "user_id_list": [
+          "employee-1",
+          "employee-2",
+          "employee-3",
+          "employee-4",
+          "employee-5",
+          "employee-6",
+          "employee-7"
+        ],
+        "chat_mode": "group",
+        "chat_type": "private"
+      },
+      "operation": "create_room"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_1",
+        "msg_type": "text",
+        "content": "{\"text\":\"Customer (telegram): Здравствуйте\\n中文: 你好\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_1",
+        "msg_type": "text",
+        "content": "{\"text\":\"AI → 客户: Здравствуйте! Чем я могу вам помочь?\\n中文: 您好，请问有什么可以帮您？\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "telegram",
+      "method": "POST",
+      "path": "/telegram/bot<redacted>/sendMessage",
+      "query": {},
+      "body": {
+        "chat_id": "10001",
+        "text": "employee-1: Здравствуйте! Я помогу вам."
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "telegram",
+      "method": "POST",
+      "path": "/telegram/bot<redacted>/deleteMessage",
+      "query": {},
+      "body": {
+        "chat_id": "10001",
+        "message_id": 2
+      },
+      "operation": "delete"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_1",
+        "msg_type": "text",
+        "content": "{\"text\":\"OmniService 服务通知：平台已确认删除对应消息。消息 msg_50e7d43124f34749a0360dd32690e7f1\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "max",
+      "method": "POST",
+      "path": "/max/messages",
+      "query": {
+        "chat_id": [
+          "10001"
+        ]
+      },
+      "body": {
+        "text": "Здравствуйте! Чем я могу вам помочь?"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/chats",
+      "query": {
+        "user_id_type": [
+          "open_id"
+        ]
+      },
+      "body": {
+        "name": "OmniService 7f90f9fa",
+        "user_id_list": [
+          "employee-1",
+          "employee-2",
+          "employee-3",
+          "employee-4",
+          "employee-5",
+          "employee-6",
+          "employee-7"
+        ],
+        "chat_mode": "group",
+        "chat_type": "private"
+      },
+      "operation": "create_room"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_2",
+        "msg_type": "text",
+        "content": "{\"text\":\"Customer (max): Здравствуйте\\n中文: 你好\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_2",
+        "msg_type": "text",
+        "content": "{\"text\":\"AI → 客户: Здравствуйте! Чем я могу вам помочь?\\n中文: 您好，请问有什么可以帮您？\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "max",
+      "method": "POST",
+      "path": "/max/messages",
+      "query": {
+        "chat_id": [
+          "10001"
+        ]
+      },
+      "body": {
+        "text": "employee-1: Здравствуйте! Я помогу вам."
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "max",
+      "method": "DELETE",
+      "path": "/max/messages",
+      "query": {
+        "message_id": [
+          "mid.mock.2"
+        ]
+      },
+      "body": {},
+      "operation": "delete"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_2",
+        "msg_type": "text",
+        "content": "{\"text\":\"OmniService 服务通知：平台已确认删除对应消息。消息 msg_45aa2f4a6f0448fa83801c7864e2c66b\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "whatsapp",
+      "method": "POST",
+      "path": "/whatsapp/v27.0/demo-whatsapp/messages",
+      "query": {},
+      "body": {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": "10001",
+        "type": "text",
+        "text": {
+          "body": "Здравствуйте! Чем я могу вам помочь?",
+          "preview_url": false
+        }
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/chats",
+      "query": {
+        "user_id_type": [
+          "open_id"
+        ]
+      },
+      "body": {
+        "name": "OmniService d9732fd3",
+        "user_id_list": [
+          "employee-1",
+          "employee-2",
+          "employee-3",
+          "employee-4",
+          "employee-5",
+          "employee-6",
+          "employee-7"
+        ],
+        "chat_mode": "group",
+        "chat_type": "private"
+      },
+      "operation": "create_room"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_3",
+        "msg_type": "text",
+        "content": "{\"text\":\"Customer (whatsapp): Здравствуйте\\n中文: 你好\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_3",
+        "msg_type": "text",
+        "content": "{\"text\":\"AI → 客户: Здравствуйте! Чем я могу вам помочь?\\n中文: 您好，请问有什么可以帮您？\"}"
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "whatsapp",
+      "method": "POST",
+      "path": "/whatsapp/v27.0/demo-whatsapp/messages",
+      "query": {},
+      "body": {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": "10001",
+        "type": "text",
+        "text": {
+          "body": "employee-1: Здравствуйте! Я помогу вам.",
+          "preview_url": false
+        }
+      },
+      "operation": "send"
+    },
+    {
+      "channel": "feishu",
+      "method": "POST",
+      "path": "/feishu/open-apis/im/v1/messages",
+      "query": {
+        "receive_id_type": [
+          "chat_id"
+        ]
+      },
+      "body": {
+        "receive_id": "oc_mock_3",
+        "msg_type": "text",
+        "content": "{\"text\":\"OmniService 服务通知：此平台不支持撤回已发送消息，原消息仍可能对客户可见。 消息 msg_bcc259a0372e4baaac8452e0f22e61fd\"}"
+      },
+      "operation": "send"
+    }
+  ]
+}

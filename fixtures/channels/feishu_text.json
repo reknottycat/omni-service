@@ -1,0 +1,28 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt.fs.1",
+    "event_type": "im.message.receive_v1",
+    "token": "fixture-secret",
+    "app_id": "app-1",
+    "tenant_key": "tenant-1",
+    "create_time": "1795651200000"
+  },
+  "event": {
+    "sender": {
+      "sender_type": "user",
+      "sender_id": {
+        "open_id": "ou_employee_1"
+      },
+      "tenant_key": "tenant-1"
+    },
+    "message": {
+      "message_id": "om.source.1",
+      "chat_id": "oc.service.1",
+      "chat_type": "group",
+      "message_type": "text",
+      "create_time": "1795651200000",
+      "content": "{\"text\": \"您好，我来帮您确认。\"}"
+    }
+  }
+}

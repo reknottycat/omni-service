@@ -99,13 +99,20 @@ class OnboardingContracts(unittest.TestCase):
                     "--model-url", "http://127.0.0.1:8085/v1", "--model", "demo",
                     "--chat-scope", "connection", "--port", "9090"]
             token = "123456:fixturexxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            bot = {"appId": "cli_example", "brand": "feishu", "identity": "bot", "available": True}
+            user = {"ok": True, "identity": "user", "data": {"open_id": "ou_admin", "tenant_key": "tenant_1"}}
             with patch("omni_service.onboarding.getpass.getpass", side_effect=(token, "test-model-key", "fixture-secret")), \
-                    patch("omni_service.onboarding._feishu_owner", return_value=("ou_admin", "tenant_1")), \
+                    patch("omni_service.onboarding._lark", side_effect=(None, bot, None, bot, None, user, {})) as lark, \
                     patch("omni_service.onboarding._telegram_pair",
                           return_value=({"username": "example_bot"}, Connection("conn", 10, True, True, False))), \
                     patch("omni_service.onboarding.LocalTranslation") as model:
                 self.assertEqual(main(args), 0)
                 model.return_value.translate.assert_called_once()
+                for index in (0, 2):
+                    init = lark.call_args_list[index].args[0]
+                    self.assertEqual(init[init.index("--name") + 1], "cli_example")
+                for index in (1, 3, 4, 5, 6):
+                    self.assertEqual(lark.call_args_list[index].args[0][0], "--profile=cli_example")
             actual = json.loads(config.read_text())
             self.assertEqual(actual["mode"], "personal-managed")
             self.assertEqual(actual["management"]["admin_ids"], ["ou_admin"])
@@ -116,6 +123,22 @@ class OnboardingContracts(unittest.TestCase):
             self.assertNotIn("test-model-key", config.read_text())
             self.assertEqual(read_credentials(creds)["TELEGRAM_BOT_TOKEN"], token)
             self.assertEqual(main(args), 1)  # Setup cannot rebind an enabled deployment.
+
+    def test_prepare_feishu_keeps_configured_profile_on_migration(self):
+        app_id, profile = "cli_example", "logistics"
+        bot = {"appId": app_id, "brand": "feishu", "identity": "bot", "available": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "personal.json"
+            config.write_text(json.dumps({"feishu": {"app_id": app_id, "profile": profile}}))
+            credentials = Path(tmp) / "credentials.env"
+            credentials.write_text("OMNI_FEISHU_APP_SECRET=fixture-secret\n")
+            credentials.chmod(0o600)
+            args = ["prepare-feishu", "--config", str(config), "--secrets-file", str(credentials)]
+            with patch("omni_service.onboarding._lark", side_effect=(None, bot)) as lark:
+                self.assertEqual(main(args), 0)
+                init = lark.call_args_list[0].args[0]
+                self.assertEqual(init[init.index("--name") + 1], profile)
+                self.assertEqual(lark.call_args_list[1].args[0], [f"--profile={profile}", "whoami", "--as", "bot"])
 
 
 class ConnectionScopedBridge(unittest.TestCase):

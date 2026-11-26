@@ -88,6 +88,12 @@ Mac arm64 / Python 3.12.16 通过上面的运行入口，使用真实 Telegram�
 
 `52f7674` 在 DGX Linux aarch64 / Python 3.12.3 执行 `bash scripts/acceptance.sh`，151 项通过，0 失败、0 错误、0 跳过。覆盖两客户独立群、跨群和旧版本审批拒绝、未审批禁止发送、按发送回执累计五轮和 Agent 开关。源码 SHA256 为 `36b1079c91b3841c89a506196a6f2ba1067b4a6138fc4c54e821061989a45d86`。报告在本机 `artifacts/dgx-approval-20261126/acceptance.json`。
 
+### 2026-11-26 群内开关与定向交接验收
+
+`b22ed6b` 的 Mac 真实平台试点使用一位已授权 Telegram 测试联系人。新建群 @所有人 公告显示两个开关默认关闭，客户补齐信息后群内交接只 @负责人。飞书开启两个开关后，俄语客户追问自动产生带客户原话及已收资料的待审草稿，飞书来信显示 `[用户]`。关闭回复辅助后草稿取消，Telegram 全程只有首条固定欢迎语。飞书的两项设置已恢复关闭，试点进程继续运行。本机证据见 `artifacts/personal-pilot/mac-room-preferences-acceptance.json`。
+
+同版本在 DGX Linux aarch64 / Python 3.12.3 执行 `bash scripts/acceptance.sh`，157 项通过，0 失败、0 错误、0 跳过。包含群间隔离、重启重放、关闭后拦截已批准但未发送的任务、人工回复让生成中的草稿失效，以及标签不改变外发译文。源码 SHA256 为 `e1eeef079a797623b00a6057d65fb77ca229a71ecd3e86674f6047dcf13d46a4`，报告在本机 `artifacts/dgx-room-preferences-20261126/acceptance.json`。
+
 ## 普通账号找不到连接入口时
 
 已实测 [Telegram Web K](https://web.telegram.org/k/) 可使用已登录的普通账号完成连接。在编辑个人资料中打开 Chat Automation，选择 Only Selected、指定测试联系人、开启 Reply。[客户端源码](https://github.com/morethanwords/tweb/blob/master/src/components/sidebarLeft/tabs/editProfile.tsx#L422-L472)

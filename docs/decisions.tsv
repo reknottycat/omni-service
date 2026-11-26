@@ -18,3 +18,4 @@ ts	phase	decision	why	evidence	result
 2026-11-26T16:29:56+08:00	verification	实测 Telegram 与飞书双向文字并补齐客户显示名	两轮分别验证原账号代发及重启后姓名显示	docs/personal-account.md	Mac live text passed; DGX 118 Linux mock tests passed
 2026-11-26T16:47:19+08:00	verification	新增新会话限轮接待及飞书群内提及规则	AI 和人工有独立标签，群内协调消息不会流向客户	docs/personal-account.md#新会话接待与飞书群规则	Mac live pilot passed; DGX 136 Linux mock tests passed
 2026-11-26T17:05:43+08:00	verification	基础接待固定欢迎、飞书逐条审批及独立 Agent 开关	实际验证独立群、预览一致、群内交接及人工回复	docs/personal-account.md#2026-11-26-审批式接待验收	Mac one authorized contact passed; DGX 151 Linux mock tests passed
+2026-11-26T17:23:18+08:00	verification	群内配置回复辅助、飞书来源标签和定向交接	真实新群验证群内指令及客户触发后未经审批不外发	docs/personal-account.md#2026-11-26-群内开关与定向交接验收	Mac one authorized contact passed; DGX 157 Linux mock tests passed

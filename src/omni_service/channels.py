@@ -298,23 +298,31 @@ def _media(attachment):
     return kind, _id(attachment.remote_id, "destination remote_id")
 
 
-def feishu_text(text, *, mention_all=False):
-    """Escape mention markup in message text before adding a trusted @all."""
+def feishu_text(text, *, mention_all=False, mention_user_id=None):
+    """Escape mention markup in message text before adding a trusted mention."""
     if type(mention_all) is not bool:
         raise ChannelError("invalid_payload", "Feishu @all flag must be a boolean")
+    if mention_user_id is not None and (mention_all or not isinstance(mention_user_id, str)
+            or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", mention_user_id) is None
+            or mention_user_id.lower() == "all"):
+        raise ChannelError("invalid_payload", "Feishu mention must identify one specific user")
     plain_text = _FEISHU_MENTION_TAG.sub("‹at", text)
-    return '<at user_id="all"></at> ' + plain_text if mention_all else plain_text
+    target = "all" if mention_all else mention_user_id
+    if target is not None:
+        return f'<at user_id="{target}"></at> ' + plain_text
+    return plain_text
 
 
 def send_request(channel, account_id, chat_id, text, *, token="simulation-token",
                  recipient_type="chat", attachment: Attachment | None = None,
-                 api_version="v27.0", mention_all=False) -> Request:
+                 api_version="v27.0", mention_all=False, mention_user_id=None) -> Request:
     """Build an official API request. The caller owns service-window enforcement."""
     _channel(channel)
     account_id, chat_id = _id(account_id, "account_id"), _id(chat_id, "chat_id")
     text = _text(text)
-    if type(mention_all) is not bool or (mention_all and (channel != "feishu" or attachment is not None)):
-        raise ChannelError("invalid_payload", "@all is only supported for Feishu text")
+    if (type(mention_all) is not bool or ((mention_all or mention_user_id is not None)
+            and (channel != "feishu" or attachment is not None))):
+        raise ChannelError("invalid_payload", "Mentions are only supported for Feishu text")
     if not text and attachment is None:
         raise ChannelError("invalid_payload", "Cannot send an empty message")
     if len(text) > {"telegram": 4096, "max": 4000, "whatsapp": 4096, "feishu": 20000}[channel]:
@@ -365,7 +373,7 @@ def send_request(channel, account_id, chat_id, text, *, token="simulation-token"
             raise ChannelError("unsupported", "Feishu media has no caption; send separate text")
         content = {"image_key" if kind == "image" else "file_key": remote_id}
     else:
-        content = {"text": feishu_text(text, mention_all=mention_all)}
+        content = {"text": feishu_text(text, mention_all=mention_all, mention_user_id=mention_user_id)}
         if len(content["text"]) > 20000:
             raise ChannelError("invalid_payload", "Message exceeds platform text limit")
     body = {"receive_id": chat_id, "msg_type": kind or "text",

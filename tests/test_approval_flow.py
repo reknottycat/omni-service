@@ -1,5 +1,6 @@
-"""Verify that only the exact Feishu-approved translation can leave its conversation."""
+"""Verify room preferences and versioned approvals through signed webhooks."""
 
+from contextlib import ExitStack
 import json
 from pathlib import Path
 import tempfile
@@ -33,19 +34,21 @@ class ApprovalFlowAcceptance(unittest.TestCase):
     def setUp(self):
         self.directory = self.enterContext(tempfile.TemporaryDirectory())
         self.platforms = self.enterContext(FakePlatforms())
+        self.runtime = self.enterContext(ExitStack())
         self.now = 2_000_000_000
 
-    def start(self, *, advisor=None):
+    def start(self, *, advisor=None, handoff_staff_id=None):
+        self.runtime.close()
         self.service = Service(Path(self.directory) / "approval.sqlite3", HttpTransport(self.platforms.urls),
                                clock=lambda: self.now, intake=Intake(extract, simulated=True),
-                               approval_intake=True, agent_advisor=advisor)
-        self.addCleanup(self.service.close)
+                               approval_intake=True, agent_advisor=advisor, handoff_staff_id=handoff_staff_id)
+        self.runtime.callback(self.service.close)
         server = create_server(self.service)
         thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
         thread.start()
-        self.addCleanup(thread.join, 3)
-        self.addCleanup(server.server_close)
-        self.addCleanup(server.shutdown)
+        self.runtime.callback(thread.join, 3)
+        self.runtime.callback(server.server_close)
+        self.runtime.callback(server.shutdown)
         self.base = f"http://127.0.0.1:{server.server_port}"
 
     def admin(self, path, body=None):
@@ -124,7 +127,7 @@ class ApprovalFlowAcceptance(unittest.TestCase):
         self.assertEqual(len(self.texts("telegram", "102")), 1)
 
     def test_new_customer_context_supersedes_drafts_and_complete_handoff_is_feishu_only(self):
-        self.start()
+        self.start(handoff_staff_id="employee-2")
         cid = self.customer(COMPANY)
         self.drain()
         first = self.conversation(cid)
@@ -147,7 +150,7 @@ class ApprovalFlowAcceptance(unittest.TestCase):
         self.assertEqual(len(rules), 1)
         self.assertEqual(len(handoffs), 1)
         self.assertTrue(rules[0].startswith('<at user_id="all"></at>'))
-        self.assertTrue(handoffs[0].startswith('<at user_id="all"></at>'))
+        self.assertTrue(handoffs[0].startswith('<at user_id="employee-2"></at>'))
         self.assertIn("客户原话：" + COMPANY, handoffs[0])
         self.assertIn("客户原话：" + SHIPMENT, handoffs[0])
         for fact in FACTS.values():
@@ -167,7 +170,8 @@ class ApprovalFlowAcceptance(unittest.TestCase):
                 self.assertEqual(state["drafts"], [])
                 self.assertEqual(len(self.texts("telegram", chat)), 1)
                 self.assertIn("виртуальный помощник", self.texts("telegram", chat)[0])
-                self.assertTrue(any("AI 接待结束，请转人工" in text
+                self.assertTrue(any(text.startswith('<at user_id="employee-1"></at>')
+                                    and "AI 接待结束，请转人工" in text
                                     for text in self.texts("feishu", state["room_id"])))
 
     def test_preview_confirmation_and_five_delivered_questions_gate_handoff(self):
@@ -261,7 +265,7 @@ class ApprovalFlowAcceptance(unittest.TestCase):
         other_cid = self.customer("SEPARATE CUSTOMER", chat="102")
         self.drain()
         self.service.set_agent_enabled(True)
-        self.assertEqual(self.staff(room, "/draft")["status"], "drafted")
+        self.assertEqual(self.staff(room, "/draft")["status"], "draft_queued")
         self.drain()
         advice = self.conversation(cid)["drafts"][-1]
         self.assertEqual(advice["kind"], "agent_draft")
@@ -275,7 +279,7 @@ class ApprovalFlowAcceptance(unittest.TestCase):
         self.service.set_agent_enabled(False)
         self.assertEqual(self.staff(room, approve(advice))["status"], "approval_stale")
         self.service.set_agent_enabled(True)
-        self.assertEqual(self.staff(room, "/draft")["status"], "drafted")
+        self.assertEqual(self.staff(room, "/draft")["status"], "draft_queued")
         self.drain()
         advice = self.conversation(cid)["drafts"][-1]
         self.assertEqual(self.staff(room, approve(advice))["status"], "approved")
@@ -283,3 +287,174 @@ class ApprovalFlowAcceptance(unittest.TestCase):
         self.assertEqual(self.texts("telegram", "101")[-1], advice["customer_text"])
         self.assertEqual(len(self.texts("telegram", "101")), 2)
         self.assertEqual(len(self.texts("telegram", "102")), 1)
+
+    def test_group_preferences_and_control_commands_stay_in_the_correct_room(self):
+        self.start(advisor=lambda _transcript: "您好，我来帮您处理。")
+        cid_a, cid_b = self.customer(COMPANY), self.customer(COMPLETE, chat="102")
+        self.drain()
+        room_a = self.conversation(cid_a)["room_id"]
+        room_b = self.conversation(cid_b)["room_id"]
+        defaults = {"reply_assist": False, "show_labels": False}
+        self.assertEqual(self.conversation(cid_a)["settings"], defaults)
+        self.assertEqual(self.conversation(cid_b)["settings"], defaults)
+
+        rules = [copy for copy in self.texts("feishu", room_a) if "本群的普通文字消息" in copy]
+        self.assertEqual(len(rules), 1)
+        self.assertTrue(rules[0].startswith('<at user_id="all"></at>'))
+        for command in ("/回复辅助", "/标签"):
+            self.assertIn(command, rules[0])
+        self.assertIn("关", rules[0])
+
+        self.assertEqual(self.staff(room_a, "/回复辅助 开", employee="unlisted", expected=403)["error"],
+                         "forbidden")
+        self.assertEqual(self.staff(room_a, "/标签 开", bot=True)["accepted"], 0)
+        self.assertEqual(self.staff(room_a, "@employee-2 /标签 开")["status"], "internal_only")
+        self.assertEqual(self.staff(room_a, "/未知命令 您好，我来帮您处理。")["status"], "internal_only")
+        self.assertEqual(self.conversation(cid_a)["settings"], defaults)
+
+        self.staff(room_a, "/回复辅助 开")
+        self.staff(room_a, "/标签 开")
+        self.staff(room_a, "/回复辅助 状态")
+        self.staff(room_a, "/标签 状态")
+        self.drain()
+        self.assertEqual(self.conversation(cid_a)["settings"], {"reply_assist": True, "show_labels": True})
+        self.assertEqual(self.conversation(cid_b)["settings"], defaults)
+        self.assertEqual(self.conversation(cid_a)["mode"], "auto")
+        self.assertEqual(len(self.texts("telegram", "101")), 1)
+        self.assertEqual(len(self.texts("telegram", "102")), 1)
+        notices = "\n".join(self.texts("feishu", room_a)[1:])
+        self.assertRegex(notices, r"回复辅助[^\n]*开")
+        self.assertRegex(notices, r"标签[^\n]*开")
+
+    def test_new_customer_event_schedules_agent_only_after_handoff_in_enabled_room(self):
+        calls = []
+
+        def advisor(transcript):
+            calls.append(transcript)
+            return "您好，我来帮您处理。"
+
+        self.start(advisor=advisor)
+        cid_a = self.customer(COMPANY)
+        cid_b = self.customer(COMPLETE, chat="102")
+        self.drain()
+        room_a = self.conversation(cid_a)["room_id"]
+        room_b = self.conversation(cid_b)["room_id"]
+        self.staff(room_a, "/回复辅助 开")
+        self.customer("Нужна кукуруза.")
+        self.drain()
+        self.assertFalse(calls)
+        self.assertEqual(self.conversation(cid_a)["drafts"][-1]["kind"], "intake_question")
+        self.customer(SHIPMENT)
+        self.drain()
+        self.assertEqual(self.conversation(cid_a)["mode"], "manual")
+        self.assertFalse(calls)
+
+        self.staff(room_a, "@employee-2 Private comment")
+        self.customer("Изолированное сообщение", chat="102")
+        self.now += 1
+        trigger = customer_payload("telegram", "Когда возможна перевозка?", customer="101",
+                                   sequence=self.now, timestamp=self.now, language_hint="ru")
+        self.webhook("telegram", trigger)
+        self.assertEqual(self.webhook("telegram", trigger)["results"][0]["status"], "duplicate")
+        self.start(advisor=advisor)
+        self.assertEqual(self.conversation(cid_a)["settings"], {"reply_assist": True, "show_labels": False})
+        self.assertFalse(self.conversation(cid_b)["settings"]["reply_assist"])
+        self.drain()
+        self.assertEqual(len(calls), 1)
+        seen = calls[0]
+        self.assertIn({"actor": "customer", "text": "Когда возможна перевозка?"}, seen)
+        self.assertNotIn("Private comment", str(seen))
+        self.assertNotIn("Изолированное сообщение", str(seen))
+        self.assertEqual(len(self.texts("telegram", "101")), 1)
+        draft = self.conversation(cid_a)["drafts"][-1]
+        self.assertEqual(draft["kind"], "agent_draft")
+        previews = [copy for copy in self.texts("feishu", room_a) if approve(draft) in copy]
+        self.assertEqual(len(previews), 1)
+        self.assertIn("参考", previews[0])
+        self.assertNotIn(approve(draft), "\n".join(self.texts("feishu", room_b)))
+
+        self.staff(room_a, "/回复辅助 关")
+        self.assertEqual(self.staff(room_a, approve(draft))["status"], "approval_stale")
+        self.staff(room_a, "/回复辅助 开")
+        self.customer("Уточните, пожалуйста.")
+        self.drain()
+        draft = self.conversation(cid_a)["drafts"][-1]
+        self.assertEqual(self.staff(room_a, approve(draft))["status"], "approved")
+        self.staff(room_a, "/回复辅助 关")
+        self.drain()
+        self.assertEqual(len(self.texts("telegram", "101")), 1)
+        self.staff(room_a, "/回复辅助 开")
+        self.customer("Спасибо")
+        self.drain()
+        draft = self.conversation(cid_a)["drafts"][-1]
+        self.assertEqual(self.staff(room_a, approve(draft))["status"], "approved")
+        self.drain()
+        self.assertEqual(self.texts("telegram", "101")[-1], draft["customer_text"])
+        self.assertEqual(len(self.texts("telegram", "101")), 2)
+        self.assertEqual(len(self.texts("telegram", "102")), 1)
+
+    def test_source_labels_only_change_feishu_display(self):
+        self.start()
+        cid_a, cid_b = self.customer(COMPANY), self.customer(COMPLETE, chat="102")
+        self.drain()
+        room_a = self.conversation(cid_a)["room_id"]
+        room_b = self.conversation(cid_b)["room_id"]
+        prefixes = ("[用户]", "[AI]", "[AI 模拟]", "OmniService 服务通知：[同事]")
+        self.assertFalse(any(copy.startswith(prefixes) for copy in self.texts("feishu", room_a)))
+
+        self.staff(room_a, "/标签 开")
+        self.customer("Нужна кукуруза.")
+        self.drain()
+        draft = self.conversation(cid_a)["drafts"][-1]
+        self.assertEqual(self.staff(room_a, approve(draft))["status"], "approved")
+        self.drain()
+        self.staff(room_a, "您好，我来帮您处理。")
+        self.staff(room_b, "您好，我来帮您处理。")
+        self.drain()
+        tagged = self.texts("feishu", room_a)
+        self.assertTrue(any(copy.startswith("[用户]") and "Нужна кукуруза" in copy for copy in tagged))
+        self.assertTrue(any(copy.startswith(("[AI]", "[AI 模拟]")) for copy in tagged))
+        self.assertTrue(any(copy.startswith("[同事] 已发给客户：") for copy in tagged))
+        self.assertFalse(any(copy.startswith(prefixes) for copy in self.texts("feishu", room_b)))
+        self.assertEqual(self.texts("telegram", "101")[-2], draft["customer_text"])
+        self.assertEqual(self.texts("telegram", "101")[-1], self.texts("telegram", "102")[-1])
+
+        start = len(tagged)
+        self.staff(room_a, "/标签 关")
+        self.customer("Спасибо")
+        self.staff(room_a, "您好，我来帮您处理。")
+        self.drain()
+        self.assertFalse(self.conversation(cid_a)["settings"]["show_labels"])
+        self.assertFalse(any(copy.startswith(prefixes) for copy in self.texts("feishu", room_a)[start:]))
+
+    def test_staff_message_supersedes_an_inflight_agent_job(self):
+        started = threading.Event()
+        release = threading.Event()
+
+        def advisor(_transcript):
+            started.set()
+            if not release.wait(3):
+                raise AssertionError("staff could not reply while the advisor was running")
+            return "您好，我来帮您处理。"
+
+        self.start(advisor=advisor)
+        cid = self.customer(COMPLETE)
+        self.drain()
+        room = self.conversation(cid)["room_id"]
+        self.staff(room, "/回复辅助 开")
+        self.customer("Уточните, пожалуйста.")
+
+        result = []
+        thread = threading.Thread(target=lambda: result.append(self.drain()), daemon=True)
+        thread.start()
+        self.addCleanup(thread.join, 3)
+        self.addCleanup(release.set)
+        self.assertTrue(started.wait(3))
+        self.assertEqual(self.staff(room, "您好，我来帮您处理。")["status"], "queued")
+        release.set()
+        thread.join(3)
+        self.assertFalse(thread.is_alive())
+        self.assertTrue(result)
+        self.assertEqual(self.conversation(cid)["drafts"], [])
+        self.assertEqual(len(self.texts("telegram", "101")), 2)
+        self.assertIn("Здравствуйте! Я помогу вам.", self.texts("telegram", "101")[-1])

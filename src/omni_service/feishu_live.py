@@ -134,14 +134,16 @@ class FeishuLive:
             raise ChannelError("delivery_unknown")
         return chat_id
 
-    def send(self, text, operation_id, *, mention_all=False, chat_id=None):
+    def send(self, text, operation_id, *, mention_all=False, mention_user_id=None, chat_id=None):
         """Send bot text to the scoped group and return the confirmed message ID."""
         chat_id = self._target(chat_id)
         if chat_id is None:
             raise ChannelError("feishu_invalid_chat")
         if not isinstance(text, str) or not text.strip() or not isinstance(operation_id, str) or not operation_id:
             raise ChannelError("feishu_invalid_payload")
-        content = feishu_text(text, mention_all=mention_all)
+        if mention_user_id is not None and (not _id(mention_user_id, "ou_") or mention_user_id not in self.staff_ids):
+            raise ChannelError("feishu_invalid_mention")
+        content = feishu_text(text, mention_all=mention_all, mention_user_id=mention_user_id)
         self.preflight(chat_id)
         key = sha256(f"{self.app_id}:{chat_id}:{operation_id}".encode()).hexdigest()[:48]
         receipt = self._bot_data(["im", "+messages-send", "--chat-id", chat_id,

@@ -30,6 +30,7 @@ class ManagedFeishu:
         self.groups = {}
         self.create_requests = []
         self.sent = []
+        self.mentioned_staff = []
         self.unknown_create = False
 
     def create_room(self, name, key):
@@ -44,9 +45,11 @@ class ManagedFeishu:
         if self.groups.get(chat_id) != {"users": self.staff_ids, "bots": self.bot_app_ids}:
             raise ChannelError("feishu_members_mismatch")
 
-    def send(self, text, key, *, chat_id, mention_all=False):
+    def send(self, text, key, *, chat_id, mention_all=False, mention_user_id=None):
         self.preflight(chat_id)
         self.sent.append((chat_id, text, key, mention_all))
+        if mention_user_id is not None:
+            self.mentioned_staff.append((chat_id, mention_user_id))
         return "om_" + str(len(self.sent))
 
 
@@ -121,6 +124,7 @@ class ManagedBridgeAcceptance(unittest.TestCase):
             (20, draft["customer_text"]), (30, "[Agent] OmniService: Hello! I will help you."),
         ])
         self.assertEqual(self.conversations()["30"]["drafts"][0]["status"], "cancelled")
+        self.assertEqual(self.feishu.mentioned_staff, [(room_b, "ou_allowed")])
 
         self.bridge.close()
         self.now = 1002

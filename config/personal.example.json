@@ -12,6 +12,7 @@
     "profile": "",
     "chat_id": "",
     "staff_ids": [],
+    "handoff_staff_id": null,
     "allowed_bot_app_ids": []
   },
   "translation": {

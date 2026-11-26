@@ -144,8 +144,9 @@ class PersonalBridge(Service):
             mid = self._message(db, cid, direction="outbound", source_channel="telegram",
                                 source_id=event.message_id, author_id=event.user_id, text=event.text,
                                 status="sent", language=self.language.detect(event.text, conv["language"]))
+            label = self._source_label(db, cid, '同事') if self.approval_intake else '[人工客服] '
             self._queue(db, cid, "feishu", "send", "owner:" + mid,
-                        {"text": "[人工客服] Telegram 本人已回复：" + event.text})
+                        {"text": label + "Telegram 本人已回复：" + event.text})
         return {"status": "owner_mirrored", "conversation_id": cid}
 
     def _request(self, db, item, conv):
@@ -185,6 +186,8 @@ class PersonalBridge(Service):
             options = {"chat_id": conv["room_id"]} if self.managed else {}
             if request.get("mention_all") is True:
                 options["mention_all"] = True
+            if "mention_user_id" in request:
+                options["mention_user_id"] = request["mention_user_id"]
             return self.feishu.send(request["text"], item["operation_key"], **options)
         if self.managed and conv["room_id"] is not None:
             self.feishu.preflight(conv["room_id"])
@@ -253,7 +256,7 @@ def run(bridge):
     try:
         print("OmniService Telegram–Feishu bridge started. Translation:", bridge.language.provider_name,
               "Intake:", "on" if bridge.intake_enabled else "off",
-              "Agent:", "on" if bridge.agent_advisor is not None else "off", flush=True)
+              "Agent default:", "on" if bridge.agent_enabled else "off", flush=True)
         while not stop.is_set():
             try:
                 for event in bridge.telegram.poll(timeout=2):
@@ -297,17 +300,18 @@ def intake_provider(config, language):
     return Intake(extract, max_replies=config.get("max_replies", 5), simulated=simulated), config.get("enabled", False)
 
 
-def agent_provider(config, language):
+def agent_provider(config, language, *, approval_intake):
     if not isinstance(config, dict) or type(config.get("enabled", False)) is not bool:
         raise ChannelError("invalid_agent_config")
-    if not config.get("enabled", False):
-        return None
-    if isinstance(language, SimulationLanguage):
-        return lambda _messages: "您好，我来帮您处理。"
+    enabled = config.get("enabled", False)
+    if not approval_intake:
+        if enabled:
+            raise ChannelError("invalid_agent_config")
+        return None, False
     advisor = getattr(language, "suggest_reply", None)
     if not callable(advisor):
         raise ChannelError("invalid_agent_config")
-    return advisor
+    return advisor, enabled
 
 
 def main():
@@ -349,9 +353,15 @@ def main():
         room = feishu_config.get("chat_id")
         if (managed and room not in (None, "")) or (not managed and not room):
             raise ChannelError("feishu_invalid_config")
-        feishu = FeishuLive(None if managed else room, feishu_config["staff_ids"],
+        staff_ids = feishu_config["staff_ids"]
+        feishu = FeishuLive(None if managed else room, staff_ids,
                             app_id=feishu_config["app_id"], profile=feishu_config.get("profile"),
                             allowed_bot_app_ids=feishu_config.get("allowed_bot_app_ids", []))
+        handoff_staff_id = feishu_config.get("handoff_staff_id")
+        if handoff_staff_id is None:
+            handoff_staff_id = staff_ids[0]
+        if not isinstance(handoff_staff_id, str) or handoff_staff_id not in feishu.staff_ids:
+            raise ChannelError("invalid_handoff_staff")
         feishu.preflight()
         connection = Connection.from_update(api.call("getBusinessConnection",
             {"business_connection_id": telegram["connection_id"]}))
@@ -367,13 +377,11 @@ def main():
         language = translation_provider(config["translation"])
         intake, intake_enabled = intake_provider(config.get("intake", {}), language)
         intake_enabled = managed or intake_enabled
-        advisor = agent_provider(config.get("agent", {}), language)
-        if advisor is not None and not intake_enabled:
-            raise ChannelError("invalid_agent_config")
+        advisor, agent_enabled = agent_provider(config.get("agent", {}), language, approval_intake=intake_enabled)
         if args.action == "check":
             audience = "Feishu application identity" if managed else "Feishu group"
             print("Telegram connection and", audience, "verified. Translation:", language.provider_name,
-                  "Intake:", "on" if intake_enabled else "off", "Agent:", "on" if advisor is not None else "off")
+                  "Intake:", "on" if intake_enabled else "off", "Agent default:", "on" if agent_enabled else "off")
             return 0
         os.umask(0o077)
         args.db.parent.mkdir(parents=True, exist_ok=True)
@@ -387,7 +395,8 @@ def main():
                 args.db, api, feishu, owner=connection.owner_id, **scope,
                 connection_id=connection.connection_id, bot_id=bot["id"],
                 language=language, intake=intake, intake_enabled=intake_enabled,
-                approval_intake=intake_enabled, agent_advisor=advisor)
+                approval_intake=intake_enabled, agent_advisor=advisor,
+                agent_enabled=agent_enabled, handoff_staff_id=handoff_staff_id)
             try:
                 if not intake_enabled:
                     bridge.set_intake_enabled(False)

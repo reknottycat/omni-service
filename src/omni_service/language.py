@@ -35,6 +35,9 @@ class SimulationLanguage:
     provider_name = 'deterministic-fixtures'
     supported = ('zh', 'ru', 'en', 'es')
 
+    def suggest_reply(self, _transcript):
+        return '您好，我来帮您处理。'
+
     def detect(self, text, previous='und', hint=''):
         value = _normal(text)
         if not value or value in ('ok', 'okay', 'да', 'нет', 'yes', 'no') or not any(c.isalpha() for c in value):

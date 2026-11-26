@@ -29,6 +29,7 @@ _STAFF_LABELS = {'zh': '人工客服', 'ru': 'Сотрудник', 'en': 'Agent'
 _ROOM_RULES = ('本群的普通文字消息会翻译后发给客户。'
                '带 @ 的消息只在群内使用，包括 @所有人、@机器人和 @同事。')
 _APPROVAL_RULES = _ROOM_RULES + ' 机器人草稿须由客服按预览中的 /approve 指令逐条批准。'
+_PREFERENCE_COMMANDS = {'/回复辅助': 'reply_assist', '/标签': 'show_labels'}
 
 
 def _json(value):
@@ -43,19 +44,24 @@ class Service:
     def __init__(self, db_path, transport, *, clock=time.time,
                  members=tuple(f'employee-{n}' for n in range(1, 8)), language=None,
                  intake=None, intake_enabled=False, label_replies=False,
-                 approval_intake=False, agent_advisor=None):
+                 approval_intake=False, agent_advisor=None, agent_enabled=False, handoff_staff_id=None):
         if approval_intake and intake is None:
             raise ChannelError('invalid_intake_config')
+        self.default_members = tuple(dict.fromkeys(members))
+        if handoff_staff_id is not None and handoff_staff_id not in self.default_members:
+            raise ChannelError('invalid_handoff_staff')
+        if type(agent_enabled) is not bool or (agent_enabled and not callable(agent_advisor)):
+            raise ChannelError('invalid_agent_config')
         self.store = Store(db_path)
         self.transport = transport
         self.clock = clock
-        self.default_members = tuple(dict.fromkeys(members))
+        self.handoff_staff_id = handoff_staff_id or next(iter(self.default_members), None)
         self.language = language or SimulationLanguage()
         self.intake = intake
         self.approval_intake = approval_intake
         self.intake_enabled = approval_intake or intake_enabled
         self.agent_advisor = agent_advisor
-        self.agent_enabled = agent_advisor is not None
+        self.agent_enabled = agent_enabled
         self.label_replies = label_replies or intake is not None
         self._drain_lock = threading.Lock()
 
@@ -74,13 +80,39 @@ class Service:
         return {'enabled': enabled, 'max_replies': self.intake.max_replies}
 
     def set_agent_enabled(self, enabled):
-        if not self.approval_intake or type(enabled) is not bool or (enabled and self.agent_advisor is None):
+        if not self.approval_intake or type(enabled) is not bool or (enabled and not callable(self.agent_advisor)):
             raise ChannelError('invalid_agent_config')
         with self.store.transaction() as db:
             if not enabled:
-                db.execute("UPDATE reply_drafts SET status='cancelled' WHERE kind='agent_draft' AND status='pending'")
+                rows = db.execute('''SELECT conversation_id FROM agent_reply_jobs
+                    UNION SELECT conversation_id FROM reply_drafts WHERE kind='agent_draft'
+                    AND (status='pending' OR message_id IN (SELECT id FROM messages WHERE status='queued'))''').fetchall()
+                for row in rows:
+                    cid = row['conversation_id']
+                    if db.execute('SELECT reply_assist FROM conversation_settings WHERE conversation_id=? AND reply_assist IS NOT NULL',
+                                  (cid,)).fetchone() is None:
+                        self._cancel_agent_work(db, cid)
             self.agent_enabled = enabled
         return {'enabled': enabled}
+
+    def _room_settings(self, db, cid):
+        row = db.execute('SELECT reply_assist,show_labels FROM conversation_settings WHERE conversation_id=?', (cid,)).fetchone()
+        return {
+            'reply_assist': bool(row['reply_assist']) if row and row['reply_assist'] is not None else self.agent_enabled,
+            'show_labels': bool(row and row['show_labels']),
+        }
+
+    def _source_label(self, db, cid, label):
+        return f'[{label}] ' if self._room_settings(db, cid)['show_labels'] else ''
+
+    def _room_rules(self, db, cid):
+        settings = self._room_settings(db, cid)
+        assist = '开' if settings['reply_assist'] else '关'
+        labels = '开' if settings['show_labels'] else '关'
+        return (_APPROVAL_RULES + '\n'
+                f'/回复辅助 开|关|状态（当前：{assist}，转人工后生效）\n'
+                f'/标签 开|关|状态（当前：{labels}，仅影响飞书显示）\n'
+                '/draft 手动请求跟进草稿。所有斜杠命令都留在飞书群内。')
 
     def close(self):
         self.store.close()
@@ -100,11 +132,13 @@ class Service:
           (operation_key,conversation_id,message_id,channel,operation,payload,available_at)
           VALUES(?,?,?,?,?,?,?)''', (key, cid, mid, channel, operation, _json(payload), self.clock()))
 
-    def _notify(self, db, cid, key, text, *, mention_all=False):
+    def _notify(self, db, cid, key, text, *, mention_user_id=None):
         conv = self._conversation(db, cid)
         if conv['room_status'] != 'absent':
-            self._queue(db, cid, 'feishu', 'send', 'notice:' + key,
-                        {'text': 'OmniService 服务通知：' + text, 'mention_all': mention_all})
+            payload = {'text': 'OmniService 服务通知：' + text}
+            if mention_user_id:
+                payload['mention_user_id'] = mention_user_id
+            self._queue(db, cid, 'feishu', 'send', 'notice:' + key, payload)
 
     def _message(self, db, cid, *, direction, source_channel, source_id, author_id,
                  text, translated='', language='und', sender_name='', kind='text',
@@ -119,16 +153,27 @@ class Service:
         return mid
 
     def _cancel_ai(self, db, cid):
+        db.execute('DELETE FROM agent_reply_jobs WHERE conversation_id=?', (cid,))
         self._cancel_drafts(db, cid)
+        self._cancel_queued_ai(db, cid)
+
+    def _cancel_agent_work(self, db, cid):
+        db.execute('DELETE FROM agent_reply_jobs WHERE conversation_id=?', (cid,))
+        self._cancel_drafts(db, cid, kind='agent_draft')
+        self._cancel_queued_ai(db, cid, source='agent_draft')
+
+    def _cancel_queued_ai(self, db, cid, *, source=None):
         db.execute("""UPDATE outbox SET status='cancelled' WHERE conversation_id=? AND operation='send'
-            AND status='pending' AND message_id IN (SELECT id FROM messages WHERE author_id='AI' AND source_channel!='ai_welcome')""", (cid,))
+            AND status='pending' AND message_id IN (SELECT id FROM messages WHERE author_id='AI'
+                AND source_channel!='ai_welcome' AND (? IS NULL OR source_channel=?))""", (cid, source, source))
         db.execute("UPDATE messages SET status='cancelled' WHERE conversation_id=? AND author_id='AI' AND status='queued' AND id IN (SELECT message_id FROM outbox WHERE status='cancelled')", (cid,))
 
-    def _cancel_drafts(self, db, cid):
+    def _cancel_drafts(self, db, cid, *, kind=None):
         db.execute("""UPDATE outbox SET status='cancelled' WHERE conversation_id=? AND status='pending'
             AND operation_key IN (SELECT 'notice:draft:' || id FROM reply_drafts
-                                   WHERE conversation_id=? AND status='pending')""", (cid, cid))
-        db.execute("UPDATE reply_drafts SET status='cancelled' WHERE conversation_id=? AND status='pending'", (cid,))
+                                   WHERE conversation_id=? AND status='pending' AND (? IS NULL OR kind=?))""", (cid, cid, kind, kind))
+        db.execute("UPDATE reply_drafts SET status='cancelled' WHERE conversation_id=? AND status='pending' AND (? IS NULL OR kind=?)",
+                   (cid, kind, kind))
 
     def _display_reply(self, text, language, author, sender_name=''):
         if author == 'AI':
@@ -185,7 +230,7 @@ class Service:
             text = '[媒体待转码/上传] ' + text
         body = f"{message['sender_name'] or '客户'} ({conv['channel']}): {text}"
         if self.approval_intake:
-            body = '[客户] ' + body
+            body = self._source_label(db, conv['id'], '用户') + body
         if translated and translated != text:
             body += '\n中文: ' + translated
         self._queue(db, conv['id'], 'feishu', 'send', 'mirror:' + message['id'], {'text': body}, message['id'])
@@ -202,7 +247,11 @@ class Service:
         except ChannelError:
             chinese = '[中文翻译暂不可用]'
         label = 'AI 模拟' if self.intake and self.intake.simulated else 'AI'
-        body = f'{label} → 客户: ' + customer_text
+        if self.approval_intake:
+            simulated = '模拟投递。' if self.intake.simulated else ''
+            body = self._source_label(db, conv['id'], label) + simulated + '已发给客户：' + customer_text
+        else:
+            body = f'{label} → 客户: ' + customer_text
         if chinese and chinese != customer_text:
             body += '\n中文: ' + chinese
         self._queue(db, conv['id'], 'feishu', 'send', key,
@@ -232,7 +281,7 @@ class Service:
             self._queue(db, cid, 'feishu', 'create_room', 'room:' + cid,
                         {'name': 'OmniService ' + cid[-8:]})
             self._queue(db, cid, 'feishu', 'send', 'room-rules:' + cid,
-                        {'text': _APPROVAL_RULES if self.approval_intake else _ROOM_RULES, 'mention_all': True})
+                        {'text': self._room_rules(db, cid) if self.approval_intake else _ROOM_RULES, 'mention_all': True})
         return selected
 
     def _finish_intake(self, db, cid, reason):
@@ -256,8 +305,13 @@ class Service:
                     lines.append('客户原话：' + evidence['original'][:800])
         self._notify(db, cid, 'intake:' + cid,
                      title + '（' + _HANDOFF_LABELS[reason] + '）。\n' + '\n'.join(lines),
-                     mention_all=self.approval_intake)
+                     mention_user_id=self._handoff_recipient(db, cid) if self.approval_intake else None)
         self._audit(db, cid, 'intake_handoff', {'reason': reason})
+
+    def _handoff_recipient(self, db, cid):
+        row = db.execute('''SELECT user_id FROM members WHERE conversation_id=?
+            ORDER BY (user_id=?) DESC, rowid LIMIT 1''', (cid, self.handoff_staff_id)).fetchone()
+        return row['user_id'] if row else None
 
     def _handoff(self, db, cid, staff_ids=None, *, intake_reason='manual_handoff'):
         selected = self._ensure_service_room(db, cid, staff_ids)
@@ -304,7 +358,7 @@ class Service:
             db.execute('UPDATE intake_sessions SET facts=?,source_messages=? WHERE conversation_id=?',
                        (_json(facts), _json(sources), cid))
 
-    def _draft(self, db, conv, translated, *, kind, parent_id=None):
+    def _draft(self, db, conv, translated, *, kind, parent_id=None, reference=''):
         cid = conv['id']
         self._cancel_drafts(db, cid)
         draft_id = _id('draft_')
@@ -316,9 +370,11 @@ class Service:
             (id,conversation_id,kind,language,translated,customer_text,version,parent_id,created_at)
             VALUES(?,?,?,?,?,?,?,?,?)''',
                    (draft_id, cid, kind, conv['language'], translated, customer_text, version, parent_id, self.clock()))
+        label = self._source_label(db, cid, 'AI 模拟' if self.intake.simulated else 'AI')
+        staff_context = reference + '\n\n' if reference else ''
         self._notify(db, cid, 'draft:' + draft_id,
-                     f'机器人草稿，等待客服审批。将向客户发送的译文如下。\n{customer_text}\n\n'
-                     f'/approve {draft_id} {version}')
+                     f'{label}机器人草稿，等待客服审批。将向客户发送的译文如下。\n{customer_text}\n\n'
+                     f'{staff_context}/approve {draft_id} {version}')
         self._audit(db, cid, 'reply_drafted', {'draft_id': draft_id, 'kind': kind, 'version': version})
         return draft_id
 
@@ -342,7 +398,7 @@ class Service:
         if draft['kind'] == 'intake_question':
             if conv['mode'] != 'auto' or self._sent_questions(db, cid) >= self.intake.max_replies:
                 return {'status': 'approval_stale', 'conversation_id': cid}
-        elif not self.agent_enabled or conv['mode'] != 'manual':
+        elif not self._room_settings(db, cid)['reply_assist'] or conv['mode'] != 'manual':
             return {'status': 'agent_disabled', 'conversation_id': cid}
         if (conv['channel'] == 'whatsapp' and self.clock() - conv['last_customer_at'] >= 86400):
             return {'status': 'blocked_window', 'conversation_id': cid}
@@ -358,11 +414,14 @@ class Service:
                                               'actor': event.user_id, 'message_id': mid})
         return {'status': 'approved', 'conversation_id': cid, 'message_id': mid}
 
-    def _suggest_reply(self, db, conv, event):
+    def _queue_agent_job(self, db, conv):
         cid = conv['id']
-        if not self.agent_enabled or conv['mode'] != 'manual':
-            self._notify(db, cid, 'advisor:' + event.message_id, '客服跟进阶段的 Agent 辅助未开启或尚未转人工。')
-            return {'status': 'agent_disabled', 'conversation_id': cid}
+        self._cancel_agent_work(db, cid)
+        request_id = _id('agent_')
+        db.execute('INSERT INTO agent_reply_jobs VALUES(?,?,?)', (cid, request_id, self.clock()))
+        self._audit(db, cid, 'agent_reply_requested', {'request_id': request_id})
+
+    def _agent_context(self, db, cid):
         rows = db.execute("""SELECT direction,author_id,original FROM messages WHERE conversation_id=?
             AND (direction='inbound' AND status!='deleted' OR direction='outbound' AND status='sent')
             ORDER BY rowid DESC LIMIT 12""", (cid,)).fetchall()
@@ -371,18 +430,48 @@ class Service:
             actor = 'customer' if row['direction'] == 'inbound' else ('ai' if row['author_id'] == 'AI' else 'staff')
             if row['original'].strip():
                 transcript.append({'actor': actor, 'text': row['original'][:500]})
+        last_customer = next((turn['text'] for turn in reversed(transcript) if turn['actor'] == 'customer'), '')
+        session = db.execute('SELECT facts FROM intake_sessions WHERE conversation_id=?', (cid,)).fetchone()
+        facts = json.loads(session['facts']) if session else {}
+        confirmed = '、'.join(f'{label} {facts[key]}' for key, label in _INTAKE_LABELS.items() if key in facts)
+        reference = '\n'.join(part for part in (
+            f'供客服参考，客户最近来信：{last_customer}' if last_customer else '',
+            f'接待阶段已确认：{confirmed}' if confirmed else '',
+        ) if part)
+        return transcript, reference
+
+    def _one_agent_job(self):
+        with self.store.transaction() as db:
+            job = db.execute('''SELECT j.* FROM agent_reply_jobs j JOIN conversations c ON c.id=j.conversation_id
+                WHERE c.room_status='ready' ORDER BY j.requested_at,j.request_id LIMIT 1''').fetchone()
+            if job is None:
+                return False
+            cid, request_id = job['conversation_id'], job['request_id']
+            conv = self._conversation(db, cid)
+            if (self.agent_advisor is None or conv['mode'] != 'manual'
+                    or not self._room_settings(db, cid)['reply_assist']):
+                db.execute('DELETE FROM agent_reply_jobs WHERE conversation_id=?', (cid,))
+                return True
+            transcript, reference = self._agent_context(db, cid)
+        translated = None
         try:
             chinese = self.agent_advisor(transcript)
-            translated = self.language.translate(chinese, 'zh', conv['language'])
-            if not translated.strip():
-                raise ChannelError('agent_unavailable')
+            if isinstance(chinese, str) and chinese.strip():
+                translated = self.language.translate(chinese, 'zh', conv['language'])
         except ChannelError:
-            self._notify(db, cid, 'advisor:' + event.message_id, 'Agent 草稿暂不可用，请人工处理。')
-            return {'status': 'agent_unavailable', 'conversation_id': cid}
-        draft_id = self._draft(db, conv, translated, kind='agent_draft')
-        if draft_id is None:
-            return {'status': 'agent_unavailable', 'conversation_id': cid}
-        return {'status': 'drafted', 'conversation_id': cid, 'draft_id': draft_id}
+            pass
+        with self.store.transaction() as db:
+            if not db.execute('DELETE FROM agent_reply_jobs WHERE conversation_id=? AND request_id=?',
+                              (cid, request_id)).rowcount:
+                return True
+            current = self._conversation(db, cid)
+            if (current['mode'] != 'manual' or current['language'] != conv['language']
+                    or not self._room_settings(db, cid)['reply_assist']):
+                return True
+            if not isinstance(translated, str) or not translated.strip() or self._draft(
+                    db, current, translated, kind='agent_draft', reference=reference) is None:
+                self._notify(db, cid, 'advisor:' + request_id, 'Agent 草稿暂不可用，请人工处理。')
+        return True
 
     def _guide_customer(self, db, conv, event, mid, language, *, first):
         cid = conv['id']
@@ -477,6 +566,8 @@ class Service:
                 return {'status': 'unknown_message', 'conversation_id': cid}
             if self.intake is not None:
                 self._forget_intake_source(db, cid, existing['id'])
+            if self.approval_intake:
+                self._cancel_ai(db, cid)
             inflight = db.execute("SELECT 1 FROM outbox WHERE message_id=? AND operation='send' AND status='inflight'", (existing['id'],)).fetchone()
             recall = 'pending' if (existing['external_id'] or inflight) else 'cancelled'
             db.execute("UPDATE messages SET status='deleted',recall_status=? WHERE id=?", (recall, existing['id']))
@@ -517,9 +608,12 @@ class Service:
             self._cancel_ai(db, cid)
             if self.intake is not None:
                 self._forget_intake_source(db, cid, existing['id'])
-        elif self.approval_intake and conv['mode'] == 'manual':
+        elif self.approval_intake and conv['mode'] == 'manual' and timestamp >= conv['language_at']:
             self._cancel_ai(db, cid)
         self._mirror(db, conv, message)
+        if (self.approval_intake and conv['mode'] == 'manual' and event.event_type == 'message'
+                and timestamp >= conv['language_at'] and self._room_settings(db, cid)['reply_assist']):
+            self._queue_agent_job(db, conv)
         if conv['mode'] == 'auto' and event.event_type == 'message' and self.intake is not None:
             if timestamp >= conv['language_at']:
                 self._guide_customer(db, conv, event, mid, language, first=first_contact)
@@ -535,6 +629,56 @@ class Service:
             self._audit(db, cid, 'stale_message_no_auto_reply', {'message_id': mid})
         self._audit(db, cid, 'customer_message', {'message_id': mid, 'language': language})
         return {'status': 'accepted', 'conversation_id': cid, 'message_id': mid}
+
+    def _change_room_setting(self, db, cid, command, arguments):
+        key = _PREFERENCE_COMMANDS[command]
+        if len(arguments) != 1 or arguments[0] not in ('开', '关', '状态'):
+            return 'settings_invalid', f'用法 {command} 开|关|状态'
+        action = arguments[0]
+        if key == 'reply_assist' and action == '开' and not callable(self.agent_advisor):
+            return 'agent_unavailable', '当前服务端没有配置 Agent 回复辅助。'
+        if action != '状态':
+            enabled = action == '开'
+            db.execute('INSERT OR IGNORE INTO conversation_settings(conversation_id) VALUES(?)', (cid,))
+            db.execute(f'UPDATE conversation_settings SET {key}=? WHERE conversation_id=?', (int(enabled), cid))
+            if key == 'reply_assist' and not enabled:
+                self._cancel_agent_work(db, cid)
+            self._audit(db, cid, 'room_setting_changed', {'setting': key, 'enabled': enabled})
+        state = '开' if self._room_settings(db, cid)[key] else '关'
+        return ('settings_status' if action == '状态' else 'settings_updated'), f'{command[1:]}当前：{state}'
+
+    def _room_command(self, db, conv, event, text):
+        cid = conv['id']
+        command, *args = text.split()
+        if not self.approval_intake:
+            return {'status': 'internal_only', 'conversation_id': cid}
+        if command == '/approve':
+            result = self._approve(db, conv, event, args)
+            feedback = {
+                'approved': '译文已批准，等待平台投递回执。',
+                'duplicate_approval': '该译文已处理，请查看对应的投递结果。',
+                'approval_invalid': '请复制机器人草稿下方的完整 /approve 指令。',
+                'approval_stale': '该草稿版本已失效或不属于本群，请查看最新草稿。',
+                'approval_preview_not_delivered': '译文预览还未确认送达，请等群内预览。',
+                'agent_disabled': 'Agent 辅助已关闭，草稿未发出。',
+                'blocked_window': '客户消息窗口已过期，草稿未发出。',
+            }
+            self._notify(db, cid, 'approval:' + event.message_id, feedback[result['status']])
+            return result
+        if command in _PREFERENCE_COMMANDS:
+            status, feedback = self._change_room_setting(db, cid, command, args)
+        elif command == '/draft':
+            if args:
+                status, feedback = 'approval_invalid', '用法 /draft'
+            elif conv['mode'] != 'manual' or not self._room_settings(db, cid)['reply_assist']:
+                status, feedback = 'agent_disabled', '客服跟进阶段的 Agent 辅助未开启或尚未转人工。'
+            else:
+                self._queue_agent_job(db, conv)
+                return {'status': 'draft_queued', 'conversation_id': cid}
+        else:
+            status, feedback = 'internal_only', '该群命令暂不可用。可用 /回复辅助 状态 或 /标签 状态 查询。'
+        self._notify(db, cid, 'command:' + event.message_id, feedback)
+        return {'status': status, 'conversation_id': cid}
 
     def _staff_event(self, db, event):
         row = db.execute('SELECT * FROM conversations WHERE room_id=?', (event.chat_id,)).fetchone()
@@ -553,26 +697,9 @@ class Service:
         if event.has_mentions or '@' in event.text or '＠' in event.text:
             self._audit(db, conv['id'], 'staff_internal_mention', {'source_message_id': event.message_id})
             return {'status': 'internal_only', 'conversation_id': conv['id']}
-        parts = event.text.split()
-        if parts and parts[0] in ('/approve', '/draft'):
-            if not self.approval_intake:
-                return {'status': 'internal_only', 'conversation_id': conv['id']}
-            if parts[0] == '/approve':
-                result = self._approve(db, conv, event, parts[1:])
-                feedback = {
-                    'approved': '译文已批准，等待平台投递回执。',
-                    'duplicate_approval': '该译文已处理，请查看对应的投递结果。',
-                    'approval_invalid': '请复制机器人草稿下方的完整 /approve 指令。',
-                    'approval_stale': '该草稿版本已失效或不属于本群，请查看最新草稿。',
-                    'approval_preview_not_delivered': '译文预览还未确认送达，请等群内预览。',
-                    'agent_disabled': 'Agent 辅助已关闭，草稿未发出。',
-                    'blocked_window': '客户消息窗口已过期，草稿未发出。',
-                }
-                self._notify(db, conv['id'], 'approval:' + event.message_id, feedback[result['status']])
-                return result
-            if parts[0] == '/draft':
-                return (self._suggest_reply(db, conv, event) if len(parts) == 1 else
-                        {'status': 'approval_invalid', 'conversation_id': conv['id']})
+        command_text = event.text.lstrip()
+        if command_text.startswith(('/', '／')):
+            return self._room_command(db, conv, event, '/' + command_text[1:])
         if existing and event.event_type != 'edit':
             return {'status': 'duplicate_message', 'conversation_id': conv['id'], 'message_id': existing['id']}
         self._cancel_ai(db, conv['id'])
@@ -645,6 +772,7 @@ class Service:
                     result['intake'] = {**dict(session), 'facts': json.loads(session['facts']),
                                         'source_messages': json.loads(session['source_messages'])}
             if self.approval_intake:
+                result['settings'] = self._room_settings(db, conversation_id)
                 result['drafts'] = [dict(row) for row in db.execute('''SELECT * FROM reply_drafts
                     WHERE conversation_id=? ORDER BY rowid''', (conversation_id,))]
             result['outbox'] = [dict(r) for r in db.execute('SELECT * FROM outbox WHERE conversation_id=? ORDER BY id', (conversation_id,))]
@@ -665,7 +793,8 @@ class Service:
             return channels.delete_request(channel, conv['account_id'], target, payload['external_id'])
         return channels.send_request(channel, conv['account_id'], target, payload['text'],
                                      recipient_type=payload.get('recipient_type', 'chat'),
-                                     mention_all=payload.get('mention_all', False))
+                                     mention_all=payload.get('mention_all', False),
+                                     mention_user_id=payload.get('mention_user_id'))
 
     def _deliver(self, item, conv, request):
         payload = self.transport.send(item['channel'], request)
@@ -681,7 +810,7 @@ class Service:
             AND message_id=? AND status='approved' ''', (item['conversation_id'], item['message_id'])).fetchone()
         if not draft or draft['customer_text'] != json.loads(item['payload']).get('text'):
             raise ChannelError('approval_required')
-        if draft['kind'] == 'agent_draft' and not self.agent_enabled:
+        if draft['kind'] == 'agent_draft' and not self._room_settings(db, item['conversation_id'])['reply_assist']:
             raise ChannelError('agent_disabled')
 
     def drain(self):
@@ -720,6 +849,8 @@ class Service:
                         item['attempts'] += 1
                         break
                 if item is None:
+                    if self._one_agent_job():
+                        continue
                     break
                 try:
                     external_id = self._deliver(item, conv, request)
@@ -788,6 +919,10 @@ class Service:
                 if (self.approval_intake and msg['source_channel'] == 'intake_question'
                         and self._sent_questions(db, item['conversation_id']) >= self.intake.max_replies):
                     self._handoff(db, item['conversation_id'], intake_reason='reply_limit')
+            elif (self.approval_intake and msg['status'] == 'sent' and msg['source_channel'] == 'feishu'
+                  and self._room_settings(db, item['conversation_id'])['show_labels']):
+                self._queue(db, item['conversation_id'], 'feishu', 'send', 'staff-sent:' + msg['id'],
+                            {'text': '[同事] 已发给客户：' + msg['translated']})
         elif item['operation'] == 'send':
             original_id = json.loads(item['payload']).get('original_message_id')
             if original_id:

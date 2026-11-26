@@ -54,6 +54,24 @@ class FeishuLiveTest(unittest.TestCase):
         self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"],
                          '<at user_id="all"></at> ‹at user_id="all">客户</at>')
 
+    def test_targeted_send_limits_mention_to_the_allowed_staff(self):
+        adapter = self.setup_adapter()
+        with patch("omni_service.feishu_live.subprocess.run") as run:
+            for invalid in ("all", "ou_unlisted", ["ou_staff"]):
+                with self.subTest(invalid=invalid), self.assertRaisesRegex(ChannelError, "feishu_invalid_mention"):
+                    adapter.send("交接", "handoff", mention_user_id=invalid)
+            with self.assertRaisesRegex(ChannelError, "one specific user"):
+                adapter.send("交接", "handoff", mention_all=True, mention_user_id="ou_staff")
+            run.assert_not_called()
+
+        receipt = _data({"chat_id": "oc_test", "message_id": "om_handoff"})
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+            _cli_result, [_IDENTITY, _data(_GROUP), _data(_MEMBERS), receipt]
+        )) as run:
+            self.assertEqual(adapter.send("交接给客服", "handoff", mention_user_id="ou_staff"), "om_handoff")
+        self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"],
+                         '<at user_id="ou_staff"></at> 交接给客服')
+
     def test_unapproved_members_block_the_send_before_issuing_the_command(self):
         adapter = self.setup_adapter()
         scenarios = [

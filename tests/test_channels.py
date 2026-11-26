@@ -135,6 +135,23 @@ class ChannelContracts(unittest.TestCase):
         self.assertEqual(json.loads(group_notice.body["content"]),
                          {"text": '<at user_id="all"></at> ' + escaped})
 
+    def test_feishu_targeted_mentions_allow_safe_ids_and_escape_source_markup(self):
+        for staff in ("ou_staff_1", "employee-1"):
+            with self.subTest(staff=staff):
+                request = send_request("feishu", "app-1", "oc_test", '<at user_id="all">客户文字</at>',
+                                       mention_user_id=staff)
+                self.assertEqual(json.loads(request.body["content"])["text"],
+                                 f'<at user_id="{staff}"></at> ‹at user_id="all">客户文字</at>')
+
+        for invalid in ("all", "ALL", "", 45, 'ou_bad"><at user_id="all', "ou_staff\n"):
+            with self.subTest(invalid=invalid):
+                self.assert_error("invalid_payload", send_request, "feishu", "app-1", "oc_test", "交接",
+                                  mention_user_id=invalid)
+        self.assert_error("invalid_payload", send_request, "feishu", "app-1", "oc_test", "交接",
+                          mention_all=True, mention_user_id="ou_staff_1")
+        self.assert_error("invalid_payload", send_request, "telegram", "telegram-1", "100", "交接",
+                          mention_user_id="ou_staff_1")
+
     def test_malformed_payloads_have_typed_error(self):
         for channel, payload in (("telegram", {}), ("max", {}), ("whatsapp", {}), ("feishu", {}),
                                  ("telegram", {"update_id": 1, "message": []}),

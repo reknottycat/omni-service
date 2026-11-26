@@ -171,13 +171,16 @@ def main():
     args = parser.parse_args()
     from .service import Service
     from .intake import Intake
+    from .language import SimulationLanguage
     from .transport import HttpTransport
     transport = HttpTransport({c: args.fake_platform_url.rstrip("/") + "/" + c
                                for c in ("telegram", "max", "whatsapp", "feishu")})
     intake = None
     if args.intake_max_replies is not None:
         intake = Intake(lambda _text, _fields: {}, max_replies=args.intake_max_replies, simulated=True)
-    service = Service(args.db, transport, intake=intake, approval_intake=intake is not None)
+    language = SimulationLanguage()
+    service = Service(args.db, transport, language=language, intake=intake, approval_intake=intake is not None,
+                      agent_advisor=language.suggest_reply if intake is not None else None)
     server = create_server(service, port=args.port)
     print(f"Simulation API: http://127.0.0.1:{server.server_port}; POST /api/drain to process queue", flush=True)
     try:

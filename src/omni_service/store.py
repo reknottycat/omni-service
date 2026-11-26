@@ -59,6 +59,15 @@ CREATE TABLE IF NOT EXISTS reply_drafts (
  approved_by TEXT, message_id TEXT REFERENCES messages(id), created_at REAL NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS pending_reply_draft ON reply_drafts(conversation_id) WHERE status='pending';
+CREATE TABLE IF NOT EXISTS conversation_settings (
+ conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
+ reply_assist INTEGER CHECK(reply_assist IN (0,1)),
+ show_labels INTEGER NOT NULL DEFAULT 0 CHECK(show_labels IN (0,1))
+);
+CREATE TABLE IF NOT EXISTS agent_reply_jobs (
+ conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
+ request_id TEXT NOT NULL, requested_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS audit (
  id INTEGER PRIMARY KEY AUTOINCREMENT, created_at REAL NOT NULL,
  conversation_id TEXT, action TEXT NOT NULL, detail TEXT NOT NULL

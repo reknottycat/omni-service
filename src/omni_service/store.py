@@ -51,6 +51,14 @@ CREATE TABLE IF NOT EXISTS outbox (
  status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
  available_at REAL NOT NULL, last_error TEXT NOT NULL DEFAULT '', external_id TEXT
 );
+CREATE TABLE IF NOT EXISTS reply_drafts (
+ id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id),
+ kind TEXT NOT NULL CHECK(kind IN ('intake_question','agent_draft')), language TEXT NOT NULL,
+ translated TEXT NOT NULL, customer_text TEXT NOT NULL, version TEXT NOT NULL,
+ parent_id TEXT REFERENCES messages(id), status TEXT NOT NULL DEFAULT 'pending',
+ approved_by TEXT, message_id TEXT REFERENCES messages(id), created_at REAL NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS pending_reply_draft ON reply_drafts(conversation_id) WHERE status='pending';
 CREATE TABLE IF NOT EXISTS audit (
  id INTEGER PRIMARY KEY AUTOINCREMENT, created_at REAL NOT NULL,
  conversation_id TEXT, action TEXT NOT NULL, detail TEXT NOT NULL

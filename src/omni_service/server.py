@@ -129,6 +129,8 @@ def create_server(service, *, host="127.0.0.1", port=0,
                     return self.respond(200, {"results": service.drain()})
                 if parts == ["api", "intake"]:
                     return self.respond(200, service.set_intake_enabled(body.get("enabled")))
+                if parts == ["api", "agent"]:
+                    return self.respond(200, service.set_agent_enabled(body.get("enabled")))
                 if len(parts) == 4 and parts[:2] == ["api", "conversations"]:
                     conversation, action = parts[2:]
                     if action == "handoff":
@@ -175,7 +177,7 @@ def main():
     intake = None
     if args.intake_max_replies is not None:
         intake = Intake(lambda _text, _fields: {}, max_replies=args.intake_max_replies, simulated=True)
-    service = Service(args.db, transport, intake=intake, intake_enabled=intake is not None)
+    service = Service(args.db, transport, intake=intake, approval_intake=intake is not None)
     server = create_server(service, port=args.port)
     print(f"Simulation API: http://127.0.0.1:{server.server_port}; POST /api/drain to process queue", flush=True)
     try:

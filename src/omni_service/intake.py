@@ -84,7 +84,10 @@ class Intake:
         self.max_replies = max_replies
         self.simulated = simulated
 
-    def evaluate(self, text, language, facts, replies, *, first):
+    def welcome(self, language):
+        return _COPY.get(language, _COPY['en'])['welcome']
+
+    def evaluate(self, text, language, facts, replies, *, first, handoff_on_last=True):
         """Use English customer copy when the language is undetermined or unsupported."""
         facts = dict(facts)
         if replies >= self.max_replies:
@@ -111,7 +114,7 @@ class Intake:
 
         if all(field in facts for field in FIELDS):
             return IntakeDecision(facts, transfer, "complete")
-        if replies == self.max_replies - 1:
+        if handoff_on_last and replies == self.max_replies - 1:
             return IntakeDecision(facts, transfer, "reply_limit")
 
         for group in _QUESTION_GROUPS:

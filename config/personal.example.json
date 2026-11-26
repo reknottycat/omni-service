@@ -25,6 +25,9 @@
     "enabled": false,
     "max_replies": 5
   },
+  "agent": {
+    "enabled": false
+  },
   "llm": {
     "base_url": "",
     "model": "",

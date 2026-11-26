@@ -4,8 +4,10 @@ import tempfile
 import threading
 import unittest
 from collections import deque
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
+from uuid import UUID
 
 from omni_service.feishu_live import FeishuLive
 from omni_service.models import ChannelError
@@ -95,7 +97,63 @@ class FeishuLiveTest(unittest.TestCase):
             with self.assertRaisesRegex(ChannelError, "delivery_unknown"):
                 adapter.send("sample", "op1")
 
-    def _stub_cli(self, directory, trace):
+    def test_managed_private_group_creation_is_scoped_and_repeatable(self):
+        adapter = FeishuLive(None, ["ou_second", "ou_staff"], app_id="cli_test",
+                             allowed_bot_app_ids=["cli_companion"])
+        result = _data({**_GROUP, "chat_id": "oc_created"})
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+            _cli_result, [_IDENTITY, result] * 3
+        )) as run:
+            self.assertEqual(adapter.create_room("Synthetic group", "room:first"), "oc_created")
+            self.assertEqual(adapter.create_room("Synthetic group", "room:first"), "oc_created")
+            self.assertEqual(adapter.create_room("Synthetic group", "room:second"), "oc_created")
+
+        first, repeated, different = run.call_args_list[1::2]
+        self.assertEqual(first, repeated)
+        args = first.args[0]
+        self.assertEqual(args[2:5], ["im", "chats", "create"])
+        self.assertEqual(args[args.index("--user-id-type") + 1], "open_id")
+        request_uuid = args[args.index("--uuid") + 1]
+        self.assertEqual(str(UUID(request_uuid)), request_uuid)
+        self.assertNotIn(request_uuid, different.args[0])
+        self.assertEqual(json.loads(first.kwargs["input"]), {
+            "name": "Synthetic group", "chat_mode": "group", "chat_type": "private", "external": False,
+            "group_message_type": "chat", "user_id_list": ["ou_second", "ou_staff"],
+            "bot_id_list": ["cli_companion"],
+        })
+
+    def test_managed_room_requires_a_private_internal_creation_receipt(self):
+        adapter = FeishuLive(None, ["ou_staff"], app_id="cli_test")
+        for mutation in ({"chat_id": "room_incorrect"}, {"chat_type": "public"}, {"external": True}):
+            receipt = _data({**_GROUP, "chat_id": "oc_created", **mutation})
+            with self.subTest(mutation=mutation), patch("omni_service.feishu_live.subprocess.run",
+                side_effect=map(_cli_result, [_IDENTITY, receipt])
+            ) as run:
+                with self.assertRaisesRegex(ChannelError, "^delivery_unknown$"):
+                    adapter.create_room("Synthetic group", "room:uncertain")
+                self.assertEqual(run.call_count, 2)
+
+    def test_managed_send_requires_explicit_chat_and_checks_its_roster(self):
+        adapter, pinned = FeishuLive(None, ["ou_staff"], app_id="cli_test"), self.setup_adapter()
+        with patch("omni_service.feishu_live.subprocess.run") as run:
+            with self.assertRaisesRegex(ChannelError, "feishu_invalid_chat"):
+                adapter.send("sample", "op1")
+            with self.assertRaisesRegex(ChannelError, "feishu_invalid_chat"):
+                pinned.send("sample", "op1", chat_id="oc_other")
+            with self.assertRaisesRegex(ChannelError, "feishu_room_creation_disabled"):
+                pinned.create_room("Cannot create", "op1")
+            run.assert_not_called()
+
+        members = _data({**_MEMBERS, "chat_id": "oc_created"})
+        receipt = _data({"chat_id": "oc_created", "message_id": "om_sent"})
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=map(
+            _cli_result, [_IDENTITY, _data(_GROUP), members, receipt]
+        )) as run:
+            self.assertEqual(adapter.send("room rule", "room:rule", chat_id="oc_created", mention_all=True), "om_sent")
+        self.assertTrue(all("oc_created" in step.args[0] for step in run.call_args_list[1:]))
+        self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"], '<at user_id="all"></at> room rule')
+
+    def _stub_cli(self, directory, trace, *, managed=False):
         script = Path(directory) / "lark-cli"
         responses = {
             ("whoami", "--as"): _IDENTITY,
@@ -115,6 +173,8 @@ class FeishuLiveTest(unittest.TestCase):
             encoding="utf-8",
         )
         script.chmod(0o700)
+        if managed:
+            return FeishuLive(None, ["ou_staff"], app_id="cli_test", cli=str(script))
         return self.setup_adapter(str(script))
 
     def test_stream_filters_chat_sender_bot_and_type_before_returning_message(self):
@@ -142,6 +202,30 @@ class FeishuLiveTest(unittest.TestCase):
                          ("收到", "om_test", 1700000000))
         self.assertFalse(accepted[0].has_mentions)
         self.assertTrue(accepted[2].has_mentions)
+
+    def test_managed_stream_only_returns_rooms_currently_mapped(self):
+        events = [{**_EVENT, **mutation} for mutation in (
+            {"chat_id": "oc_outside", "content": "unrelated"},
+            {"chat_id": "oc_first"},
+            {"chat_id": "oc_second", "has_mentions": True},
+            {"chat_id": "oc_first", "sender_type": "bot"},
+        )]
+        lines = "\n".join(json.dumps(event) for event in events)
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = self._stub_cli(directory, (
+                "arg = sys.argv[sys.argv.index('--jq') + 1]\n"
+                "assert '.chat_id ==' not in arg and 'ou_staff' in arg\n"
+                "print('[event] ready event_key=im.message.receive_v1', file=sys.stderr)\n"
+                f"print({lines!r})\n"
+                "print('[event] exited (reason: timeout)', file=sys.stderr)\n"
+            ), managed=True)
+            mapped = {"oc_first"}
+            with closing(adapter.events(duration=1, room_allowed=mapped.__contains__)) as stream:
+                self.assertEqual(next(stream).chat_id, "oc_first")
+                mapped.add("oc_second")
+                second, = list(stream)
+                self.assertEqual(second.chat_id, "oc_second")
+                self.assertTrue(second.has_mentions)
 
     def test_persistent_stream_stops_or_reports_unexpected_exit(self):
         with tempfile.TemporaryDirectory() as directory:

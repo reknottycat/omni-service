@@ -1,4 +1,4 @@
-"""Feishu bot transport for one private personal-bridge test group."""
+"""Feishu bot transport for private pinned or bridge-managed groups."""
 
 import json
 import os
@@ -8,6 +8,7 @@ import subprocess
 import time
 from contextlib import suppress
 from hashlib import sha256
+from uuid import NAMESPACE_URL, uuid5
 
 from .channels import feishu_text
 from .models import ChannelError, InboundEvent
@@ -29,7 +30,7 @@ def _id(value, prefix):
 class FeishuLive:
     def __init__(self, chat_id, staff_ids, *, app_id, profile=None, cli="lark-cli", allowed_bot_app_ids=()):
         staff = tuple(staff_ids) if isinstance(staff_ids, (list, tuple, set, frozenset)) else ()
-        if (not _id(chat_id, "oc_") or not _id(app_id, "cli_") or not staff
+        if ((chat_id is not None and not _id(chat_id, "oc_")) or not _id(app_id, "cli_") or not staff
                 or not all(_id(staff_id, "ou_") for staff_id in staff)
                 or not isinstance(allowed_bot_app_ids, (list, tuple, set, frozenset))
                 or not all(_id(bot_app_id, "cli_") for bot_app_id in allowed_bot_app_ids)
@@ -39,6 +40,8 @@ class FeishuLive:
         self.app_id = app_id
         self.staff_ids = frozenset(staff)
         self.bot_app_ids = frozenset((app_id, *allowed_bot_app_ids))
+        if chat_id is None and (len(self.staff_ids) > 50 or len(self.bot_app_ids) > 6):
+            raise ChannelError("feishu_invalid_config")
         self._command = [cli, f"--profile={profile or app_id}"]
         self._env = {**os.environ, "LARKSUITE_CLI_NO_UPDATE_NOTIFIER": "1",
                      "LARKSUITE_CLI_NO_SKILLS_NOTIFIER": "1"}
@@ -72,21 +75,31 @@ class FeishuLive:
             raise ChannelError(error)
         return data
 
-    def preflight(self):
+    def _target(self, chat_id):
+        if chat_id is None:
+            return self.chat_id
+        if not _id(chat_id, "oc_") or self.chat_id not in (None, chat_id):
+            raise ChannelError("feishu_invalid_chat")
+        return chat_id
+
+    def preflight(self, chat_id=None):
         """Check the configured app, group privacy, and full member roster."""
+        chat_id = self._target(chat_id)
         self._verify_identity()
-        group = self._bot_data(["im", "chats", "get", "--chat-id", self.chat_id],
+        if chat_id is None:
+            return  # Managed groups only exist after the first customer event.
+        group = self._bot_data(["im", "chats", "get", "--chat-id", chat_id],
                                error="feishu_group_unavailable")
         if (group.get("chat_mode") != "group" or group.get("chat_type") != "private"
                 or group.get("external") is not False or group.get("chat_status") != "normal"):
             raise ChannelError("feishu_group_not_private_internal")
         if group.get("agent_count", "0") not in (0, "0"):
             raise ChannelError("feishu_members_mismatch")
-        members = self._bot_data(["im", "+chat-members-list", "--chat-id", self.chat_id,
+        members = self._bot_data(["im", "+chat-members-list", "--chat-id", chat_id,
                                   "--member-id-type", "open_id", "--page-size", "100"],
                                  error="feishu_members_unavailable")
         users, bots = members.get("users"), members.get("bots")
-        if (members.get("chat_id") != self.chat_id or members.get("has_more") is not False
+        if (members.get("chat_id") != chat_id or members.get("has_more") is not False
                 or members.get("truncations") or not isinstance(users, list)
                 or not isinstance(bots, list) or len(users) != len(self.staff_ids)
                 or not all(isinstance(user, dict) and _id(user.get("member_id"), "ou_") for user in users)
@@ -96,52 +109,84 @@ class FeishuLive:
                 or {bot["app_id"] for bot in bots} != self.bot_app_ids):
             raise ChannelError("feishu_members_mismatch")
 
-    def send(self, text, operation_id, *, mention_all=False):
+    def create_room(self, name, operation_id):
+        """Create an internal private group owned by the configured tracking bot."""
+        if self.chat_id is not None:
+            raise ChannelError("feishu_room_creation_disabled")
+        if (not isinstance(name, str) or not name.strip() or len(name) > 60
+                or not isinstance(operation_id, str) or not operation_id):
+            raise ChannelError("feishu_invalid_payload")
+        self.preflight()
+        request_id = str(uuid5(NAMESPACE_URL, f"urn:omni-service:feishu:{self.app_id}:{operation_id}"))
+        body = {
+            "name": name, "chat_mode": "group", "chat_type": "private", "external": False,
+            "group_message_type": "chat", "user_id_list": sorted(self.staff_ids),
+        }
+        other_bots = self.bot_app_ids - {self.app_id}
+        if other_bots:
+            body["bot_id_list"] = sorted(other_bots)
+        receipt = self._bot_data(["im", "chats", "create", "--user-id-type", "open_id",
+                                  "--uuid", request_id, "--data", "-"],
+                                 input_text=json.dumps(body, ensure_ascii=False), error="delivery_unknown")
+        chat_id = receipt.get("chat_id")
+        if (not _id(chat_id, "oc_") or receipt.get("chat_mode") != "group"
+                or receipt.get("chat_type") != "private" or receipt.get("external") is not False):
+            raise ChannelError("delivery_unknown")
+        return chat_id
+
+    def send(self, text, operation_id, *, mention_all=False, chat_id=None):
         """Send bot text to the scoped group and return the confirmed message ID."""
+        chat_id = self._target(chat_id)
+        if chat_id is None:
+            raise ChannelError("feishu_invalid_chat")
         if not isinstance(text, str) or not text.strip() or not isinstance(operation_id, str) or not operation_id:
             raise ChannelError("feishu_invalid_payload")
         content = feishu_text(text, mention_all=mention_all)
-        self.preflight()
-        key = sha256(f"{self.app_id}:{self.chat_id}:{operation_id}".encode()).hexdigest()[:48]
-        receipt = self._bot_data(["im", "+messages-send", "--chat-id", self.chat_id,
+        self.preflight(chat_id)
+        key = sha256(f"{self.app_id}:{chat_id}:{operation_id}".encode()).hexdigest()[:48]
+        receipt = self._bot_data(["im", "+messages-send", "--chat-id", chat_id,
                                   "--content", "-", "--msg-type", "text", "--idempotency-key", key],
                                  input_text=json.dumps({"text": content}, ensure_ascii=False),
                                  error="delivery_unknown")
-        if receipt.get("chat_id") != self.chat_id or not _id(receipt.get("message_id"), "om_"):
+        if receipt.get("chat_id") != chat_id or not _id(receipt.get("message_id"), "om_"):
             raise ChannelError("delivery_unknown")
         return receipt["message_id"]
 
     def _event_filter(self):
-        chat = json.dumps(self.chat_id)
+        chat_filter = f" and .chat_id == {json.dumps(self.chat_id)}" if self.chat_id is not None else ""
         staff = json.dumps(sorted(self.staff_ids))
         return (
-            f'select(.type == "{_EVENT}" and .chat_id == {chat} and .chat_type == "group" '
+            f'select(.type == "{_EVENT}"{chat_filter} and .chat_type == "group" '
             f'and .sender_type == "user" and .message_type == "text" and '
             f'(.sender_id as $sender | {staff} | index($sender) != null)) | '
             '{type, chat_id, chat_type, sender_type, message_type, sender_id, message_id, create_time, content, '
             'has_mentions: (.mentions != null and .mentions != [])}'
         )
 
-    def _parse_event(self, line):
+    def _parse_event(self, line, room_allowed=None):
         try:
             event = json.loads(line)
         except (ValueError, UnicodeError):
             raise ChannelError("feishu_invalid_event_stream") from None
-        if (not isinstance(event, dict) or event.get("type") != _EVENT or event.get("chat_id") != self.chat_id
-                or event.get("chat_type") != "group" or event.get("sender_type") != "user"
+        if (not isinstance(event, dict) or event.get("type") != _EVENT or event.get("chat_type") != "group"
+                or event.get("sender_type") != "user"
                 or event.get("message_type") != "text" or not _id(event.get("sender_id"), "ou_")
                 or event["sender_id"] not in self.staff_ids):
+            return None
+        chat_id = event.get("chat_id")
+        if (not _id(chat_id, "oc_") or self.chat_id not in (None, chat_id)
+                or (room_allowed is not None and not room_allowed(chat_id))):
             return None
         message_id, text, created = event.get("message_id"), event.get("content"), event.get("create_time")
         if (not _id(message_id, "om_") or not isinstance(text, str) or not text.strip()
                 or not isinstance(created, str) or re.fullmatch(r"[0-9]{1,15}", created) is None):
             return None
         # Feishu may assign a new event ID to re-delivery of the same message.
-        return InboundEvent("feishu", self.app_id, message_id, self.chat_id, event["sender_id"],
+        return InboundEvent("feishu", self.app_id, message_id, chat_id, event["sender_id"],
                             message_id, text=text, timestamp=int(created) / 1000,
                             has_mentions=event.get("has_mentions", False) is not False)
 
-    def events(self, stop=None, *, duration=0):
+    def events(self, stop=None, *, duration=0, room_allowed=None):
         """Consume approved text events until stopped, or for a bounded CLI session."""
         if type(duration) is not int or not 0 <= duration <= 3600:
             raise ChannelError("feishu_invalid_duration")
@@ -158,7 +203,7 @@ class FeishuLive:
             raise ChannelError("feishu_stream_unavailable") from None
         with process:
             try:
-                yield from self._read_stream(process, stop, duration)
+                yield from self._read_stream(process, stop, duration, room_allowed)
             finally:
                 if process.poll() is None:
                     with suppress(ProcessLookupError):
@@ -169,7 +214,7 @@ class FeishuLive:
                         # This IM consumer has no server-side subscription to clean up.
                         process.kill()
 
-    def _read_stream(self, process, stop, duration):
+    def _read_stream(self, process, stop, duration, room_allowed):
         ready = timed_out = False
         started = time.monotonic()
         with selectors.DefaultSelector() as selector:
@@ -200,7 +245,7 @@ class FeishuLive:
                             if line.startswith(_EVENT_LOSS_PREFIXES) or (line.startswith(b"WARN: event ") and b" dropped:" in line):
                                 raise ChannelError("feishu_event_loss")
                         else:
-                            event = self._parse_event(line)
+                            event = self._parse_event(line, room_allowed)
                             if event is not None:
                                 yield event
                     if len(key.data) > _MAX_LINE:

@@ -21,3 +21,4 @@ ts	phase	decision	why	evidence	result
 2026-11-26T17:23:18+08:00	verification	群内配置回复辅助、飞书来源标签和定向交接	真实新群验证群内指令及客户触发后未经审批不外发	docs/personal-account.md#2026-11-26-群内开关与定向交接验收	Mac one authorized contact passed; DGX 157 Linux mock tests passed
 2026-11-26T17:52:39+08:00	verification	审批卡片终态置灰与网页管理台	真实批准与拒绝回写原卡片，统一验证网页和群命令权限及模板版本	docs/personal-account.md#图形化管理台与逐命令权限	Mac live cards passed; DGX 188 Linux mock tests passed; live workbench setup pending
 2026-11-26T18:08:56+08:00	verification	Telegram 与飞书双向原生附件及客户指令防护	按来源与会话校验资源和权限，疑似指令交人工且保持既有回复语言	docs/personal-account.md#2026-11-26-双向附件与-telegram-客户指令防护	Mac four native image and PDF receipts; DGX 201 Linux mock tests passed
+2026-11-26T18:35:26+08:00	verification	Linux 团队部署、扫码引导和飞书组织内客服邀请	按人员验证身份和按会话授权，无全局协作模式；升级保留原数据和权限	docs/personal-deployment.md	DGX 227 Linux mock tests passed; new-tenant and mixed external roster live acceptance pending

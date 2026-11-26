@@ -95,3 +95,7 @@ HTTP 测试创建 **1,000 个不同客户会话**，分布在 Telegram / MAX / W
 ## 2026-11-26 Telegram–飞书附件与客户指令防护复验
 
 DGX Linux aarch64 / Python 3.12.3 对 `8ec76c8` 执行 `bash scripts/acceptance.sh`，201 项通过，0 失败、0 错误、0 跳过。 `test_live_media.py` 覆盖双向图片和文件、错房间与未授权人员、未知回执重启不重发、客户冒用审批和配置指令。源码 SHA256 为 `4161e78170cc8284910ce9dab35765797fb576622cecc49841b17088b698c0c5`。原始报告 `artifacts/dgx-media-20261126/acceptance.json`。 [对应 Mac 试点](../personal-account.md#2026-11-26-双向附件与-telegram-客户指令防护)
+
+## 2026-11-26 团队部署与接入复验
+
+DGX Linux aarch64 / Python 3.12.3 对 `8d596ab` 执行 `bash scripts/acceptance.sh`，227 项通过，0 失败、0 错误、0 跳过。覆盖团队初始化、应用扫码协议、Telegram 配对隔离、飞书定向与管理员审批邀请、客服交接轮转、安装器预检和失败回滚。源码 SHA256 为 `da481940814ef5e6b60f5e1f3470c92bff3dff6ac5c8f8a3f0220546c6860365`。报告及日志位于 `artifacts/dgx-onboarding-20261126/`。首轮 `cb10485` 的 226 项中，管理默认设置字段兼容断言失败，原始结果保存在同目录的 `initial/`。

@@ -53,3 +53,13 @@ systemctl --user status omni-service-support.service
 ```
 
 升级保留账号配置、凭据和 SQLite 数据，使用新版本之前先检查平台。迁移时先停旧轮询实例并备份 SQLite 和对应配置。现有配置的凭据变量使用 `TELEGRAM_BOT_TOKEN`、`OMNI_FEISHU_APP_SECRET`、`OMNI_ADMIN_SIGNING_KEY` 和可选 `TRANSLATION_API_KEY`，迁移自定义名称时同步改名。将已配置的文件用安装器 `--config`、`--secrets-file` 和 `--no-start` 导入后，用同一配置路径运行 `onboarding prepare-feishu` 重建独立 CLI 应用配置，然后按原路径放回备份并启动。安装器不会替换不同内容的已有配置或凭据。不要用初次接入命令覆盖已启用的账号绑定。
+
+## 2026-11-26 验收记录
+
+| 任务 / 状态 / 负责人 | 交付及范围 | 复验 |
+|---|---|---|
+| P1-I / done / 协调负责人 | `scripts/install-personal.sh`、`deploy/`、`onboarding.py` 完成单团队部署、凭据隔离、预检和升级激活回滚 | DGX 安装器测试检查 systemd unit、原数据、预检失败以及模拟重启失败回滚。 |
+| P1-J / done / 协调负责人 | Telegram 连接身份证明、飞书官方扫码注册及管理员身份引导、模型预检、蓝白管理页、组织内客服邀请和轮流交接 | `test_onboarding.py`、`test_feishu_provision.py`、`test_staff_invites.py`。Mac 浏览器用合成身份验证生成一次性邀请，并检查窄屏和 1210 px 的布局。 |
+| P1-K / verify / 协调负责人 | 真实新组织扫码、回调登记、应用发版审批、员工私聊邀请和混合名单外部群 | 用获准外部测试账号核对飞书返回的身份、入群和授权三项回执。现有证据是平台模拟、历史本组织试点与官方协议核对，真实验收待做。 |
+
+DGX Linux aarch64 / Python 3.12.3 对 `8d596ab` 执行 `bash scripts/acceptance.sh`，227 项通过，0 失败、0 错误、0 跳过。报告及首次接口兼容失败记录在 `artifacts/dgx-onboarding-20261126/`。 [Linux 执行记录](evidence/linux-mock-acceptance.md#2026-11-26-团队部署与接入复验)

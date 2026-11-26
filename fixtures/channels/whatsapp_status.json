@@ -1,0 +1,27 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "waba-1",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "phone_number_id": "phone-1"
+            },
+            "statuses": [
+              {
+                "id": "wamid.out.1",
+                "status": "delivered",
+                "timestamp": "1795651200",
+                "recipient_id": "15550001111"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "2.0",
+  "header": {
+    "event_id": "evt.fs.2",
+    "event_type": "im.message.recalled_v1",
+    "token": "fixture-secret",
+    "app_id": "app-1",
+    "tenant_key": "tenant-1",
+    "create_time": "1795651201000"
+  },
+  "event": {
+    "message_id": "om.source.1",
+    "chat_id": "oc.service.1",
+    "recall_time": "1795651201000",
+    "recall_type": "message_owner"
+  }
+}

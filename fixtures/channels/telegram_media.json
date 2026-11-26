@@ -1,0 +1,22 @@
+{
+  "update_id": 101,
+  "message": {
+    "message_id": 11,
+    "date": 1795651200,
+    "chat": {
+      "id": 1001,
+      "type": "private"
+    },
+    "from": {
+      "id": 1001,
+      "is_bot": false,
+      "first_name": "Customer"
+    },
+    "caption": "Отчёт",
+    "document": {
+      "file_id": "tg.source.file",
+      "file_name": "report.pdf",
+      "mime_type": "application/pdf"
+    }
+  }
+}

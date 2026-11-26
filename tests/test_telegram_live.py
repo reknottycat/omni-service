@@ -114,6 +114,20 @@ class TelegramPolling(unittest.TestCase):
 
 
 class TelegramTransport(unittest.TestCase):
+    @patch("omni_service.telegram_live.ssl.create_default_context")
+    @patch("omni_service.telegram_live.socket.create_connection")
+    @patch("omni_service.telegram_live.http.client.HTTPSConnection")
+    def test_ssh_forward_keeps_telegram_tls_name(self, https, connect, ssl_context):
+        conn = https.return_value
+        conn.getresponse.return_value.status = 200
+        conn.getresponse.return_value.read.return_value = b'{"ok":true,"result":{"id":123}}'
+        api = TelegramAPI("123:synthetic", tunnel_port=37892)
+        self.assertEqual(api.call("getMe"), {"id": 123})
+        connect.assert_called_once_with(("127.0.0.1", 37892), 10)
+        ssl_context.return_value.wrap_socket.assert_called_once_with(
+            connect.return_value, server_hostname="api.telegram.org")
+        self.assertIs(conn.sock, ssl_context.return_value.wrap_socket.return_value)
+
     @patch("omni_service.telegram_live.http.client.HTTPSConnection")
     def test_explicit_proxy_tunnels_only_to_telegram(self, tls):
         conn = tls.return_value

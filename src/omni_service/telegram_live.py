@@ -4,6 +4,8 @@ import http.client
 import ipaddress
 import json
 import re
+import socket
+import ssl
 import time
 from urllib.parse import urlsplit
 
@@ -17,10 +19,14 @@ class TelegramAPI:
         "sendMessage", "deleteBusinessMessages", "setMySettings",
     })
 
-    def __init__(self, token, *, proxy_url=None):
+    def __init__(self, token, *, proxy_url=None, tunnel_port=None):
         if not isinstance(token, str) or not re.fullmatch(r"[0-9]+:[A-Za-z0-9_-]+", token):
             raise ChannelError("invalid_telegram_token")
         self._token = token
+        if tunnel_port is not None and (type(tunnel_port) is not int or not 1 <= tunnel_port <= 65535
+                                        or proxy_url is not None):
+            raise ChannelError("invalid_telegram_tunnel")
+        self._tunnel_port = tunnel_port
         self._proxy = None
         if proxy_url is not None:
             try:
@@ -55,6 +61,16 @@ class TelegramAPI:
         if self._proxy:
             connection.set_tunnel("api.telegram.org", 443)
         try:
+            if self._tunnel_port is not None:
+                # The SSH forward carries the original Telegram TLS stream.
+                # Verify Telegram's certificate and send its hostname as SNI.
+                raw_socket = socket.create_connection(("127.0.0.1", self._tunnel_port), poll_timeout + 10)
+                try:
+                    connection.sock = ssl.create_default_context().wrap_socket(
+                        raw_socket, server_hostname="api.telegram.org")
+                except BaseException:
+                    raw_socket.close()
+                    raise
             connection.request("POST", f"/bot{self._token}/{method}", body=body,
                                headers={"Content-Type": "application/json"})
             response = connection.getresponse()

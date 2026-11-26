@@ -73,7 +73,11 @@ class OnboardingContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             with patch("omni_service.onboarding._lark", side_effect=(None, bot, None, bot, None, profile, {})) as lark:
                 self.assertEqual(_feishu_owner(app, "fixture-secret", Path(tmp)), ("ou_admin", "tenant_1"))
-                self.assertIn("user_profile", lark.call_args_list[4].args[0])
+                self.assertEqual(lark.call_args_list[4].args[0],
+                                 ["--profile=cli_example", "auth", "login", "--scope", "auth:user.id:read"])
+                self.assertEqual(lark.call_args_list[5].args[0],
+                                 ["--profile=cli_example", "api", "GET", "/open-apis/authen/v1/user_info",
+                                  "--as", "user", "--format", "json"])
                 self.assertIn("logout", lark.call_args_list[-1].args[0])
                 env = lark.call_args_list[0].args[1]
                 self.assertEqual(Path(env["LARKSUITE_CLI_CONFIG_DIR"]), Path(tmp) / "lark")

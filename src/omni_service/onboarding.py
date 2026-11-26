@@ -152,7 +152,7 @@ def _read_feishu_owner(profile, env):
     print("飞书应用已识别。请使用准备管理 OmniService 的飞书账号完成官方授权。", flush=True)
     verified = False
     try:
-        _lark([profile, "auth", "login", "--scope", "user_profile"], env, timeout=480, show=True)
+        _lark([profile, "auth", "login", "--scope", "auth:user.id:read"], env, timeout=480, show=True)
         response = _lark([profile, "api", "GET", _USER_INFO, "--as", "user", "--format", "json"], env)
         info = response.get("data") if isinstance(response, dict) and response.get("ok") is True else None
         if (not isinstance(info, dict) or response.get("identity") != "user" or not isinstance(info.get("open_id"), str)

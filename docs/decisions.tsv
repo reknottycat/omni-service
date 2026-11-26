@@ -9,3 +9,7 @@ ts	phase	decision	why	evidence	result
 2026-11-26T10:54:40+08:00	review	把不完整成功回执保留为结果未知	实际平台可能已发出或删除，缺字段不能当成明确失败	tests/test_receipts.py	fix in progress
 2026-11-26T10:54:40+08:00	review	修复429响应中parameters为空或数组的异常	不规范重试字段不能让队列工作线程直接崩溃	tests/test_transport.py	implemented
 2026-11-26T10:54:40+08:00	scope	写清人工接管对已在途AI请求的边界	只能取消尚未发送任务，已发起网络请求必须等待实际回执	docs/acceptance.md	documented
+2026-11-26T10:58:52+08:00	verification	冻结源码后统一执行87项验收并全部通过	三个审查缺陷均已有行为回归证据，脚本首尾源文件指纹一致	docs/evidence/local-run.json	87 passed; 0 failures; 0 errors; 0 skipped
+2026-11-26T10:58:52+08:00	delivery	提交源码并逐一核对远端42个文件的Git blob	将本地运行证据绑定到实际交付提交且不修改原始uncommitted字段	docs/evidence/source-tree-verification.json	all 42 blobs match 75a2cd32064c58eebd76fe7e973b749ade5a62a4
+2026-11-26T10:58:52+08:00	ci	单独登记GitHub Actions执行前失败	Job未运行任何step且日志不存在，当前未获得注释不能猜测根因	https://github.com/reknottycat/omni-service/actions/runs/45745662203	CI blocked; Linux mock acceptance passed
+2026-11-26T11:00:05+08:00	delivery	创建ready-for-review PR #2并完成P0进度回链	用户需要可审查交付和单一工作追踪；合并与远端CI单独记录	https://github.com/reknottycat/omni-service/pull/2	P0 done; PR open; CI blocked

@@ -85,6 +85,7 @@ flowchart TD
 
 ## 验收、进度和依据
 
+- [交付 PR #2](https://github.com/reknottycat/omni-service/pull/2)：87 项 Linux 模拟测试通过，未合并；远端 CI 单独阻塞。
 - [总控 Issue #1](https://github.com/reknottycat/omni-service/issues/1)
 - [验收合同与完整产品待办](docs/acceptance.md)
 - [任务进度](docs/progress.md)

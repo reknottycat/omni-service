@@ -1,16 +1,33 @@
-"""Fail-closed Telegram connected-account contract; no network or persistence.
-
-This is an opt-in boundary for a future live runner, not a replacement for the
-P0 bot transport. Filter before passing any text to storage, AI or Feishu.
-"""
+"""Validate Telegram connected-account events before they reach the bridge."""
 from dataclasses import dataclass
 
 from .channels import profile_name
-from .models import ChannelError, InboundEvent
+from .media import safe_filename
+from .models import Attachment, ChannelError, InboundEvent
 
 
 def _positive(value):
     return type(value) is int and value > 0
+
+
+def valid_file_id(value):
+    return (isinstance(value, str) and 0 < len(value) <= 1024
+            and value.isascii() and value.isprintable() and " " not in value)
+
+
+def _attachment(message, caption):
+    photos = message.get("photo")
+    if isinstance(photos, list):
+        for photo in reversed(photos):
+            if isinstance(photo, dict) and valid_file_id(photo.get("file_id")):
+                return Attachment("image", photo["file_id"], caption=caption)
+    for field, kind in (("animation", "file"), ("document", "file"), ("video", "file"),
+                        ("video_note", "file"), ("voice", "audio"), ("audio", "audio")):
+        media = message.get(field)
+        if isinstance(media, dict) and valid_file_id(media.get("file_id")):
+            name = safe_filename(media.get("file_name"), fallback="")
+            return Attachment(kind, media["file_id"], name, caption)
+    return None
 
 
 @dataclass(frozen=True)
@@ -111,16 +128,22 @@ class TelegramPersonal:
                 role = "customer"
             else:
                 return []
+            caption = data.get("caption")
+            caption = caption if isinstance(caption, str) and caption.strip() else ""
+            attachment = _attachment(data, caption)
             body = data.get("text")
             if not isinstance(body, str) or not body.strip():
-                return []  # media remains unsupported, not a text success
+                body = caption if attachment else ""
+            if not (body or attachment):
+                return []
             try:
                 sender_name = " ".join(profile_name(sender).split())
             except ChannelError:
                 sender_name = ""  # optional display metadata must not drop the message
             return [PersonalEvent(role, InboundEvent(
                 "telegram", cid, str(uid), str(chat_id), str(sender_id), str(mid),
-                text=body, sender_name=sender_name, event_type=kind, timestamp=float(date)))]
+                text=body, sender_name=sender_name, event_type=kind, timestamp=float(date),
+                attachments=(attachment,) if attachment else ()))]
         return []
 
     def send_payload(self, cid, chat_id, text, *, last_incoming_at, now):

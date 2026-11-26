@@ -12,7 +12,8 @@ from uuid import UUID
 from omni_service.approval_card import build_approval_card, parse_feishu_card_action
 from omni_service.channels import feishu_card_request
 from omni_service.feishu_live import FeishuLive
-from omni_service.models import ChannelError, DraftDecision
+from omni_service.media import MAX_FILE_BYTES, MediaBlob
+from omni_service.models import Attachment, ChannelError, DraftDecision
 
 
 _IDENTITY = {"appId": "cli_test", "brand": "feishu", "identity": "bot", "available": True}
@@ -25,6 +26,8 @@ _EVENT = {"type": "im.message.receive_v1", "chat_id": "oc_test", "chat_type": "g
 _DRAFT_ID = "draft_" + "a" * 32
 _VERSION = "1234567890abcdef"
 _APPROVAL = {"omni_action": "approve", "draft_id": _DRAFT_ID, "version": _VERSION}
+_PDF = b"%PDF-1.7\nfixture"
+_PNG = b"\x89PNG\r\n\x1a\nfixture"
 
 
 def _data(value):
@@ -265,6 +268,105 @@ class FeishuLiveTest(unittest.TestCase):
         self.assertTrue(all("oc_created" in step.args[0] for step in run.call_args_list[1:]))
         self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"], '<at user_id="all"></at> room rule')
 
+    def test_download_attachment_scopes_message_resource_and_uses_private_destination(self):
+        adapter = self.setup_adapter()
+        calls = []
+
+        def download(args, **opts):
+            calls.append(args)
+            preflight = [_IDENTITY, _data(_GROUP), _data(_MEMBERS)]
+            if len(calls) <= len(preflight):
+                return _cli_result(preflight[len(calls) - 1])
+            self.assertEqual(args[2:], [
+                "im", "+messages-resources-download", "--message-id", "om_resource", "--file-key",
+                "file_v3_x-1", "--type", "file", "--output", "payload", "--as", "bot", "--format", "json",
+            ])
+            directory = Path(opts["cwd"])
+            self.assertEqual(directory.stat().st_mode & 0o777, 0o700)
+            output = directory / "payload.pdf"
+            output.write_bytes(_PDF)
+            return _cli_result(_data({"saved_path": str(output.resolve()), "size_bytes": len(_PDF)}))
+
+        with patch("omni_service.feishu_live.subprocess.run", side_effect=download) as run:
+            blob = adapter.download_attachment("oc_test", "om_resource",
+                                               Attachment("file", "file_v3_x-1", "../订单.pdf"))
+        self.assertEqual(blob, MediaBlob(_PDF, "订单.pdf", "application/pdf"))
+        self.assertFalse(Path(run.call_args.kwargs["cwd"]).exists())
+
+    def test_download_attachment_rejects_unscoped_and_unsafe_receipts(self):
+        adapter = self.setup_adapter()
+        with patch("omni_service.feishu_live.subprocess.run") as run:
+            with self.assertRaisesRegex(ChannelError, "feishu_invalid_chat"):
+                adapter.download_attachment("oc_other", "om_resource", Attachment("file", "file_key"))
+            with self.assertRaisesRegex(ChannelError, "feishu_invalid_payload"):
+                adapter.download_attachment("oc_test", "om_resource", Attachment("file", "file_../key"))
+            run.assert_not_called()
+
+        with tempfile.TemporaryDirectory() as directory:
+            external_file = Path(directory) / "payload.pdf"
+            external_file.write_bytes(_PDF)
+            for receipt, error in (
+                ({"saved_path": str(external_file), "size_bytes": len(_PDF)}, "feishu_attachment_download_failed"),
+                ({"saved_path": "payload.pdf", "size_bytes": len(_PDF)}, "feishu_attachment_download_failed"),
+                ({"saved_path": "payload.pdf", "size_bytes": MAX_FILE_BYTES + 1}, "media_too_large"),
+            ):
+                with self.subTest(receipt=receipt):
+                    preflight = deque([_IDENTITY, _data(_GROUP), _data(_MEMBERS)])
+
+                    def download(*_args, **opts):
+                        if preflight:
+                            return _cli_result(preflight.popleft())
+                        (Path(opts["cwd"]) / "payload.pdf").symlink_to(external_file)
+                        return _cli_result(_data(receipt))
+
+                    with patch("omni_service.feishu_live.subprocess.run", side_effect=download):
+                        with self.assertRaisesRegex(ChannelError, error):
+                            adapter.download_attachment("oc_test", "om_resource", Attachment("file", "file_key"))
+
+    def test_send_attachment_uploads_native_media_and_keeps_delivery_key(self):
+        adapter = self.setup_adapter()
+        for kind, data, name, collection, field, suffix, key, value, body in (
+            ("image", _PNG, "../../客户图.png", "images", "image", ".png",
+             "image_key", "img_v3_media-1", {"image_type": "message"}),
+            ("file", _PDF, "../../订单.pdf", "files", "file", ".pdf",
+             "file_key", "file_v3_media-1", {"file_type": "pdf", "file_name": "订单.pdf"}),
+        ):
+            with self.subTest(kind=kind):
+                uploads, messages = [], []
+
+                def run_cli(args, **opts):
+                    if args[2] == "whoami":
+                        return _cli_result(_IDENTITY)
+                    if args[3] == "chats":
+                        return _cli_result(_data(_GROUP))
+                    if args[3] == "+chat-members-list":
+                        return _cli_result(_data(_MEMBERS))
+                    if args[3] == collection:
+                        self.assertEqual(args[4:],
+                                         ["create", "--data", "-", "--file", f"{field}=payload{suffix}",
+                                          "--as", "bot", "--format", "json"])
+                        directory = Path(opts["cwd"])
+                        uploads.append(directory)
+                        self.assertEqual((directory / f"payload{suffix}").read_bytes(), data)
+                        self.assertEqual(json.loads(opts["input"]), body)
+                        return _cli_result(_data({key: value}))
+                    self.assertEqual(args[2:9],
+                                     ["im", "+messages-send", "--chat-id", "oc_test", "--content", "-", "--msg-type"])
+                    self.assertEqual(args[9], kind)
+                    self.assertEqual(json.loads(opts["input"]), {key: value})
+                    messages.append(args[args.index("--idempotency-key") + 1])
+                    return _cli_result(_data({"chat_id": "oc_test", "message_id": "om_sent"}))
+
+                with patch("omni_service.feishu_live.subprocess.run", side_effect=run_cli) as run:
+                    blob = MediaBlob(data, name, "application/octet-stream")
+                    for _ in range(2):
+                        self.assertEqual(adapter.send_attachment(kind, blob, "operation"), "om_sent")
+                self.assertEqual(run.call_count, 16)
+                self.assertEqual(len(uploads), 2)
+                self.assertFalse(any(directory.exists() for directory in uploads))
+                self.assertEqual(len(messages), 2)
+                self.assertEqual(messages[0], messages[1])
+
     def _stub_cli(self, directory, trace, *, managed=False):
         script = Path(directory) / "lark-cli"
         responses = {
@@ -314,6 +416,38 @@ class FeishuLiveTest(unittest.TestCase):
                          ("收到", "om_test", 1700000000))
         self.assertFalse(accepted[0].has_mentions)
         self.assertTrue(accepted[2].has_mentions)
+
+    def test_stream_parses_installed_cli_native_media_shapes(self):
+        file_content = '<file key="file_v3_pdf-1" name="订单.pdf"/>'
+        events = [{**_EVENT, **mutation} for mutation in (
+            {"message_id": "om_photo", "message_type": "image", "content": "[Image: img_v3_photo-1]"},
+            {"message_id": "om_file", "message_type": "file", "content": file_content},
+            {"message_id": "om_audio", "message_type": "audio", "content": '<audio key="file_v3_voice" duration="3s"/>'},
+            {"message_id": "om_video", "message_type": "media", "has_mentions": True,
+             "content": '<video key="file_v3_video" name="clip.mp4" duration="3s" cover_image_key="img_v3_cover"/>'},
+            {"message_id": "om_text", "content": file_content},
+            {"message_id": "om_other", "message_type": "file", "content": file_content, "chat_id": "oc_other"},
+            {"message_id": "om_bot", "message_type": "file", "content": file_content, "sender_type": "bot"},
+            {"message_id": "om_invalid", "message_type": "image", "content": "[Image: img_v3_bad/path]"},
+            {"message_id": "om_fake", "message_type": "file", "content": file_content + file_content},
+        )]
+        lines = "\n".join(json.dumps(event) for event in events)
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = self._stub_cli(directory, (
+                "jq = sys.argv[sys.argv.index('--jq') + 1]\n"
+                "assert all(kind in jq for kind in ('text', 'image', 'file', 'audio', 'media', 'video'))\n"
+                "print('[event] ready event_key=im.message.receive_v1', file=sys.stderr)\n"
+                f"print({lines!r})\n"
+                "print('[event] exited (reason: timeout)', file=sys.stderr)\n"
+            ))
+            image, file, audio, video, text = adapter.events(duration=1)
+        self.assertEqual(image.attachments, (Attachment("image", "img_v3_photo-1"),))
+        self.assertEqual(file.attachments, (Attachment("file", "file_v3_pdf-1", "订单.pdf"),))
+        self.assertEqual(audio.attachments, (Attachment("audio", "file_v3_voice", "audio.opus"),))
+        self.assertEqual(video.attachments, (Attachment("file", "file_v3_video", "clip.mp4"),))
+        self.assertTrue(video.has_mentions)
+        self.assertTrue(all(not event.text for event in (image, file, audio, video)))
+        self.assertEqual((text.text, text.attachments), (file_content, ()))
 
     def test_managed_stream_only_returns_rooms_currently_mapped(self):
         events = [{**_EVENT, **mutation} for mutation in (

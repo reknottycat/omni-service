@@ -9,6 +9,7 @@ import uuid
 
 from . import channels
 from .approval_card import build_approval_card, finalize_approval_card
+from .customer_security import customer_control_text
 from .language import SimulationLanguage
 from .management import Management
 from .models import ChannelError, DraftDecision
@@ -25,6 +26,7 @@ _HANDOFF_LABELS = {
     'server_disabled': '服务端已关闭自动接待', 'staff_reply': '员工已回复',
     'owner_reply': 'Telegram 本人已回复', 'manual_handoff': '人工接管',
     'media': '收到需要人工查看的附件',
+    'customer_control_text': '客户消息含疑似控制指令',
     'reply_not_confirmed': '机器人问询送达未确认',
 }
 _STAFF_LABELS = {'zh': '人工客服', 'ru': 'Сотрудник', 'en': 'Agent', 'es': 'Agente'}
@@ -48,7 +50,7 @@ class Service(Management):
                  members=tuple(f'employee-{n}' for n in range(1, 8)), language=None,
                  intake=None, intake_enabled=False, label_replies=False,
                  approval_intake=False, agent_advisor=None, agent_enabled=False, handoff_staff_id=None,
-                 approval_cards=False):
+                 approval_cards=False, customer_prompt_guard=True):
         if (approval_intake and intake is None) or (approval_cards and not approval_intake):
             raise ChannelError('invalid_intake_config')
         self.default_members = tuple(dict.fromkeys(members))
@@ -56,6 +58,8 @@ class Service(Management):
             raise ChannelError('invalid_handoff_staff')
         if type(agent_enabled) is not bool or (agent_enabled and not callable(agent_advisor)):
             raise ChannelError('invalid_agent_config')
+        if type(customer_prompt_guard) is not bool:
+            raise ChannelError('invalid_customer_security_config')
         self.store = Store(db_path)
         self.transport = transport
         self.clock = clock
@@ -67,6 +71,7 @@ class Service(Management):
         self.intake_enabled = approval_intake or intake_enabled
         self.agent_advisor = agent_advisor
         self.agent_enabled = agent_enabled
+        self.customer_prompt_guard = customer_prompt_guard
         self.label_replies = label_replies or intake is not None
         self._drain_lock = threading.Lock()
         self._cards_reconciled = False
@@ -292,23 +297,32 @@ class Service(Management):
             self._queue(db, cid, 'telegram', 'send', 'out:' + mid, payload, mid)
         return True
 
+    def _guard_customer(self, channel, text):
+        return self.customer_prompt_guard and channel == 'telegram' and customer_control_text(text)
+
+    def _customer_mirror_body(self, db, conv, message, prefix=''):
+        text = message['original']
+        body = f"{message['sender_name'] or '客户'} ({conv['channel']}): {prefix}{text}"
+        if self.approval_intake:
+            body = self._source_label(db, conv['id'], '用户') + body
+        if self._guard_customer(message['source_channel'], text):
+            return body + '\n含疑似控制指令，已保留原文供人工处理。'
+        if text:
+            try:
+                translated = self.language.translate(text, message['language'], 'zh')
+            except ChannelError:
+                translated = '[翻译不可用]'
+            if translated and translated != text:
+                body += '\n中文: ' + translated
+        return body
+
     def _mirror(self, db, conv, message):
         if conv['room_status'] == 'absent' or message['status'] == 'deleted':
             return
         if db.execute('SELECT 1 FROM outbox WHERE operation_key=?', ('mirror:' + message['id'],)).fetchone():
             return
-        text = message['original']
-        try:
-            translated = self.language.translate(text, message['language'], 'zh')
-        except ChannelError:
-            translated = '[翻译不可用]'
-        if message['kind'] == 'media':
-            text = '[媒体待转码/上传] ' + text
-        body = f"{message['sender_name'] or '客户'} ({conv['channel']}): {text}"
-        if self.approval_intake:
-            body = self._source_label(db, conv['id'], '用户') + body
-        if translated and translated != text:
-            body += '\n中文: ' + translated
+        prefix = '[媒体待转码/上传] ' if message['kind'] == 'media' else ''
+        body = self._customer_mirror_body(db, conv, message, prefix)
         self._queue(db, conv['id'], 'feishu', 'send', 'mirror:' + message['id'], {'text': body}, message['id'])
 
     def _mirror_ai(self, db, conv, message):
@@ -567,12 +581,14 @@ class Service(Management):
         self._audit(db, cid, 'agent_reply_requested', {'request_id': request_id})
 
     def _agent_context(self, db, cid):
-        rows = db.execute("""SELECT direction,author_id,original FROM messages WHERE conversation_id=?
+        rows = db.execute("""SELECT direction,author_id,original,source_channel,kind FROM messages WHERE conversation_id=?
             AND (direction='inbound' AND status!='deleted' OR direction='outbound' AND status='sent')
             ORDER BY rowid DESC LIMIT 12""", (cid,)).fetchall()
         transcript = []
         for row in reversed(rows):
             actor = 'customer' if row['direction'] == 'inbound' else ('ai' if row['author_id'] == 'AI' else 'staff')
+            if actor == 'customer' and (row['kind'] == 'media' or self._guard_customer(row['source_channel'], row['original'])):
+                continue
             if row['original'].strip():
                 transcript.append({'actor': actor, 'text': row['original'][:500]})
         last_customer = next((turn['text'] for turn in reversed(transcript) if turn['actor'] == 'customer'), '')
@@ -620,7 +636,7 @@ class Service(Management):
                 self._notify(db, cid, 'advisor:' + request_id, 'Agent 草稿暂不可用，请人工处理。')
         return True
 
-    def _guide_customer(self, db, conv, event, mid, language, *, first):
+    def _guide_customer(self, db, conv, event, mid, language, *, first, guarded):
         cid = conv['id']
         session = db.execute('SELECT * FROM intake_sessions WHERE conversation_id=?', (cid,)).fetchone()
         if session is None:
@@ -634,8 +650,9 @@ class Service(Management):
             if not version or not self._queue_welcome_version(db, conv, version, key='welcome:' + cid):
                 self._outgoing(db, conv, self.intake.welcome(language), source_channel='ai_welcome',
                                already_translated=True)
-        if event.attachments:
-            self._handoff(db, cid, intake_reason='media')
+        if guarded or event.attachments:
+            reason = 'customer_control_text' if guarded else 'media'
+            self._handoff(db, cid, intake_reason=reason)
             return
         # Several customer messages may arrive before the worker sends a question.
         # Keep the latest question and count only replies that were not cancelled.
@@ -761,17 +778,21 @@ class Service(Management):
                 self._forget_intake_source(db, cid, existing['id'])
         elif self.approval_intake and conv['mode'] == 'manual' and timestamp >= conv['language_at']:
             self._cancel_ai(db, cid)
+        guarded = self._guard_customer(event.channel, event.text)
+        if guarded:
+            self._audit(db, cid, 'customer_control_text_held', {'message_id': mid})
         self._mirror(db, conv, message)
         if (self.approval_intake and conv['mode'] == 'manual' and event.event_type == 'message'
-                and timestamp >= conv['language_at'] and self._room_settings(db, cid)['reply_assist']):
+                and not guarded and not event.attachments and timestamp >= conv['language_at']
+                and self._room_settings(db, cid)['reply_assist']):
             self._queue_agent_job(db, conv, from_customer=True)
         if conv['mode'] == 'auto' and event.event_type == 'message' and self.intake is not None:
             if timestamp >= conv['language_at']:
-                self._guide_customer(db, conv, event, mid, language, first=first_contact)
+                self._guide_customer(db, conv, event, mid, language, first=first_contact, guarded=guarded)
             else:
                 self._audit(db, cid, 'stale_message_no_auto_reply', {'message_id': mid})
         elif self.intake is None and conv['mode'] == 'auto' and timestamp >= conv['language_at']:
-            answer = self.language.reply(event.text, language) if not event.attachments else {'action': 'handoff'}
+            answer = {'action': 'handoff'} if guarded or event.attachments else self.language.reply(event.text, language)
             if answer['action'] == 'reply':
                 self._outgoing(db, conv, answer['text'], parent_id=mid, already_translated=True)
             else:

@@ -42,6 +42,9 @@
   "agent": {
     "enabled": false
   },
+  "security": {
+    "customer_prompt_guard": true
+  },
   "llm": {
     "base_url": "",
     "model": "",

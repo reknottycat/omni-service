@@ -11,8 +11,9 @@ import ssl
 import time
 from urllib.parse import urlsplit
 
+from .media import MAX_FILE_BYTES, MAX_IMAGE_BYTES, MediaBlob, normalize_blob, safe_filename
 from .models import ChannelError
-from .personal import Connection
+from .personal import Connection, valid_file_id
 
 
 _MAX_WELCOME_PHOTO_BYTES = 8 * 1024 * 1024
@@ -20,12 +21,13 @@ _WELCOME_PHOTOS = {
     "image/png": ("welcome.png", b"\x89PNG\r\n\x1a\n", b"\x00\x00\x00\x00IEND\xaeB`\x82"),
     "image/jpeg": ("welcome.jpg", b"\xff\xd8\xff", b"\xff\xd9"),
 }
+_FILE_PATH = re.compile(r"[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*")
 
 
 class TelegramAPI:
     _METHODS = frozenset({
         "getMe", "getWebhookInfo", "getBusinessConnection", "getUpdates",
-        "sendMessage", "deleteBusinessMessages", "setMySettings",
+        "getFile", "sendMessage", "deleteBusinessMessages", "setMySettings",
     })
 
     def __init__(self, token, *, proxy_url=None, tunnel_port=None):
@@ -69,27 +71,69 @@ class TelegramAPI:
 
     def send_welcome_photo(self, connection_id, chat_id, photo, *, caption=''):
         """Upload a validated image from a frozen welcome snapshot."""
-        if (not isinstance(connection_id, str) or not connection_id.strip() or len(connection_id) > 512
-                or any(ord(char) < 32 or ord(char) == 127 for char in connection_id)
-                or type(chat_id) is not int or not 0 < chat_id < 2**63 or not isinstance(caption, str)
-                or not isinstance(photo, dict) or set(photo) != {"type", "data", "mime", "alt"}
+        if (not isinstance(photo, dict) or set(photo) != {"type", "data", "mime", "alt"}
                 or photo["type"] != "image" or not isinstance(photo["alt"], str)):
             raise ChannelError("invalid_payload")
         mime, encoded = photo["mime"], photo["data"]
         encoded_limit = 4 * ((_MAX_WELCOME_PHOTO_BYTES + 2) // 3)
         if (not isinstance(mime, str) or mime not in _WELCOME_PHOTOS or not isinstance(encoded, str)
-                or not 0 < len(encoded) <= encoded_limit or len(caption) > 1024):
+                or not 0 < len(encoded) <= encoded_limit):
+            raise ChannelError("invalid_payload")
+        try:
+            data = base64.b64decode(encoded, validate=True)
+        except ValueError:
+            raise ChannelError("invalid_payload") from None
+        filename, start, end = _WELCOME_PHOTOS[mime]
+        if (not 0 < len(data) <= _MAX_WELCOME_PHOTO_BYTES
+                or not data.startswith(start) or not data.endswith(end)):
+            raise ChannelError("invalid_payload")
+        return self._send_media("sendPhoto", "photo", connection_id, chat_id,
+                                MediaBlob(data, filename, mime), caption, timeout=10)
+
+    def download_attachment(self, remote_id, *, kind, filename=""):
+        """Resolve a Telegram file ID and download it through the fixed TLS endpoint."""
+        if not valid_file_id(remote_id) or kind not in ("image", "file", "audio"):
+            raise ChannelError("invalid_payload")
+        try:
+            resource = self.call("getFile", {"file_id": remote_id})
+        except ChannelError as exc:
+            if exc.code in ("authorization_failed", "rate_limited"):
+                raise
+            raise ChannelError("media_source_unavailable") from None
+        path = resource.get("file_path") if isinstance(resource, dict) else None
+        if (not isinstance(path, str) or len(path) > 1024 or not _FILE_PATH.fullmatch(path)
+                or any(segment in (".", "..") for segment in path.split("/"))):
+            raise ChannelError("media_source_unavailable")
+        limit = MAX_IMAGE_BYTES if kind == "image" else MAX_FILE_BYTES
+        size = resource.get("file_size")
+        if type(size) is int and size > limit:
+            raise ChannelError("media_too_large")
+        data, content_type = self._download(path, limit)
+        if type(size) is int and size != len(data):
+            raise ChannelError("media_source_unavailable")
+        name = safe_filename(filename, fallback=path.rsplit("/", 1)[-1])
+        return normalize_blob(MediaBlob(data, name, content_type), kind)
+
+    def send_attachment(self, connection_id, chat_id, kind, blob, *, caption=""):
+        """Send a relayed attachment as the connected account."""
+        blob = normalize_blob(blob, kind)
+        if kind == "image" and blob.mime in _WELCOME_PHOTOS:
+            return self._send_media("sendPhoto", "photo", connection_id, chat_id, blob, caption, timeout=60)
+        return self._send_media("sendDocument", "document", connection_id, chat_id, blob, caption, timeout=60)
+
+    def _send_media(self, method, field, connection_id, chat_id, blob, caption, *, timeout):
+        if (not isinstance(connection_id, str) or not connection_id.strip() or len(connection_id) > 512
+                or any(ord(char) < 32 or ord(char) == 127 for char in connection_id)
+                or type(chat_id) is not int or not 0 < chat_id < 2**63
+                or not isinstance(caption, str) or len(caption) > 1024 or "\x00" in caption):
             raise ChannelError("invalid_payload")
         try:
             connection_bytes = connection_id.encode()
             caption_bytes = caption.encode()
             caption_units = len(caption.encode("utf-16-le")) // 2
-            data = base64.b64decode(encoded, validate=True)
-        except (ValueError, UnicodeError):
+        except UnicodeError:
             raise ChannelError("invalid_payload") from None
-        filename, start, end = _WELCOME_PHOTOS[mime]
-        if (caption_units > 1024 or "\x00" in caption or not 0 < len(data) <= _MAX_WELCOME_PHOTO_BYTES
-                or not data.startswith(start) or not data.endswith(end)):
+        if caption_units > 1024:
             raise ChannelError("invalid_payload")
 
         boundary = "omni-" + secrets.token_hex(24)
@@ -97,20 +141,23 @@ class TelegramAPI:
         fields = [("business_connection_id", connection_bytes), ("chat_id", str(chat_id).encode("ascii"))]
         if caption_bytes:
             fields.append(("caption", caption_bytes))
+        if field == "document":
+            fields.append(("disable_content_type_detection", b"true"))
         parts = []
         for name, value in fields:
             parts.extend((delimiter, f'Content-Disposition: form-data; name="{name}"'.encode("ascii"),
                           b"", value))
-        parts.extend((delimiter, f'Content-Disposition: form-data; name="photo"; filename="{filename}"'.encode("ascii"),
-                      f"Content-Type: {mime}".encode("ascii"), b"", data, delimiter + b"--", b""))
-        return self._request("sendPhoto", b"\r\n".join(parts),
-                             content_type="multipart/form-data; boundary=" + boundary, timeout=10)
+        disposition = f'Content-Disposition: form-data; name="{field}"; filename="{blob.name}"'.encode()
+        parts.extend((delimiter, disposition, f"Content-Type: {blob.mime}".encode("ascii"),
+                      b"", blob.data, delimiter + b"--", b""))
+        return self._request(method, b"\r\n".join(parts),
+                             content_type="multipart/form-data; boundary=" + boundary, timeout=timeout)
 
-    def _request(self, method, body, *, content_type, timeout):
+    def _connection(self, timeout):
         connection = http.client.HTTPSConnection(*(self._proxy or ("api.telegram.org",)), timeout=timeout)
-        if self._proxy:
-            connection.set_tunnel("api.telegram.org", 443)
         try:
+            if self._proxy:
+                connection.set_tunnel("api.telegram.org", 443)
             if self._tunnel_port is not None:
                 # The SSH forward carries the original Telegram TLS stream.
                 # Verify Telegram's certificate and send its hostname as SNI.
@@ -121,6 +168,51 @@ class TelegramAPI:
                 except BaseException:
                     raw_socket.close()
                     raise
+            return connection
+        except BaseException:
+            connection.close()
+            raise
+
+    def _download(self, path, limit):
+        connection = None
+        try:
+            connection = self._connection(60)
+            connection.request("GET", f"/file/bot{self._token}/{path}")
+            response = connection.getresponse()
+            if response.status in (401, 403):
+                raise ChannelError("authorization_failed")
+            if response.status == 429:
+                raise ChannelError("rate_limited", retry_after=self._retry_after(response))
+            if response.status != 200:
+                raise ChannelError("media_source_unavailable")
+            advertised = response.getheader("Content-Length")
+            length = int(advertised) if advertised is not None else None
+            if length is not None and length > limit:
+                raise ChannelError("media_too_large")
+            data = response.read(limit + 1)
+            if len(data) > limit:
+                raise ChannelError("media_too_large")
+            if not data or (length is not None and length != len(data)):
+                raise ChannelError("media_source_unavailable")
+            return data, response.getheader("Content-Type") or "application/octet-stream"
+        except (OSError, http.client.HTTPException, ValueError):
+            raise ChannelError("media_source_unavailable") from None
+        finally:
+            if connection is not None:
+                connection.close()
+
+    @staticmethod
+    def _retry_after(response):
+        try:
+            delay = int(response.getheader("Retry-After") or 1)
+        except (TypeError, ValueError):
+            delay = 1
+        return max(1, min(delay, 3600))
+
+    def _request(self, method, body, *, content_type, timeout):
+        connection = None
+        try:
+            connection = self._connection(timeout)
             connection.request("POST", f"/bot{self._token}/{method}", body=body,
                                headers={"Content-Type": content_type})
             response = connection.getresponse()
@@ -133,10 +225,7 @@ class TelegramAPI:
             if status == 409 and method == "getUpdates":
                 raise ChannelError("telegram_poll_conflict")
             if status == 429:
-                try:
-                    delay = int(response.getheader("Retry-After") or 1)
-                except (TypeError, ValueError):
-                    delay = 1
+                delay = self._retry_after(response)
                 try:
                     data = json.loads(raw)
                     delay = int(data.get("parameters", {}).get("retry_after", delay))
@@ -155,7 +244,8 @@ class TelegramAPI:
             # Exception strings can contain the path, which includes the token.
             raise ChannelError("delivery_unknown") from None
         finally:
-            connection.close()
+            if connection is not None:
+                connection.close()
 
 
 class TelegramPoller:

@@ -1,4 +1,4 @@
-"""Run the Telegram connected-account and Feishu text bridge."""
+"""Run the Telegram connected-account and Feishu message bridge."""
 
 import argparse
 from dataclasses import replace
@@ -17,11 +17,17 @@ from .feishu_live import FeishuLive
 from .intake import Intake
 from .language import SimulationLanguage
 from .local_translation import LocalTranslation
-from .models import ChannelError
+from .media import MEDIA_KINDS, normalize_blob, safe_filename
+from .models import Attachment, ChannelError
 from .personal import Connection, TelegramPersonal
 from .service import Service, _id
 from .telegram_live import TelegramAPI, TelegramPoller
 from .welcome_templates import FeishuWelcomeDocument
+
+
+def _relay_attachment(attachments):
+    return (len(attachments) == 1 and attachments[0]['kind'] in MEDIA_KINDS
+            and bool(attachments[0]['remote_id']))
 
 
 class PersonalBridge(Service):
@@ -159,6 +165,10 @@ class PersonalBridge(Service):
             return
         return self.decide_draft(event)
 
+    def _room_rules(self, db, cid):
+        return (super()._room_rules(db, cid) + '\n普通图片和文件也会转发给客户。'
+                '请将内部附件单独留在带 @ 的消息中。')
+
     def _customer_event(self, db, event):
         if event.user_id != str(self.telegram.policy.owner_id):
             return super()._customer_event(db, event)
@@ -181,6 +191,47 @@ class PersonalBridge(Service):
                         {"text": label + "Telegram 本人已回复：" + event.text})
         return {"status": "owner_mirrored", "conversation_id": cid}
 
+    def _mirror(self, db, conv, message):
+        attachments = json.loads(message['attachments'])
+        if message['source_channel'] != 'telegram' or not _relay_attachment(attachments):
+            return super()._mirror(db, conv, message)
+        if conv['room_status'] == 'absent' or message['status'] == 'deleted':
+            return
+        mid, cid = message['id'], conv['id']
+        attachment = attachments[0]
+        label = {'image': '图片', 'file': '文件', 'audio': '音频'}[attachment['kind']]
+        name = safe_filename(attachment['name'], '')
+        prefix = f'发来{label}' + (f' {name}' if name else '') + '\n'
+        body = self._customer_mirror_body(db, conv, message, prefix)
+        self._queue(db, cid, 'feishu', 'send', 'media-caption:' + mid, {'text': body})
+        self._queue(db, cid, 'feishu', 'send', 'mirror:' + mid, {'relay_media': True}, mid)
+
+    def _outgoing(self, db, conv, text, *, author='AI', source_channel='ai', source_id=None,
+                  sender_name='', parent_id=None, already_translated=False, attachments=()):
+        if source_channel != 'feishu' or not _relay_attachment(attachments):
+            return super()._outgoing(db, conv, text, author=author, source_channel=source_channel,
+                                     source_id=source_id, sender_name=sender_name, parent_id=parent_id,
+                                     already_translated=already_translated, attachments=attachments)
+        cid = conv['id']
+        translated = ''
+        if text:
+            try:
+                translated = self.language.translate(text, 'zh', conv['language'])
+            except ChannelError as exc:
+                if exc.code != 'translation_unavailable':
+                    raise
+        caption = self._display_reply(translated, conv['language'], author, sender_name) if translated else ''
+        if len(caption.encode('utf-16-le')) > 2048:
+            caption = ''
+        mid = self._message(db, cid, direction='outbound', source_channel=source_channel, source_id=source_id,
+                            author_id=author, sender_name=sender_name, text=text, translated=translated,
+                            language=conv['language'], kind='media', attachments=attachments, status='queued',
+                            parent_id=parent_id)
+        self._queue(db, cid, 'telegram', 'send', 'out:' + mid, {'text': caption, 'relay_media': True}, mid)
+        if text and not caption:
+            self._notify(db, cid, 'media-caption:' + mid, '附件说明无法随文件发送，请另发文字。')
+        return mid, 'queued'
+
     def _request(self, db, item, conv):
         if not self._valid_conversation(conv):
             raise ChannelError("unsupported")
@@ -201,6 +252,17 @@ class PersonalBridge(Service):
         if (operation == "send" and channel in ("telegram", "feishu")
                 or operation == 'update_card' and channel == 'feishu'):
             if conv["room_id"] is not None and conv["room_status"] == "ready":
+                if payload.get('relay_media') is True:
+                    source, direction = ('telegram', 'inbound') if channel == 'feishu' else ('feishu', 'outbound')
+                    message = db.execute('''SELECT source_id, attachments FROM messages WHERE id=?
+                        AND conversation_id=? AND source_channel=? AND direction=? AND kind='media'
+                        AND status NOT IN ('deleted','cancelled')''',
+                                         (item['message_id'], conv['id'], source, direction)).fetchone()
+                    attachments = json.loads(message['attachments']) if message is not None else []
+                    if not _relay_attachment(attachments):
+                        raise ChannelError('unsupported_media')
+                    payload['media_source_id'] = message['source_id']
+                    payload['relay_attachment'] = Attachment(**attachments[0])
                 return payload
             if self.managed and channel == "telegram" and payload.get("mandatory_welcome") is True:
                 message = db.execute("SELECT author_id,source_channel FROM messages WHERE id=? AND conversation_id=?",
@@ -209,12 +271,21 @@ class PersonalBridge(Service):
                     return payload
         raise ChannelError("unsupported")
 
+    def _failure(self, db, item, exc):
+        super()._failure(db, item, exc)
+        if item['channel'] == 'feishu' and json.loads(item['payload']).get('relay_media') is True:
+            row = db.execute('SELECT status FROM outbox WHERE id=?', (item['id'],)).fetchone()
+            if row['status'] == 'failed':
+                self._notify(db, item['conversation_id'], 'media-failed:' + str(item['id']),
+                             '客户附件未能传入飞书。错误 ' + exc.code + '。')
+
     def _deliver(self, item, conv, request):
         # Revocation also blocks delivery of already queued Telegram content.
         connection = self.telegram.refresh()
         if not connection.enabled or not connection.can_reply:
             raise ChannelError("authorization_failed")
         staff_options = {"staff_ids": request["feishu_staff_ids"]} if "feishu_staff_ids" in request else {}
+        attachment = request.get('relay_attachment')
         if item["channel"] == "feishu":
             if item["operation"] == "create_room":
                 room = self.feishu.create_room(request["name"], item["operation_key"], **staff_options)
@@ -225,6 +296,11 @@ class PersonalBridge(Service):
             options = dict(staff_options)
             if self.managed:
                 options["chat_id"] = conv["room_id"]
+            if attachment is not None:
+                blob = self.api.download_attachment(attachment.remote_id, kind=attachment.kind,
+                                                    filename=attachment.name)
+                return self.feishu.send_attachment(attachment.kind, normalize_blob(blob, attachment.kind),
+                                                  item['operation_key'], **options)
             if "card" in request:
                 if not self.approval_cards:
                     raise ChannelError("approval_cards_disabled")
@@ -236,15 +312,21 @@ class PersonalBridge(Service):
             if "mention_user_id" in request:
                 options["mention_user_id"] = request["mention_user_id"]
             return self.feishu.send(request["text"], item["operation_key"], **options)
-        if self.managed and conv["room_id"] is not None:
-            self.feishu.preflight(conv["room_id"], **staff_options)
-        elif not self.managed:
-            self.feishu.preflight(**staff_options)
+        if attachment is None:  # Media downloads validate the Feishu source room and roster themselves.
+            if self.managed and conv["room_id"] is not None:
+                self.feishu.preflight(conv["room_id"], **staff_options)
+            elif not self.managed:
+                self.feishu.preflight(**staff_options)
         text, photo = request["text"], request.get("welcome_photo")
         method, payload = self.telegram.policy.send_payload(
-            connection.connection_id, int(conv["chat_id"]), (text or ".") if photo is not None else text,
+            connection.connection_id, int(conv["chat_id"]), (text or ".") if photo or attachment else text,
             last_incoming_at=conv["last_customer_at"], now=self.clock())
-        if photo is not None:
+        if attachment is not None:
+            blob = self.feishu.download_attachment(conv['room_id'], request['media_source_id'], attachment,
+                                                   **staff_options)
+            result = self.api.send_attachment(payload['business_connection_id'], payload['chat_id'], attachment.kind,
+                                              normalize_blob(blob, attachment.kind), caption=text)
+        elif photo is not None:
             result = self.api.send_welcome_photo(payload["business_connection_id"], payload["chat_id"], photo,
                                                  caption=text)
         else:
@@ -324,7 +406,8 @@ def run(bridge, *, admin_server=None):
         print("OmniService Telegram–Feishu bridge started. Translation:", bridge.language.provider_name,
               "Intake:", "on" if bridge.intake_enabled else "off",
               "Approval cards:", "on" if bridge.approval_cards else "off",
-              "Agent default:", "on" if bridge.agent_enabled else "off", flush=True)
+              "Agent default:", "on" if bridge.agent_enabled else "off",
+              "Customer prompt guard:", "on" if bridge.customer_prompt_guard else "off", flush=True)
         while not stop.is_set():
             try:
                 for event in bridge.telegram.poll(timeout=2):
@@ -377,6 +460,12 @@ def intake_provider(config, language):
     simulated = isinstance(language, SimulationLanguage)
     extract = (lambda _text, _fields: {}) if simulated else language.extract_intake
     return Intake(extract, max_replies=config.get("max_replies", 5), simulated=simulated), config.get("enabled", False)
+
+
+def customer_security_setting(config):
+    if not isinstance(config, dict) or type(config.get("customer_prompt_guard", True)) is not bool:
+        raise ChannelError("invalid_customer_security_config")
+    return config.get("customer_prompt_guard", True)
 
 
 def agent_provider(config, language, *, approval_intake):
@@ -494,11 +583,13 @@ def main():
         intake_enabled = managed or intake_enabled
         approval_cards = cards_configured and intake_enabled
         advisor, agent_enabled = agent_provider(config.get("agent", {}), language, approval_intake=intake_enabled)
+        prompt_guard = customer_security_setting(config.get("security", {}))
         if args.action == "check":
             audience = "Feishu application identity" if managed else "Feishu group"
             print("Telegram connection and", audience, "verified. Translation:", language.provider_name,
                   "Intake:", "on" if intake_enabled else "off", "Approval cards:", "on" if approval_cards else "off",
                   "Agent default:", "on" if agent_enabled else "off",
+                  "Customer prompt guard:", "on" if prompt_guard else "off",
                   "Management configuration:", "present" if management else "disabled")
             return 0
         os.umask(0o077)
@@ -514,7 +605,7 @@ def main():
                 connection_id=connection.connection_id, bot_id=bot["id"],
                 language=language, intake=intake, intake_enabled=intake_enabled,
                 approval_intake=intake_enabled, approval_cards=approval_cards, agent_advisor=advisor,
-                agent_enabled=agent_enabled, handoff_staff_id=handoff_staff_id)
+                agent_enabled=agent_enabled, handoff_staff_id=handoff_staff_id, customer_prompt_guard=prompt_guard)
             try:
                 if not intake_enabled:
                     bridge.set_intake_enabled(False)

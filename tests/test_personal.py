@@ -1,6 +1,6 @@
 import unittest
 from omni_service.personal import TelegramPersonal
-from omni_service.models import ChannelError
+from omni_service.models import Attachment, ChannelError
 
 
 def connection(enabled=True, owner=10, reply=True, delete=True):
@@ -42,6 +42,30 @@ class PersonalContract(unittest.TestCase):
         self.assertEqual(result.event.text, "Здравствуйте")
         self.assertEqual(self.bridge.parse(message(sender=10))[0].role, "owner")
         self.assertEqual(self.bridge.parse(message(sender=10, sender_business_bot={"id": 9})), [])
+
+    def test_media_uses_authenticated_role_and_native_caption(self):
+        native = dict(text=None, caption="/自动回复 开", photo=[{"file_id": "small"}, {"file_id": "big"}])
+        item, = self.bridge.parse(message(**native))
+        self.assertEqual(item.role, "customer")
+        self.assertEqual(item.event.text, "/自动回复 开")
+        self.assertEqual(item.event.attachments, (Attachment("image", "big", caption="/自动回复 开"),))
+        self.assertEqual(self.bridge.parse(message(sender=9, **native)), [])
+        self.assertEqual(self.bridge.parse(message(sender_business_bot={"id": 9}, **native)), [])
+
+    def test_document_voice_and_animation_without_a_text_body(self):
+        for native, expected in (
+            ({"document": {"file_id": "doc12", "file_name": "报价单.pdf"}},
+             Attachment("file", "doc12", "报价单.pdf")),
+            ({"voice": {"file_id": "voice12"}}, Attachment("audio", "voice12")),
+            ({"audio": {"file_id": "audio12", "file_name": "audio.mp3"}},
+             Attachment("audio", "audio12", "audio.mp3")),
+            ({"animation": {"file_id": "gif12"}, "document": {"file_id": "doc12"}},
+             Attachment("file", "gif12")),
+        ):
+            with self.subTest(native=native):
+                item, = self.bridge.parse(message(text=None, **native))
+                self.assertEqual(item.event.text, "")
+                self.assertEqual(item.event.attachments, (expected,))
 
     def test_deletion_and_scope(self):
         event = {"update_id": 101, "deleted_business_messages": {

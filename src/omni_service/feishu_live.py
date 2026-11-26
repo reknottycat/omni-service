@@ -1,23 +1,41 @@
 """Feishu bot transport for private pinned or bridge-managed groups."""
 
 import json
+import mimetypes
 import os
 import re
 import selectors
+import stat
 import subprocess
+import tempfile
 import time
 from contextlib import suppress
 from hashlib import sha256
+from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
 from .approval_card import CARD_ACTION, card_decision
 from .channels import feishu_text
-from .models import ChannelError, InboundEvent
+from .media import MAX_FILE_BYTES, MAX_IMAGE_BYTES, MediaBlob, normalize_blob, safe_filename
+from .models import Attachment, ChannelError, InboundEvent
 
 
 _EVENT = "im.message.receive_v1"
 _MAX_LINE = 256 * 1024
 _CLI_TIMEOUT = 15
+_MEDIA_TIMEOUT = 60
+_ATTACHMENT_TYPES = ("image", "file", "audio", "media", "video")
+_FILE_TYPES = {
+    ".opus": "opus", ".mp4": "mp4", ".pdf": "pdf", ".doc": "doc", ".docx": "doc",
+    ".xls": "xls", ".xlsx": "xls", ".ppt": "ppt", ".pptx": "ppt",
+}
+_MEDIA_IMAGE = re.compile(r"\[Image: (img_[A-Za-z0-9_-]{1,256})\]")
+# lark-cli escapes quotes and backslashes in its rendered media tags like JSON.
+_MEDIA_FILE = re.compile(
+    r'<(file|audio|video) key="(file_[A-Za-z0-9_-]{1,256})"'
+    r'(?: name="((?:[^"\\]|\\["\\nrt])*)")?'
+    r'(?: duration="[0-9]+s")?(?: cover_image_key="img_[A-Za-z0-9_-]{1,256}")?/>'
+)
 _EVENT_LOSS_PREFIXES = (b"WARN: event seq gap", b"WARN: consume backpressure",
                         b"WARN: dropping oversized frame", b"WARN: sink write failed",
                         b"WARN: Process error", b"WARN: JQ error")
@@ -25,6 +43,62 @@ _EVENT_LOSS_PREFIXES = (b"WARN: event seq gap", b"WARN: consume backpressure",
 
 def _id(value, prefix):
     return isinstance(value, str) and re.fullmatch(prefix + r"[A-Za-z0-9_]+", value) is not None
+
+
+def _resource_id(value, kind):
+    prefix = "img_" if kind == "image" else "file_"
+    return isinstance(value, str) and re.fullmatch(prefix + r"[A-Za-z0-9_-]{1,256}", value) is not None
+
+
+def _event_attachment(message_type, content):
+    if not isinstance(content, str):
+        return None
+    if message_type == "image":
+        match = _MEDIA_IMAGE.fullmatch(content)
+        return Attachment("image", match[1]) if match else None
+    tag = "video" if message_type == "media" else message_type
+    match = _MEDIA_FILE.fullmatch(content)
+    if not match or match[1] != tag:
+        return None
+    key, encoded_name = match[2], match[3]
+    fallback = {"video": "video.mp4", "audio": "audio.opus"}.get(tag, "")
+    name = fallback
+    if encoded_name and encoded_name != key:
+        with suppress(ValueError):
+            name = safe_filename(json.loads(f'"{encoded_name}"'), fallback)
+    return Attachment("audio" if tag == "audio" else "file", key, name)
+
+
+def _downloaded_blob(directory, receipt, kind, name):
+    error = "feishu_attachment_download_failed"
+    path, size = receipt.get("saved_path"), receipt.get("size_bytes")
+    limit = MAX_IMAGE_BYTES if kind == "image" else MAX_FILE_BYTES
+    if type(size) is not int or size <= 0:
+        raise ChannelError(error)
+    if size > limit:
+        raise ChannelError("media_too_large")
+    if not isinstance(path, str) or not path:
+        raise ChannelError(error)
+    try:
+        root = Path(directory).resolve(strict=True)
+        path = root / path
+        # The CLI can add an extension based on the response. Only accept its fixed
+        # output basename directly inside this private directory.
+        if path.parent.resolve(strict=True) != root or not re.fullmatch(r"payload(?:\.[A-Za-z0-9]{1,12})?", path.name):
+            raise ChannelError(error)
+        fd = os.open(root / path.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as stream:
+            status = os.fstat(stream.fileno())
+            if not stat.S_ISREG(status.st_mode) or status.st_size != size:
+                raise ChannelError(error)
+            data = stream.read(limit + 1)
+        if len(data) != size:
+            raise ChannelError(error)
+    except (OSError, ValueError, RuntimeError):
+        raise ChannelError(error) from None
+    name = safe_filename(name, f"attachment{path.suffix}")
+    mime = mimetypes.guess_type(name)[0] or mimetypes.guess_type(path.name)[0]
+    return normalize_blob(MediaBlob(data, name, mime or "application/octet-stream"), kind)
 
 
 class FeishuLive:
@@ -42,16 +116,19 @@ class FeishuLive:
         self.bot_app_ids = frozenset((app_id, *allowed_bot_app_ids))
         if chat_id is None and (len(self.staff_ids) > 50 or len(self.bot_app_ids) > 6):
             raise ChannelError("feishu_invalid_config")
-        self._command = [cli, f"--profile={profile or app_id}"]
+        executable = os.fspath(cli)
+        self._command = [
+            os.path.abspath(executable) if os.sep in executable else executable, f"--profile={profile or app_id}",
+        ]
         self._env = {**os.environ, "LARKSUITE_CLI_NO_UPDATE_NOTIFIER": "1",
                      "LARKSUITE_CLI_NO_SKILLS_NOTIFIER": "1"}
 
-    def _run_json(self, args, *, error, input_text=None):
+    def _run_json(self, args, *, error, input_text=None, cwd=None, timeout=_CLI_TIMEOUT):
         # Never include stderr or command input in errors. The CLI can echo content.
         try:
             result = subprocess.run(self._command + args, input=input_text,
                                     capture_output=True, encoding="utf-8", env=self._env,
-                                    timeout=_CLI_TIMEOUT, check=False)
+                                    timeout=timeout, cwd=cwd, check=False)
             if result.returncode:
                 raise ChannelError(error)
             payload = json.loads(result.stdout)
@@ -67,9 +144,9 @@ class FeishuLive:
                 or response.get("brand") != "feishu" or response.get("available") is not True):
             raise ChannelError("feishu_identity_mismatch")
 
-    def _bot_data(self, args, *, error, input_text=None):
+    def _bot_data(self, args, *, error, input_text=None, cwd=None, timeout=_CLI_TIMEOUT):
         result = self._run_json(args + ["--as", "bot", "--format", "json"],
-                                error=error, input_text=input_text)
+                                error=error, input_text=input_text, cwd=cwd, timeout=timeout)
         data = result.get("data")
         if result.get("ok") is not True or result.get("identity") != "bot" or not isinstance(data, dict):
             raise ChannelError(error)
@@ -179,6 +256,61 @@ class FeishuLive:
             raise ChannelError("feishu_invalid_payload")
         return self._send_message(chat_id, "interactive", card, operation_id, staff_ids=staff_ids)
 
+    def download_attachment(self, chat_id, message_id, attachment, *, staff_ids=None):
+        """Fetch a native resource bound to the accepted Feishu message ID."""
+        chat_id = self._target(chat_id)
+        if chat_id is None:
+            raise ChannelError("feishu_invalid_chat")
+        if (not _id(message_id, "om_") or not isinstance(attachment, Attachment)
+                or attachment.kind not in ("image", "file", "audio")
+                or not _resource_id(attachment.remote_id, attachment.kind)):
+            raise ChannelError("feishu_invalid_payload")
+        self.preflight(chat_id, staff_ids=staff_ids)
+        kind = "image" if attachment.kind == "image" else "file"
+        try:
+            with tempfile.TemporaryDirectory(prefix="omni-feishu-media-") as directory:
+                receipt = self._bot_data(
+                    ["im", "+messages-resources-download", "--message-id", message_id,
+                     "--file-key", attachment.remote_id, "--type", kind, "--output", "payload"],
+                    error="feishu_attachment_download_failed", cwd=directory, timeout=_MEDIA_TIMEOUT,
+                )
+                return _downloaded_blob(directory, receipt, kind, attachment.name)
+        except OSError:
+            raise ChannelError("feishu_attachment_download_failed") from None
+
+    def send_attachment(self, kind, blob, operation_id, *, chat_id=None, staff_ids=None):
+        """Upload scoped bytes and send native media with the existing delivery key."""
+        chat_id = self._target(chat_id)
+        if chat_id is None:
+            raise ChannelError("feishu_invalid_chat")
+        if kind not in ("image", "file", "audio") or not isinstance(operation_id, str) or not operation_id:
+            raise ChannelError("feishu_invalid_payload")
+        message_type = "image" if kind == "image" else "file"
+        blob = normalize_blob(blob, message_type)
+        self.preflight(chat_id, staff_ids=staff_ids)
+        suffix = Path(blob.name).suffix.lower()
+        filename = "payload" + (suffix if re.fullmatch(r"\.[a-z0-9]{1,12}", suffix) else ".bin")
+        if message_type == "image":
+            collection, field, key = "images", "image", "image_key"
+            data = {"image_type": "message"}
+        else:
+            collection, field, key = "files", "file", "file_key"
+            data = {"file_type": _FILE_TYPES.get(suffix, "stream"), "file_name": blob.name}
+        try:
+            with tempfile.TemporaryDirectory(prefix="omni-feishu-media-") as directory:
+                (Path(directory) / filename).write_bytes(blob.data)
+                receipt = self._bot_data(
+                    ["im", collection, "create", "--data", "-", "--file", f"{field}={filename}"],
+                    error="feishu_attachment_upload_failed", input_text=json.dumps(data, ensure_ascii=False),
+                    cwd=directory, timeout=_MEDIA_TIMEOUT,
+                )
+        except OSError:
+            raise ChannelError("feishu_attachment_upload_failed") from None
+        resource = receipt.get(key)
+        if not _resource_id(resource, message_type):
+            raise ChannelError("feishu_attachment_upload_failed")
+        return self._send_message(chat_id, message_type, {key: resource}, operation_id, staff_ids=staff_ids)
+
     def patch_card(self, message_id, card, *, chat_id=None, staff_ids=None):
         """Update an app-owned card whose receipt has been bound to this room."""
         chat_id = self._target(chat_id)
@@ -210,9 +342,11 @@ class FeishuLive:
     def _event_filter(self, managed_membership):
         chat_filter = f" and .chat_id == {json.dumps(self.chat_id)}" if self.chat_id is not None else ""
         staff_filter = self._staff_filter("sender_id", managed_membership)
+        types = json.dumps(("text", *_ATTACHMENT_TYPES))
         return (
             f'select(.type == "{_EVENT}"{chat_filter} and .chat_type == "group" '
-            f'and .sender_type == "user" and .message_type == "text"{staff_filter}) | '
+            f'and .sender_type == "user" and (.message_type as $kind | {types} | any(. == $kind))'
+            f'{staff_filter}) | '
             '{type, chat_id, chat_type, sender_type, message_type, sender_id, message_id, create_time, content, '
             'has_mentions: (.mentions != null and .mentions != [])}'
         )
@@ -230,20 +364,28 @@ class FeishuLive:
             raise ChannelError("feishu_invalid_event_stream") from None
         if (not isinstance(event, dict) or event.get("type") != _EVENT or event.get("chat_type") != "group"
                 or event.get("sender_type") != "user"
-                or event.get("message_type") != "text" or not _id(event.get("sender_id"), "ou_")
+                or not _id(event.get("sender_id"), "ou_")
                 or (not managed_membership and event["sender_id"] not in self.staff_ids)):
             return None
         chat_id = event.get("chat_id")
         if (not _id(chat_id, "oc_") or self.chat_id not in (None, chat_id)
                 or (room_allowed is not None and not room_allowed(chat_id))):
             return None
-        message_id, text, created = event.get("message_id"), event.get("content"), event.get("create_time")
-        if (not _id(message_id, "om_") or not isinstance(text, str) or not text.strip()
-                or not isinstance(created, str) or re.fullmatch(r"[0-9]{1,15}", created) is None):
+        message_id, content, created = event.get("message_id"), event.get("content"), event.get("create_time")
+        if (not _id(message_id, "om_") or not isinstance(created, str)
+                or re.fullmatch(r"[0-9]{1,15}", created) is None):
+            return None
+        message_type = event.get("message_type")
+        if message_type == "text" and isinstance(content, str) and content.strip():
+            text, attachments = content, ()
+        elif message_type in _ATTACHMENT_TYPES and (attachment := _event_attachment(message_type, content)):
+            text, attachments = "", (attachment,)
+        else:
             return None
         # Feishu may assign a new event ID to re-delivery of the same message.
         return InboundEvent("feishu", self.app_id, message_id, chat_id, event["sender_id"],
                             message_id, text=text, timestamp=int(created) / 1000,
+                            attachments=attachments,
                             has_mentions=event.get("has_mentions", False) is not False)
 
     def _card_filter(self, managed_membership):

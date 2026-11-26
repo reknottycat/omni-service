@@ -19,6 +19,7 @@ import warnings
 from urllib.parse import urlsplit
 
 from .admin_auth import FeishuAdminAuth
+from .company_accounts import CompanyConfigurationError, validate_company
 from .feishu_provision import provision_feishu
 from .local_translation import LocalTranslation
 from .models import ChannelError
@@ -258,6 +259,10 @@ def configure(args, credentials, config):
         raise ChannelError("invalid_setup_config")
     if args.chat_scope is None or not args.model_url or not args.model or not 1 <= args.port <= 65535:
         raise ChannelError("invalid_setup_config")
+    company_name = args.company_name or args.config.parent.name
+    if (len(company_name) > 40 or not company_name.strip()
+            or any(ord(char) < 32 or ord(char) == 127 for char in company_name)):
+        raise ChannelError('invalid_company_name')
     scopes = args.chat_scope
     if scopes == "allowlist" and (not args.test_chat_id or len(args.test_chat_id) != len(set(args.test_chat_id))
                                  or any(not 0 < peer < 2**52 for peer in args.test_chat_id)):
@@ -313,6 +318,7 @@ def configure(args, credentials, config):
     config["management"].update(enabled=True, admin_ids=[admin], tenant_key=organization,
                                  callback_url=args.callback_url, app_secret_env="OMNI_FEISHU_APP_SECRET",
                                  signing_key_env="OMNI_ADMIN_SIGNING_KEY", bind_host="127.0.0.1", port=args.port)
+    config['company_name'] = company_name.strip()
     config["mode"] = "personal-managed"
     _save_profile(args, credentials, config)
     print("已写入服务配置。启动前请完成飞书应用审批及事件订阅，然后运行 check。", flush=True)
@@ -329,6 +335,7 @@ def main(argv=None):
     parser.add_argument("--model-url")
     parser.add_argument("--model")
     parser.add_argument("--port", type=int, default=8081, help="管理页环回端口")
+    parser.add_argument("--company-name", help="飞书服务群使用的公司名称")
     parser.add_argument("--chat-scope", choices=("connection", "allowlist"))
     parser.add_argument("--test-chat-id", action="append", type=int, default=[])
     args = parser.parse_args(argv)
@@ -353,6 +360,8 @@ def main(argv=None):
                                 args.config.parent, name=config.get('profile'))
             print('飞书应用已写入此团队的独立配置。')
             return 0
+        if args.config.name == 'personal.json' and args.config.parent.parent.name == 'omni-service':
+            validate_company(args.config.parent.parent, args.config.parent.name)
         for key in _KEYS:
             os.environ.pop(key, None)
         os.environ.update({key: value for key, value in credentials.items() if value})
@@ -365,9 +374,10 @@ def main(argv=None):
         return run_bridge(runner_args)
     except KeyboardInterrupt:
         return 130
-    except (ChannelError, OSError, ValueError, AttributeError, TypeError, KeyError) as exc:
+    except (ChannelError, CompanyConfigurationError, OSError, ValueError, AttributeError, TypeError, KeyError) as exc:
         code = getattr(exc, 'code', 'setup_config_or_local_io')
-        print('OmniService setup:', code, _SETUP_HINTS.get(code, ''))
+        message = str(exc) if isinstance(exc, CompanyConfigurationError) else _SETUP_HINTS.get(code, '')
+        print('OmniService setup:', code, message)
         return 1
 
 

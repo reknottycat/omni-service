@@ -65,3 +65,21 @@ systemctl --user status omni-service-support.service
 | P1-K / verify / 协调负责人 | 真实新组织扫码、回调登记、应用发版审批、员工私聊邀请和混合名单外部群 | 用获准外部测试账号核对飞书返回的身份、入群和授权三项回执。现有证据是平台模拟、历史本组织试点与官方协议核对，真实验收待做。 |
 
 DGX Linux aarch64 / Python 3.12.3 对 `8d596ab` 执行 `bash scripts/acceptance.sh`，227 项通过，0 失败、0 错误、0 跳过。报告及首次接口兼容失败记录在 `artifacts/dgx-onboarding-20261126/`。 [Linux 执行记录](evidence/linux-mock-acceptance.md#2026-11-26-团队部署与接入复验)
+
+## 多公司和多个 Telegram 原账号
+
+每家公司使用独立的 Telegram 原账号、专用机器人、飞书自建应用和数据库。不同公司可以选择不同的模型和客服名单。分别执行安装与首次配置，给每家公司分配不同的公司代号、管理端口和 HTTPS 地址。配置时可增加 `--company-name '公司名称'`，新建飞书服务群会带上该名称。此前已建群保留原名。
+
+```bash
+bash scripts/install-personal.sh company-a --no-start
+bash scripts/install-personal.sh company-b --no-start
+bash scripts/install-personal.sh company-c --no-start
+PYTHONPATH=src python3.12 -m omni_service.company_accounts list
+PYTHONPATH=src python3.12 -m omni_service.company_accounts serve
+```
+
+最后一条命令会输出仅当前机器可访问的公司管理页地址。打开页面可查看当前 Linux 用户下各公司的服务状态，并进入各自的管理台。管理台继续使用对应公司飞书组织登录，客服权限、欢迎语、消息、附件和会话分别保存在各公司实例中。公司管理页显示本机 systemd 状态，平台授权状态以各公司的管理台和预检为准。
+
+每个实例启动前检查同一 Linux 用户下启用的公司配置。Telegram 机器人、原账号、业务连接、飞书应用、管理端口及管理回调地址发生重复时，相关实例会报告冲突，避免共用轮询和事件接收。各公司数据目录保持隔离。互不信任的公司应使用不同 Linux 用户或容器，此时公司列表仅显示当前 Linux 用户的实例，跨用户的重复配置不在自动检查范围内。
+
+复验 `PYTHONPATH=src python3.12 -m unittest discover -s tests -p test_company_accounts.py -v`。三公司模拟使用同一个客户 ID 分别建立独立会话，覆盖公司间群路由、配置冲突、权限文件和管理页本机访问检查。真实多公司平台授权和同时在线尚待对应公司账号的验收。

@@ -50,7 +50,7 @@ class Service(Management):
                  members=tuple(f'employee-{n}' for n in range(1, 8)), language=None,
                  intake=None, intake_enabled=False, label_replies=False,
                  approval_intake=False, agent_advisor=None, agent_enabled=False, handoff_staff_id=None,
-                 approval_cards=False, customer_prompt_guard=True):
+                 approval_cards=False, customer_prompt_guard=True, company_name=''):
         if (approval_intake and intake is None) or (approval_cards and not approval_intake):
             raise ChannelError('invalid_intake_config')
         self.default_members = tuple(dict.fromkeys(members))
@@ -60,6 +60,10 @@ class Service(Management):
             raise ChannelError('invalid_agent_config')
         if type(customer_prompt_guard) is not bool:
             raise ChannelError('invalid_customer_security_config')
+        if (not isinstance(company_name, str) or len(company_name) > 40
+                or any(ord(char) < 32 or ord(char) == 127 for char in company_name)):
+            raise ChannelError('invalid_company_name')
+        self.company_name = company_name.strip()
         self.store = Store(db_path)
         self.transport = transport
         self.clock = clock
@@ -375,7 +379,8 @@ class Service(Management):
         if conv['room_status'] == 'absent':
             db.execute("UPDATE conversations SET room_status='pending' WHERE id=?", (cid,))
             self._queue(db, cid, 'feishu', 'create_room', 'room:' + cid,
-                        {'name': 'OmniService ' + cid[-8:]})
+                        {'name': ('OmniService ' + self.company_name + ' ' if self.company_name else 'OmniService ')
+                                 + cid[-8:]})
             self._queue(db, cid, 'feishu', 'send', 'room-rules:' + cid,
                         {'text': self._room_rules(db, cid) if self.approval_intake else _ROOM_RULES, 'mention_all': True})
         return selected

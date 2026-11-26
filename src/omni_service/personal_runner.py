@@ -623,7 +623,7 @@ def main(argv=None):
                 language=language, intake=intake, intake_enabled=intake_enabled,
                 approval_intake=intake_enabled, approval_cards=approval_cards, agent_advisor=advisor,
                 agent_enabled=agent_enabled, handoff_staff_id=handoff_staff_id, customer_prompt_guard=prompt_guard,
-                connection_scope=connection_scope)
+                connection_scope=connection_scope, company_name=config.get('company_name', ''))
             bridge.telegram.policy.connections[connection.connection_id] = connection
             try:
                 if not intake_enabled:

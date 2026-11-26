@@ -127,8 +127,8 @@ def _lark(args, env, *, input_text=None, timeout=20, show=False, read_json=True)
 
 def _prepare_feishu(app_id, secret, directory, *, name=None):
     env = _lark_environment(directory)
-    for name in ("LARKSUITE_CLI_CONFIG_DIR", "LARKSUITE_CLI_DATA_DIR"):
-        Path(env[name]).mkdir(mode=0o700, exist_ok=True)
+    for key in ("LARKSUITE_CLI_CONFIG_DIR", "LARKSUITE_CLI_DATA_DIR"):
+        Path(env[key]).mkdir(mode=0o700, exist_ok=True)
     name = name or app_id
     profile = f"--profile={name}"
     _lark(["config", "init", "--brand", "feishu", "--name", name, "--app-id", app_id,

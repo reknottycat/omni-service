@@ -1,5 +1,7 @@
 # OmniService 团队部署
 
+[观看人工授权演示与章节索引](authorization-walkthrough.md)。
+
 每个实例绑定一个飞书自建应用、一个 Telegram 原账号和一份 SQLite 数据库。可以装在办公室 Linux 或云主机，管理网页使用你自己的域名。互不信任的团队用各自的 Linux 用户或容器隔离。团队代号只用于区分配置目录和服务名。
 
 ## 1. 准备 Linux

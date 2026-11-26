@@ -118,11 +118,26 @@ class CompanyRegistryTest(unittest.TestCase):
 
 class SeparateCompaniesTest(unittest.TestCase):
     def test_same_customer_in_three_companies_stays_in_its_own_database_and_room(self):
+        class CompanyTelegram(ManagedTelegram):
+            def __init__(self, connection, owner):
+                super().__init__()
+                self.connection = connection
+                self.owner = owner
+
+            def call(self, method, payload):
+                result = super().call(method, payload)
+                if method == 'getBusinessConnection':
+                    result['id'] = self.connection
+                    result['user']['id'] = self.owner
+                elif method == 'sendMessage':
+                    result['business_connection_id'] = self.connection
+                return result
+
         with tempfile.TemporaryDirectory() as directory:
             bridges, clients, rooms, apis = [], [], [], []
             try:
                 for index in range(3):
-                    api, feishu = ManagedTelegram(), ManagedFeishu()
+                    api, feishu = CompanyTelegram(f'connection-{index}', 100 + index), ManagedFeishu()
                     feishu.app_id = f'cli_company{index}'
                     feishu.bot_app_ids = {feishu.app_id}
                     feishu.create_room = lambda name, key, *, index=index, feishu=feishu: (
@@ -130,12 +145,14 @@ class SeparateCompaniesTest(unittest.TestCase):
                                                                       'bots': feishu.bot_app_ids})
                         and f'oc_company{index}')
                     bridge = PersonalBridge(Path(directory) / f'{index}.sqlite', api, feishu,
-                        owner=10, peer_ids=[20], connection_id='c1', bot_id=88, clock=lambda: 1000,
+                        owner=100 + index, peer_ids=[20], connection_id=f'connection-{index}',
+                        bot_id=88 + index, clock=lambda: 1000,
                         intake=Intake(lambda _text, _fields: {}, simulated=True),
                         intake_enabled=True, approval_intake=True, company_name=f'Company {index}')
                     bridges.append(bridge)
                     apis.append(api)
                     api.update(1, 'Здравствуйте', chat=20, sender=20, first_name=f'Customer {index}')
+                    api.updates[-1]['business_message']['business_connection_id'] = f'connection-{index}'
                     for event in bridge.telegram.poll(timeout=0):
                         bridge.receive_telegram(event)
                     bridge.telegram.ack()
@@ -154,10 +171,10 @@ class SeparateCompaniesTest(unittest.TestCase):
                                     account_id=f'cli_company{index}')
                     self.assertEqual(bridge.receive_feishu(reply)['status'], 'queued')
                     bridge.drain()
-                for api in apis:
+                for index, api in enumerate(apis):
                     self.assertEqual(len(api.sent), 2)
                     self.assertEqual(api.sent[-1]['chat_id'], 20)
-                    self.assertEqual(api.sent[-1]['business_connection_id'], 'c1')
+                    self.assertEqual(api.sent[-1]['business_connection_id'], f'connection-{index}')
             finally:
                 for bridge in bridges:
                     bridge.close()

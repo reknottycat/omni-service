@@ -6,16 +6,15 @@
 
 ## 1. 准备 Linux
 
-准备 Python 3.12、systemd 用户会话、官方 `lark-cli` 和已签发 HTTPS 证书的域名。初次扫码创建飞书应用时，安装可选的官方 Python SDK。复用现有飞书应用可以跳过 SDK。 [飞书 CLI](https://github.com/larksuite/cli#quick-start) · [飞书扫码注册](https://github.com/larksuite/oapi-sdk-python/blob/v2_main/README.md#one-click-app-registration)
+准备 Python 3.12（含 venv）、systemd 用户会话、已签发 HTTPS 证书的域名。第一次构建固定官方 TDLib 时，Linux 部署机器另需 CMake、C++ 编译器、gperf 及 OpenSSL/zlib 开发库。部署者准备这些系统构建工具即可；操作员不需要单独下载、安装或登录任何 CLI。
 
-在运行服务的普通 Linux 用户下，从仓库执行以下命令。
+在运行服务的普通 Linux 用户下，从仓库执行：
 
 ```bash
-python3.12 -m venv .venv
-. .venv/bin/activate
-python -m pip install -r requirements-onboarding.txt
-bash scripts/install-personal.sh support --no-start
+bash scripts/setup-personal.sh support prepare
 ```
+
+这个命令一并准备实例、固定校验的飞书 CLI、私有 Python 环境中的飞书 SDK，以及从固定官方源码验证并构建的 Telegram TDLib。安装后验证真实 SDK 入口和 TDLib 的版本、符号；不发起平台授权、不触碰既有运行服务。首次构建可能较久；相同实例后续复用已验证的依赖。默认从 GitHub、PyPI 获取固定内容；可加 `--tdlib-source /path/to/official.tar.gz` 使用相同 SHA256 的官方缓存源码，不接受任意动态库作为托管构建。
 
 安装器输出配置、凭据和数据库的路径。以下示例用团队代号 `support`。同一台主机运行多个实例时，每个管理页使用各自的环回端口和 HTTPS 主机名。反向代理只转发该管理站点至所设置的环回端口，保留浏览器的 `Origin`，并在访问日志中省略 OAuth 回调的查询参数。无需暴露 Python 监听端口。
 
@@ -23,19 +22,14 @@ bash scripts/install-personal.sh support --no-start
 
 安装者先准备实例参数、专用 Telegram Bot Token 和 Telegram 应用的 API ID/hash。使用者按提示在飞书和 Telegram 登录或确认授权，由程序写入配置并验证平台回执。已接入实例的启动和升级沿用保存的配置，无需再次登录 Telegram。
 
-传入 `--managed-dependencies` 时，OmniService 自动在本实例私有目录安装并校验官方飞书 CLI，不修改系统 PATH。创建全新飞书应用还需要发行环境预装 `requirements-onboarding.txt`；复用现有应用不需要这个 SDK。
-
-首次用命令行绑定 Telegram 时，由部署者随发行物提供兼容当前 `setBusinessConnectedBot` 和 `getBusinessConnectedBot` 接口的 [官方 TDLib](https://github.com/tdlib/td) 动态库。把申请到的 [Telegram 应用凭据](https://core.telegram.org/api/obtaining_api_id) 放在仅当前用户可读的 JSON 文件，字段为 `api_id`（整数）和 `api_hash`（字符串），切勿提交到 Git。不提供凭据文件时，安装命令才会在终端隐藏输入。使用托管依赖时，部署者可将库打包到实例的 `tools/libtdjson.so`（Linux）或 `tools/libtdjson.dylib`（macOS），无需操作员指定库路径。本仓库目前未发布 TDLib 二进制包。示例接入一个已获准的测试客户。
+用同一个仓库入口续接；它自动使用该实例的私有组件。Telegram Bot Token 和开发者 [API ID/hash](https://core.telegram.org/api/obtaining_api_id) 分别用于 Bot API 和一次性用户绑定，不随仓库分发。可信部署者可将 API ID/hash 预置为仅本人能读的 JSON（字段 `api_id` 整数、`api_hash` 字符串），或在终端按隐藏输入提示填写。切勿提交到 Git。
 
 ```bash
 team_config="${XDG_CONFIG_HOME:-$HOME/.config}/omni-service/support"
-PYTHONPATH=src python -m omni_service.onboarding configure \
-  --managed-dependencies --config "$team_config/personal.json" \
-  --secrets-file "$team_config/credentials.env" \
+bash scripts/setup-personal.sh support configure -- \
   --callback-url 'https://support.example.com/admin/auth/callback' \
   --model-url 'http://127.0.0.1:8000/v1' --model 'translation-model' \
   --feishu-app-name 'OmniService 物流客服' \
-  --tdlib-library /usr/local/lib/libtdjson.so \
   --tdlib-app-credentials "$team_config/telegram-application.json" \
   --telegram-owner @example_logistics \
   --chat-scope allowlist --test-chat-id 12345678 --port 8081
@@ -50,10 +44,7 @@ PYTHONPATH=src python -m omni_service.onboarding configure \
 若需要先完成飞书发布审批，可以单独登记应用。登记只涉及飞书，成功后同一命令可重复运行而不再创建新应用。随后运行上面的 `configure` 续接。
 
 ```bash
-PYTHONPATH=src python -m omni_service.onboarding register-feishu \
-  --config "$team_config/personal.json" \
-  --secrets-file "$team_config/credentials.env" \
-  --feishu-app-name 'OmniService 物流客服'
+bash scripts/setup-personal.sh support register-feishu -- --feishu-app-name 'OmniService 物流客服'
 ```
 
 没有兼容的 TDLib 时，省去上面所有 TDLib 和 Telegram 登录参数，原来的 [客户端授权流程](authorization-walkthrough.md#客户端操作备选) 仍可使用。

@@ -93,7 +93,7 @@ class TDLib:
             return event
         raise ChannelError("tdlib_timeout")
 
-    def call(self, method, *, timeout=30, allow_missing=False, **fields):
+    def call(self, method, *, timeout=30, allow_missing=False, on_update=None, **fields):
         self.sequence += 1
         request = {"@type": method, "@extra": self.sequence, **fields}
         self._lib.td_send(self.client, json.dumps(request).encode())
@@ -101,6 +101,8 @@ class TDLib:
         while True:
             event = self._receive(deadline)
             if event.get("@extra") != self.sequence:
+                if on_update is not None and "@extra" not in event:
+                    on_update(event)
                 continue
             if event.get("@type") == "error":
                 if allow_missing and event.get("code") == 404:
@@ -108,6 +110,65 @@ class TDLib:
                 # TDLib responses may contain private details. Report the failed step only.
                 raise ChannelError(f"tdlib_{method}_failed")
             return event
+
+    def send_start_confirmed(self, *, bot_user_id, chat_id, parameter, timeout=30):
+        deadline = time.monotonic() + timeout
+        early = []
+
+        def capture(event):
+            kind = event.get("@type")
+            msg = event.get("message")
+            relevant = (
+                kind in ("updateMessageSendSucceeded", "updateMessageSendFailed")
+                and isinstance(msg, dict) and msg.get("chat_id") == chat_id
+            ) or (kind == "updateDeleteMessages" and event.get("chat_id") == chat_id)
+            if relevant:
+                if len(early) == 64:
+                    raise ChannelError("telegram_setup_send_unknown")
+                early.append(event)
+
+        try:
+            message = self.call("sendBotStartMessage", timeout=timeout, on_update=capture,
+                                bot_user_id=bot_user_id, chat_id=chat_id, parameter=parameter)
+            mid = message.get("id")
+            if (message.get("@type") != "message" or message.get("chat_id") != chat_id
+                    or type(mid) is not int or mid <= 0 or message.get("is_outgoing") is not True):
+                raise ChannelError("telegram_setup_send_unknown")
+            state = message.get("sending_state")
+            if state is None:
+                return
+            kind = state.get("@type") if isinstance(state, dict) else None
+            if kind == "messageSendingStateFailed":
+                raise ChannelError("telegram_setup_send_failed")
+            if kind != "messageSendingStatePending":
+                raise ChannelError("telegram_setup_send_unknown")
+            updates = iter(early)
+            while True:
+                event = next(updates, None)
+                if event is None:
+                    event = self._receive(deadline)
+                kind = event.get("@type")
+                if kind == "updateDeleteMessages" and event.get("chat_id") == chat_id:
+                    ids = event.get("message_ids")
+                    if isinstance(ids, list) and mid in ids:
+                        raise ChannelError("telegram_setup_send_failed")
+                if kind not in ("updateMessageSendSucceeded", "updateMessageSendFailed"):
+                    continue
+                msg = event.get("message")
+                if event.get("old_message_id") != mid or not isinstance(msg, dict) or msg.get("chat_id") != chat_id:
+                    continue
+                if kind == "updateMessageSendFailed":
+                    raise ChannelError("telegram_setup_send_failed")
+                if (msg.get("@type") == "message" and type(msg.get("id")) is int and msg["id"] > 0
+                        and msg.get("is_outgoing") is True and msg.get("sending_state") is None):
+                    return
+                raise ChannelError("telegram_setup_send_unknown")
+        except ChannelError as exc:
+            if exc.code == "tdlib_timeout":
+                raise ChannelError("telegram_setup_send_unknown") from None
+            if exc.code == "tdlib_sendBotStartMessage_failed":
+                raise ChannelError("telegram_setup_send_failed") from None
+            raise
 
     def next_state(self, previous=None, *, timeout=30):
         deadline = time.monotonic() + timeout
@@ -250,7 +311,7 @@ def _bind(td, bot, expected_owner, nonce, included, excluded, selectors):
             or any(scope.get(key, False) != value for key, value in recipients.items()
                    if isinstance(value, bool))):
         raise ChannelError("telegram_setup_binding_unverified")
-    td.call("sendBotStartMessage", bot_user_id=bot["id"], chat_id=bot_chat, parameter=nonce)
+    td.send_start_confirmed(bot_user_id=bot["id"], chat_id=bot_chat, parameter=nonce)
     return owner
 
 

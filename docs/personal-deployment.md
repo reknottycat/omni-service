@@ -23,12 +23,14 @@ bash scripts/install-personal.sh support --no-start
 
 安装者先准备实例参数、专用 Telegram Bot Token 和 Telegram 应用的 API ID/hash。使用者按提示在飞书和 Telegram 登录或确认授权，由程序写入配置并验证平台回执。已接入实例的启动和升级沿用保存的配置，无需再次登录 Telegram。
 
-首次用命令行绑定 Telegram 时，准备兼容当前 `setBusinessConnectedBot` 和 `getBusinessConnectedBot` 接口的 [官方 TDLib](https://github.com/tdlib/td) 动态库。把申请到的 [Telegram 应用凭据](https://core.telegram.org/api/obtaining_api_id) 放在仅当前用户可读的 JSON 文件，字段为 `api_id`（整数）和 `api_hash`（字符串），切勿提交到 Git。不提供文件时，安装命令才会在终端隐藏输入。示例接入一个已获准的测试客户。
+传入 `--managed-dependencies` 时，OmniService 自动在本实例私有目录安装并校验官方飞书 CLI，不修改系统 PATH。创建全新飞书应用还需要发行环境预装 `requirements-onboarding.txt`；复用现有应用不需要这个 SDK。
+
+首次用命令行绑定 Telegram 时，由部署者随发行物提供兼容当前 `setBusinessConnectedBot` 和 `getBusinessConnectedBot` 接口的 [官方 TDLib](https://github.com/tdlib/td) 动态库。把申请到的 [Telegram 应用凭据](https://core.telegram.org/api/obtaining_api_id) 放在仅当前用户可读的 JSON 文件，字段为 `api_id`（整数）和 `api_hash`（字符串），切勿提交到 Git。不提供凭据文件时，安装命令才会在终端隐藏输入。使用托管依赖时，部署者可将库打包到实例的 `tools/libtdjson.so`（Linux）或 `tools/libtdjson.dylib`（macOS），无需操作员指定库路径。本仓库目前未发布 TDLib 二进制包。示例接入一个已获准的测试客户。
 
 ```bash
 team_config="${XDG_CONFIG_HOME:-$HOME/.config}/omni-service/support"
 PYTHONPATH=src python -m omni_service.onboarding configure \
-  --config "$team_config/personal.json" \
+  --managed-dependencies --config "$team_config/personal.json" \
   --secrets-file "$team_config/credentials.env" \
   --callback-url 'https://support.example.com/admin/auth/callback' \
   --model-url 'http://127.0.0.1:8000/v1' --model 'translation-model' \
@@ -40,8 +42,8 @@ PYTHONPATH=src python -m omni_service.onboarding configure \
 ```
 
 - **模型**。输入一个 OpenAI 兼容的本机或私网地址和模型名。如网关有 API Key，按隐藏输入提示填写。携带 Key 的非本机地址使用 HTTPS。安装前会用一条合成消息测试中俄翻译。业务来信可能发送到你指定的模型，期限由实例的数据保留安排决定。 [Telegram 业务机器人数据条款](https://telegram.org/tos/bot-developers#5-4-telegram-business)
-- **飞书**。新应用由官方 Python SDK 发起创建并预填群消息、附件、建群与成员权限，以及群消息事件和卡片回调。用户扫码或打开官方链接确认后，程序保存 App ID 和 Secret。应用管理员登记相同的 OAuth 回调地址，确认机器人事件及卡片回调走长连接，设置团队可见范围并按组织规则发布和审批。随后用管理员账号完成官方身份授权，程序核对 Open ID 和组织标识。同一实例完成身份验证后，重跑接入命令会沿用已验证的管理员。复用明确指定的应用可加 `--feishu-app cli_...`。 [批量申请和发版审批](https://open.feishu.cn/document/ukTMukTMukTM/uQjN3QjL0YzN04CN2cDN?lang=zh-CN) · [飞书长连接](https://open.feishu.cn/document/server-side-sdk/java-sdk-guide/handle-events)
-- **Telegram**。程序用 Bot Token 开启并读回秘书模式，随后显示 Telegram 账号登录二维码。使用新号在「设置 → 设备 → 连接桌面设备」扫码。程序核对预期账号，按参数设置聊天范围和回复权，只向指定机器人发送配对挑战，并验证 Bot API 返回的账号与连接。已有其他机器人时会停止。临时用户会话退出后，后台继续用 Bot Token。平台要求验证码或两步验证时在终端隐藏输入。若登录后只差 Bot API 回执，重跑相同参数可复用仍处于有效期内的配对请求。 [Telegram 聊天自动化](https://core.telegram.org/api/bots/connected-business-bots) · [TDLib 用户侧绑定](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_business_connected_bot.html)
+- **飞书**。新应用由官方 Python SDK 发起创建并预填群消息、附件、建群与成员权限，以及群消息事件和卡片回调。用户扫码或打开官方链接确认后，程序保存 App ID 和 Secret。应用管理员登记相同的 OAuth 回调地址，确认机器人事件及卡片回调走长连接，设置团队可见范围并按组织规则发布和审批。随后用管理员账号完成官方身份授权，程序核对 Open ID 和组织标识。同一实例完成身份验证后，重跑接入命令会沿用已验证的管理员。托管模式自动核对当前应用的客服权限，只将确实缺少的权限放进官方申请链接和二维码，然后暂停接入，等待获授权的人确认；可用 `check-feishu-scopes` 单独复核。用户扫码授予的权限、应用权限、企业发版及事件订阅是不同检查。复用明确指定的应用可加 `--feishu-app cli_...`。 [批量申请和发版审批](https://open.feishu.cn/document/ukTMukTMukTM/uQjN3QjL0YzN04CN2cDN?lang=zh-CN) · [飞书长连接](https://open.feishu.cn/document/server-side-sdk/java-sdk-guide/handle-events)
+- **Telegram**。程序用 Bot Token 开启并读回秘书模式，随后显示 Telegram 账号登录二维码。使用新号在「设置 → 设备 → 连接桌面设备」扫码。程序核对预期账号，按参数设置聊天范围和回复权，只向指定机器人发送配对挑战，并验证 Bot API 返回的账号与连接。已有其他机器人时会停止。临时用户会话退出后，后台继续用 Bot Token。平台要求验证码或两步验证时在终端隐藏输入。如果 TDLib 已确认对专用机器人发送成功、仅差 Bot API 回执，同参数重跑可复用已确认的记录。加入发送队列不算成功。明确发送失败不会留待确认记录；结果不明也不会自动重发，核对专用机器人状态后再重跑。旧版未确认的记录不再复用。 [Telegram 聊天自动化](https://core.telegram.org/api/bots/connected-business-bots) · [TDLib 用户侧绑定](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_business_connected_bot.html)
 
 `allowlist` 把 Telegram 授权和 OmniService 接收同时限定在给出的测试私聊。实际接管指定类别时用 `--chat-scope connection --telegram-recipients new`，可重复显式选择 `existing`、`contacts`、`non-contacts`，并用 `--telegram-exclude-chat-id ID` 排除特定私聊。获取更多类别前先核实范围。TDLib 登录需要访问 Telegram 用户侧网络，可用 `--tdlib-http-proxy http://127.0.0.1:7890` 指定现有的 HTTP CONNECT 代理。Bot API 的专用 TLS 转发不能代替 TDLib 登录通道。
 

@@ -10,7 +10,7 @@ from .models import ChannelError
 _APP_ID = re.compile(r"cli_[A-Za-z0-9_]{1,125}")
 _APP_SECRET = re.compile(r"[!-~]{1,512}")
 _FEISHU_REGISTRATION_HOSTS = {"accounts.feishu.cn", "open.feishu.cn", "applink.feishu.cn"}
-_BRIDGE_APP_SCOPES = (
+BRIDGE_APP_SCOPES = (
     "im:chat:create", "im:chat:read", "im:chat.members:read", "im:message.group_msg",
     "im:message:readonly", "im:message:send_as_bot", "im:resource",
 )
@@ -38,7 +38,7 @@ def provision_feishu(*, show_verification_url, app_name="OmniService"):
             on_qr_code=display, create_only=True, source="omniservice",
             app_preset={"name": app_name, "desc": "在飞书客服群处理 Telegram 客户消息与附件"},
             addons={"preset": False,
-                    "scopes": {"tenant": list(_BRIDGE_APP_SCOPES)},
+                    "scopes": {"tenant": list(BRIDGE_APP_SCOPES)},
                     "events": {"items": {"tenant": ["im.message.receive_v1"]}},
                     "callbacks": {"items": ["card.action.trigger"]}},
         )

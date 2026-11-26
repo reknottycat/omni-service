@@ -41,10 +41,10 @@ class AccountClient:
             if self.unwanted_rights:
                 self.connection["rights"]["can_delete_all_messages"] = True
             return {"@type": "ok"}
-        if name == "sendBotStartMessage":
-            self.sent.append(request)
-            return {"@type": "message"}
         raise AssertionError(name)
+
+    def send_start_confirmed(self, **request):
+        self.sent.append(request)
 
 
 class TelegramCommandContracts(unittest.TestCase):

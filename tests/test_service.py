@@ -206,7 +206,8 @@ class ServiceTests(unittest.TestCase):
 
         class DeleteDuringSend:
             def send(inner_self, channel, request):
-                if channel == 'feishu' and '/im/v1/messages?' in request.path and not fired:
+                if (channel == 'feishu' and '/im/v1/messages?' in request.path
+                        and 'Customer (max):' in request.body['content'] and not fired):
                     fired.append(True)
                     service.ingest(replace(event, event_id='delete-customer', event_type='delete', text=''))
                 return transport.send(channel, request)
@@ -216,7 +217,8 @@ class ServiceTests(unittest.TestCase):
         state = self.service.get_conversation(cid)
         inbound = next(m for m in state['messages'] if m['direction'] == 'inbound')
         self.assertEqual((inbound['status'], inbound['recall_status']), ('deleted', 'deleted'))
-        mirrors = [m for m in self.platforms.messages if m['channel'] == 'feishu']
+        mirrors = [m for m in self.platforms.messages if m['channel'] == 'feishu'
+                   and m['text'].startswith('Customer (max):')]
         self.assertEqual(len(mirrors), 1)
         self.assertTrue(mirrors[0]['deleted'])
 

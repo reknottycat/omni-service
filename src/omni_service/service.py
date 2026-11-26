@@ -13,6 +13,22 @@ from .models import ChannelError
 from .store import Store
 
 
+_INTAKE_LABELS = {
+    'company': '公司', 'cargo': '货物', 'quantity': '数量',
+    'origin': '起点', 'destination': '终点',
+}
+_HANDOFF_LABELS = {
+    'complete': '已收齐', 'reply_limit': '达到问询上限',
+    'requested_human': '客户要求人工', 'extract_unavailable': 'AI 识别暂不可用',
+    'server_disabled': '服务端已关闭自动接待', 'staff_reply': '员工已回复',
+    'owner_reply': 'Telegram 本人已回复', 'manual_handoff': '人工接管',
+    'media': '收到需要人工查看的附件',
+}
+_STAFF_LABELS = {'zh': '人工客服', 'ru': 'Сотрудник', 'en': 'Agent', 'es': 'Agente'}
+_ROOM_RULES = ('本群的普通文字消息会翻译后发给客户。'
+               '带 @ 的消息只在群内使用，包括 @所有人、@机器人和 @同事。')
+
+
 def _json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
 
@@ -23,13 +39,31 @@ def _id(prefix):
 
 class Service:
     def __init__(self, db_path, transport, *, clock=time.time,
-                 members=tuple(f'employee-{n}' for n in range(1, 8)), language=None):
+                 members=tuple(f'employee-{n}' for n in range(1, 8)), language=None,
+                 intake=None, intake_enabled=False, label_replies=False):
         self.store = Store(db_path)
         self.transport = transport
         self.clock = clock
         self.default_members = tuple(dict.fromkeys(members))
         self.language = language or SimulationLanguage()
+        self.intake = intake
+        self.intake_enabled = intake_enabled
+        self.label_replies = label_replies or intake is not None
         self._drain_lock = threading.Lock()
+
+    def set_intake_enabled(self, enabled):
+        if self.intake is None or type(enabled) is not bool:
+            raise ChannelError('invalid_intake_config')
+        with self.store.transaction() as db:
+            if not enabled:
+                affected = db.execute('''SELECT conversation_id FROM intake_sessions WHERE handoff_reason IS NULL
+                    UNION SELECT conversation_id FROM messages WHERE author_id='AI' AND status='queued' ''').fetchall()
+                for row in affected:
+                    cid = row['conversation_id']
+                    self._cancel_ai(db, cid)
+                    self._finish_intake(db, cid, 'server_disabled')
+            self.intake_enabled = enabled
+        return {'enabled': enabled, 'max_replies': self.intake.max_replies}
 
     def close(self):
         self.store.close()
@@ -93,6 +127,10 @@ class Service:
                             status=status, parent_id=parent_id)
         if status == 'queued':
             display = translated if author == 'AI' else f'{sender_name or author}: {translated}'
+            if self.label_replies:
+                label = ('AI 模拟' if self.intake and self.intake.simulated else 'AI') if author == 'AI' else (
+                    _STAFF_LABELS.get(conv['language'], 'Agent'))
+                display = f'[{label}] {display}'
             self._queue(db, cid, conv['channel'], 'send', 'out:' + mid,
                         {'text': display, 'recipient_type': conv['recipient_type']}, mid)
         elif status != 'media_pending':
@@ -106,6 +144,8 @@ class Service:
 
     def _mirror(self, db, conv, message):
         if conv['room_status'] == 'absent' or message['status'] == 'deleted':
+            return
+        if db.execute('SELECT 1 FROM outbox WHERE operation_key=?', ('mirror:' + message['id'],)).fetchone():
             return
         text = message['original']
         try:
@@ -122,15 +162,19 @@ class Service:
     def _mirror_ai(self, db, conv, message):
         if conv['room_status'] == 'absent' or message['status'] != 'sent':
             return
+        key = 'history-ai:' + message['id']
+        if db.execute('SELECT 1 FROM outbox WHERE operation_key=?', (key,)).fetchone():
+            return
         customer_text = message['translated']
         try:
             chinese = self.language.translate(customer_text, message['language'], 'zh')
         except ChannelError:
-            chinese = '[模拟翻译未收录此短语]'
-        body = 'AI → 客户: ' + customer_text
+            chinese = '[中文翻译暂不可用]'
+        label = 'AI 模拟' if self.intake and self.intake.simulated else 'AI'
+        body = f'{label} → 客户: ' + customer_text
         if chinese and chinese != customer_text:
             body += '\n中文: ' + chinese
-        self._queue(db, conv['id'], 'feishu', 'send', 'history-ai:' + message['id'],
+        self._queue(db, conv['id'], 'feishu', 'send', key,
                     {'text': body, 'original_message_id': message['id']})
 
     def _delete_ai_mirror(self, db, cid, mid):
@@ -142,7 +186,7 @@ class Service:
                 self._queue(db, cid, 'feishu', 'delete', 'delete-ai-history:' + mid,
                             {'external_id': mirror['external_id']})
 
-    def _handoff(self, db, cid, staff_ids=None):
+    def _ensure_service_room(self, db, cid, staff_ids=None):
         conv = self._conversation(db, cid)
         selected = tuple(dict.fromkeys(staff_ids if staff_ids is not None else self.default_members))
         if not selected or any(not isinstance(s, str) or not s for s in selected):
@@ -152,12 +196,31 @@ class Service:
             if inserted and conv['room_id']:
                 self._queue(db, cid, 'feishu', 'add_member', 'member:' + cid + ':' + staff,
                             {'members': [staff]})
-        self._cancel_ai(db, cid)
-        db.execute("UPDATE conversations SET mode='manual' WHERE id=?", (cid,))
         if conv['room_status'] == 'absent':
             db.execute("UPDATE conversations SET room_status='pending' WHERE id=?", (cid,))
             self._queue(db, cid, 'feishu', 'create_room', 'room:' + cid,
                         {'name': 'OmniService ' + cid[-8:]})
+            self._queue(db, cid, 'feishu', 'send', 'room-rules:' + cid,
+                        {'text': _ROOM_RULES, 'mention_all': True})
+        return selected
+
+    def _finish_intake(self, db, cid, reason):
+        closed = db.execute('''UPDATE intake_sessions SET handoff_reason=?
+            WHERE conversation_id=? AND handoff_reason IS NULL RETURNING facts''', (reason, cid)).fetchone()
+        if closed is None:
+            return
+        db.execute("UPDATE conversations SET mode='manual' WHERE id=?", (cid,))
+        facts = json.loads(closed['facts'])
+        lines = [f'{label}：{facts.get(key) or "待补"}' for key, label in _INTAKE_LABELS.items()]
+        self._notify(db, cid, 'intake:' + cid,
+                     '自动接待已转人工（' + _HANDOFF_LABELS[reason] + '）。\n' + '\n'.join(lines))
+        self._audit(db, cid, 'intake_handoff', {'reason': reason})
+
+    def _handoff(self, db, cid, staff_ids=None, *, intake_reason='manual_handoff'):
+        selected = self._ensure_service_room(db, cid, staff_ids)
+        self._cancel_ai(db, cid)
+        self._finish_intake(db, cid, intake_reason)
+        db.execute("UPDATE conversations SET mode='manual' WHERE id=?", (cid,))
         conv = self._conversation(db, cid)
         for row in db.execute('SELECT * FROM messages WHERE conversation_id=? ORDER BY rowid', (cid,)).fetchall():
             message = dict(row)
@@ -179,9 +242,52 @@ class Service:
     def resume(self, conversation_id):
         with self.store.transaction() as db:
             self._conversation(db, conversation_id)
+            if self.intake is not None:
+                raise ChannelError('intake_new_conversations_only')
             db.execute("UPDATE conversations SET mode='auto' WHERE id=?", (conversation_id,))
             self._audit(db, conversation_id, 'resume_ai', {})
             return {'status': 'auto', 'conversation_id': conversation_id}
+
+    def _forget_intake_source(self, db, cid, mid):
+        row = db.execute('SELECT facts,source_messages FROM intake_sessions WHERE conversation_id=?', (cid,)).fetchone()
+        if row is None:
+            return
+        sources = json.loads(row['source_messages'])
+        removed = [key for key, source in sources.items() if source == mid]
+        if removed:
+            facts = json.loads(row['facts'])
+            for key in removed:
+                del sources[key], facts[key]
+            db.execute('UPDATE intake_sessions SET facts=?,source_messages=? WHERE conversation_id=?',
+                       (_json(facts), _json(sources), cid))
+
+    def _guide_customer(self, db, conv, event, mid, language, *, first):
+        cid = conv['id']
+        session = db.execute('SELECT * FROM intake_sessions WHERE conversation_id=?', (cid,)).fetchone()
+        if session is None:
+            self._handoff(db, cid)
+            return
+        if session['handoff_reason'] is not None or not self.intake_enabled:
+            return
+        if event.attachments:
+            self._handoff(db, cid, intake_reason='media')
+            return
+        # Several customer messages may arrive before the worker sends a question.
+        # Keep the latest question and count only replies that were not cancelled.
+        self._cancel_ai(db, cid)
+        replies = db.execute('''SELECT count(*) FROM messages WHERE conversation_id=?
+            AND author_id='AI' AND status!='cancelled' ''', (cid,)).fetchone()[0]
+        previous = json.loads(session['facts'])
+        sources = json.loads(session['source_messages'])
+        decision = self.intake.evaluate(event.text, language, previous, replies, first=first or replies == 0)
+        for key in decision.facts.keys() - previous.keys():
+            sources[key] = mid
+        db.execute('UPDATE intake_sessions SET facts=?,source_messages=? WHERE conversation_id=?',
+                   (_json(decision.facts), _json(sources), cid))
+        if decision.reason:
+            self._handoff(db, cid, intake_reason=decision.reason)
+        if decision.text:
+            self._outgoing(db, conv, decision.text, parent_id=mid, already_translated=True)
 
     def ingest(self, event):
         if event.is_bot:
@@ -190,7 +296,10 @@ class Service:
             raise ChannelError('invalid_channel', 'Unsupported source channel.')
         if not all(isinstance(v, str) and v for v in (event.account_id, event.event_id, event.chat_id, event.message_id)):
             raise ChannelError('invalid_event', 'The event is missing stable source identifiers.')
-        digest = hashlib.sha256(_json(asdict(event)).encode()).hexdigest()
+        data = asdict(event)
+        if data.get('has_mentions') is False:
+            del data['has_mentions']  # preserve inbox hashes for older events without mentions
+        digest = hashlib.sha256(_json(data).encode()).hexdigest()
         with self.store.transaction() as db:
             old = db.execute('SELECT * FROM inbox WHERE channel=? AND account_id=? AND event_id=?',
                              (event.channel, event.account_id, event.event_id)).fetchone()
@@ -234,6 +343,8 @@ class Service:
         if event.event_type == 'delete':
             if existing is None:
                 return {'status': 'unknown_message', 'conversation_id': cid}
+            if self.intake is not None:
+                self._forget_intake_source(db, cid, existing['id'])
             inflight = db.execute("SELECT 1 FROM outbox WHERE message_id=? AND operation='send' AND status='inflight'", (existing['id'],)).fetchone()
             recall = 'pending' if (existing['external_id'] or inflight) else 'cancelled'
             db.execute("UPDATE messages SET status='deleted',recall_status=? WHERE id=?", (recall, existing['id']))
@@ -247,6 +358,15 @@ class Service:
             return {'status': 'deleted', 'conversation_id': cid, 'message_id': existing['id']}
         if existing and event.event_type != 'edit':
             return {'status': 'duplicate_message', 'conversation_id': cid, 'message_id': existing['id']}
+        first_contact = False
+        if self.intake is not None and event.event_type == 'message' and not conv['last_customer_at']:
+            first_contact = db.execute('SELECT 1 FROM messages WHERE conversation_id=?', (cid,)).fetchone() is None
+            if first_contact:
+                self._ensure_service_room(db, cid)
+                mode = 'auto' if self.intake_enabled else 'manual'
+                db.execute('UPDATE conversations SET mode=? WHERE id=?', (mode, cid))
+                if self.intake_enabled:
+                    db.execute('INSERT INTO intake_sessions(conversation_id) VALUES(?)', (cid,))
         timestamp = min(event.timestamp or self.clock(), self.clock())
         language = self.language.detect(event.text, conv['language'], event.language_hint)
         if timestamp >= conv['language_at']:
@@ -263,8 +383,15 @@ class Service:
         message = dict(db.execute('SELECT * FROM messages WHERE id=?', (mid,)).fetchone())
         if existing:
             self._cancel_ai(db, cid)
+            if self.intake is not None:
+                self._forget_intake_source(db, cid, existing['id'])
         self._mirror(db, conv, message)
-        if conv['mode'] == 'auto' and timestamp >= conv['language_at']:
+        if conv['mode'] == 'auto' and event.event_type == 'message' and self.intake is not None:
+            if timestamp >= conv['language_at']:
+                self._guide_customer(db, conv, event, mid, language, first=first_contact)
+            else:
+                self._audit(db, cid, 'stale_message_no_auto_reply', {'message_id': mid})
+        elif self.intake is None and conv['mode'] == 'auto' and timestamp >= conv['language_at']:
             answer = self.language.reply(event.text, language) if not event.attachments else {'action': 'handoff'}
             if answer['action'] == 'reply':
                 self._outgoing(db, conv, answer['text'], parent_id=mid, already_translated=True)
@@ -289,9 +416,14 @@ class Service:
             return self._recall(db, existing['id'], conv['id'], actor)
         if not db.execute('SELECT 1 FROM members WHERE conversation_id=? AND user_id=?', (conv['id'], event.user_id)).fetchone():
             raise ChannelError('forbidden', 'The sender is not a member of this conversation.')
+        if event.has_mentions or '@' in event.text or '＠' in event.text:
+            self._audit(db, conv['id'], 'staff_internal_mention', {'source_message_id': event.message_id})
+            return {'status': 'internal_only', 'conversation_id': conv['id']}
         if existing and event.event_type != 'edit':
             return {'status': 'duplicate_message', 'conversation_id': conv['id'], 'message_id': existing['id']}
         self._cancel_ai(db, conv['id'])
+        if self.intake is not None:
+            self._finish_intake(db, conv['id'], 'staff_reply')
         db.execute("UPDATE conversations SET mode='manual' WHERE id=?", (conv['id'],))
         mid, status = self._outgoing(db, conv, event.text, author=event.user_id,
                                      sender_name=event.sender_name, source_channel='feishu',
@@ -352,6 +484,12 @@ class Service:
             result['messages'] = [dict(r) for r in db.execute('SELECT * FROM messages WHERE conversation_id=? ORDER BY rowid', (conversation_id,))]
             for message in result['messages']:
                 message['attachments'] = json.loads(message['attachments'])
+            if self.intake is not None:
+                session = db.execute('SELECT facts,source_messages,handoff_reason FROM intake_sessions WHERE conversation_id=?',
+                                     (conversation_id,)).fetchone()
+                if session:
+                    result['intake'] = {**dict(session), 'facts': json.loads(session['facts']),
+                                        'source_messages': json.loads(session['source_messages'])}
             result['outbox'] = [dict(r) for r in db.execute('SELECT * FROM outbox WHERE conversation_id=? ORDER BY id', (conversation_id,))]
             for item in result['outbox']:
                 item['payload'] = json.loads(item['payload'])
@@ -369,7 +507,8 @@ class Service:
         if operation == 'delete':
             return channels.delete_request(channel, conv['account_id'], target, payload['external_id'])
         return channels.send_request(channel, conv['account_id'], target, payload['text'],
-                                     recipient_type=payload.get('recipient_type', 'chat'))
+                                     recipient_type=payload.get('recipient_type', 'chat'),
+                                     mention_all=payload.get('mention_all', False))
 
     def _deliver(self, item, conv, request):
         payload = self.transport.send(item['channel'], request)

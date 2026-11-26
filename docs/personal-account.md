@@ -62,6 +62,16 @@ Mac arm64 / Python 3.12.16 通过上面的运行入口，使用真实 Telegram�
 
 首轮发现桥接未传递 Telegram 发件人显示名。`53e8cb2` 复用渠道姓名解析，将发件人的名和可选姓带入现有飞书渲染。没有姓名时保留“客户”。用原数据库重启后重新执行两端收发，飞书显示测试账号全名，第二个 Telegram 账号再次收到来自原账号的俄文。两轮四次投递各取得平台回执，本机记录见 `artifacts/personal-pilot/mac-live-acceptance.json`。同一提交在 DGX aarch64 / Python 3.12.3 执行 `bash scripts/acceptance.sh`，118 项通过，0 失败、0 错误、0 跳过。源码 SHA256 为 `9c1463d16a927c4082727db855bb96196dadc118777f1841d6b43de1bfe6f41e`，报告在本机 `artifacts/dgx-display-name-20261126/`。
 
+## 新会话接待与飞书群规则
+
+个人账号入口通过服务端 `intake.enabled` 开关控制，上线配置默认关闭。修改后重启桥接进程。关闭时停止进行中的接待，取消已排队且未发出的 AI 消息。重新打开后只接待新会话。模拟 HTTP 服务可用 `--intake-max-replies 5` 启用 `[AI 模拟]`，运行时可由管理员向 `POST /api/intake` 提交 `{"enabled": false}` 或 `{"enabled": true}`。
+
+AI 用客户语言欢迎，收集公司、货物和数量、起点和终点。`intake.max_replies` 可设为 3–5，默认为 5，欢迎和转人工提示都计入。资料齐全、客户要求人工、模型不可用或达到上限时交接。飞书展示已采集内容和缺项。每项采集值保留客户原文和对应的会话消息 ID。客户看到 `[AI]` 或对应语言的人工客服标签，普通人工回复会取消排队中的 AI 回复。已开始发送的请求按平台实际回执处理。
+
+只有获准员工的普通文字才会翻译后发给客户。飞书识别到任何提及，或正文含 `@` / `＠`，消息就只留在群内，连带邮箱等含这些字符的文本也按内部消息处理。内部消息不会触发人工接管。自动创建的服务群会收到一次 `@所有人` 规则公告。群机器人消息不会转发。如需在个人账号试点群添加其他内部机器人，可设置 `feishu.allowed_bot_app_ids`，预检按实际机器人名单和员工名单校验。
+
+真实个人账号入口继续使用已经获准的单个测试联系人和已有飞书私有群。自动建群目前通过 Linux 模拟协议入口复验。每会话一份知识文档的结构见[会话本体规划](intake-knowledge.md)。
+
 ## 普通账号找不到连接入口时
 
 已实测 [Telegram Web K](https://web.telegram.org/k/) 可使用已登录的普通账号完成连接。在编辑个人资料中打开 Chat Automation，选择 Only Selected、指定测试联系人、开启 Reply。[客户端源码](https://github.com/morethanwords/tweb/blob/master/src/components/sidebarLeft/tabs/editProfile.tsx#L422-L472)

@@ -29,6 +29,7 @@ class InboundEvent:
     timestamp: float = 0.0
     recipient_type: str = "chat"
     attachments: tuple[Attachment, ...] = ()
+    has_mentions: bool = False
 
 
 @dataclass(frozen=True)

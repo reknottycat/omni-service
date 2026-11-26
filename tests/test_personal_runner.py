@@ -84,7 +84,7 @@ class BridgeAcceptance(unittest.TestCase):
         self.poll_and_drain()
         self.assertEqual(len(self.feishu.sent), 2)
         self.assertEqual(self.feishu.sent[0], "Sandra Perez (telegram): Здравствуйте\n中文: 你好")
-        self.assertIn("Telegram 本人已回复：Owner answer", self.feishu.sent)
+        self.assertIn("[人工客服] Telegram 本人已回复：Owner answer", self.feishu.sent)
         self.bridge.receive_feishu(staff(who="ou_unapproved"))
         self.bridge.receive_feishu(staff(room="oc_wrong"))
         self.bridge.receive_feishu(staff())
@@ -92,7 +92,7 @@ class BridgeAcceptance(unittest.TestCase):
         self.bridge.drain()
         self.assertEqual(self.telegram.sent, [{
             "business_connection_id": "c1", "chat_id": 20,
-            "text": "OmniService: Здравствуйте! Я помогу вам.",
+            "text": "[Сотрудник] OmniService: Здравствуйте! Я помогу вам.",
         }])
         self.bridge.close()
         self.bridge = self.open_bridge()

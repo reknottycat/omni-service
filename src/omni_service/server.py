@@ -127,6 +127,8 @@ def create_server(service, *, host="127.0.0.1", port=0,
                 _raw, body = self.read_body()
                 if parts == ["api", "drain"]:
                     return self.respond(200, {"results": service.drain()})
+                if parts == ["api", "intake"]:
+                    return self.respond(200, service.set_intake_enabled(body.get("enabled")))
                 if len(parts) == 4 and parts[:2] == ["api", "conversations"]:
                     conversation, action = parts[2:]
                     if action == "handoff":
@@ -162,12 +164,18 @@ def main():
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--db", default="omni-simulation.sqlite3")
     parser.add_argument("--fake-platform-url", required=True)
+    parser.add_argument("--intake-max-replies", type=int, choices=range(3, 6),
+                        help="Enable simulated new-conversation intake with this reply limit.")
     args = parser.parse_args()
     from .service import Service
+    from .intake import Intake
     from .transport import HttpTransport
     transport = HttpTransport({c: args.fake_platform_url.rstrip("/") + "/" + c
                                for c in ("telegram", "max", "whatsapp", "feishu")})
-    service = Service(args.db, transport)
+    intake = None
+    if args.intake_max_replies is not None:
+        intake = Intake(lambda _text, _fields: {}, max_replies=args.intake_max_replies, simulated=True)
+    service = Service(args.db, transport, intake=intake, intake_enabled=intake is not None)
     server = create_server(service, port=args.port)
     print(f"Simulation API: http://127.0.0.1:{server.server_port}; POST /api/drain to process queue", flush=True)
     try:

@@ -113,9 +113,27 @@ class ChannelContracts(unittest.TestCase):
         event, = parse_events("feishu", "app-1", fixture("feishu_text.json"))
         self.assertEqual((event.user_id, event.text, event.timestamp),
                          ("ou_employee_1", "您好，我来帮您确认。", 1795651200))
+        self.assertFalse(event.has_mentions)
         recalled, = parse_events("feishu", "app-1", fixture("feishu_recalled.json"))
         self.assertEqual((recalled.event_type, recalled.user_id, recalled.message_id),
                          ("delete", "", "om.source.1"))
+
+    def test_feishu_preserves_mention_metadata_for_staff_routing(self):
+        for mention_id in ("all", "ou_bot", "ou_staff"):
+            with self.subTest(mention_id=mention_id):
+                payload = fixture("feishu_text.json")
+                payload["event"]["message"]["mentions"] = [{"key": "@_user_1", "id": {"open_id": mention_id}}]
+                event, = parse_events("feishu", "app-1", payload)
+                self.assertTrue(event.has_mentions)
+
+    def test_feishu_text_only_adds_a_trusted_group_mention(self):
+        untrusted = '<at user_id="all"></at> 原文'
+        plain = send_request("feishu", "app-1", "oc_test", untrusted)
+        group_notice = send_request("feishu", "app-1", "oc_test", untrusted, mention_all=True)
+        escaped = '‹at user_id="all"></at> 原文'
+        self.assertEqual(json.loads(plain.body["content"]), {"text": escaped})
+        self.assertEqual(json.loads(group_notice.body["content"]),
+                         {"text": '<at user_id="all"></at> ' + escaped})
 
     def test_malformed_payloads_have_typed_error(self):
         for channel, payload in (("telegram", {}), ("max", {}), ("whatsapp", {}), ("feishu", {}),

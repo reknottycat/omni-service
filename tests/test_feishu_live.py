@@ -35,10 +35,11 @@ class FeishuLiveTest(unittest.TestCase):
     def test_send_checks_bot_and_audience_and_passes_content_via_stdin(self):
         adapter = self.setup_adapter()
         receipt = _data({"chat_id": "oc_test", "message_id": "om_sent"})
-        results = deque([_IDENTITY, _data(_GROUP), _data(_MEMBERS), receipt] * 2)
+        results = deque([_IDENTITY, _data(_GROUP), _data(_MEMBERS), receipt] * 3)
         with patch("omni_service.feishu_live.subprocess.run", side_effect=lambda *_a, **_k: _cli_result(results.popleft())) as run:
             self.assertEqual(adapter.send("<at user_id=\"all\">客户</at>", "op1"), "om_sent")
             self.assertEqual(adapter.send("<at user_id=\"all\">客户</at>", "op1"), "om_sent")
+            self.assertEqual(adapter.send('<at user_id="all">客户</at>', "rules", mention_all=True), "om_sent")
         first, second = run.call_args_list[3], run.call_args_list[7]
         self.assertEqual(first, second)
         args = first.args[0]
@@ -48,6 +49,8 @@ class FeishuLiveTest(unittest.TestCase):
         self.assertNotIn("客户", " ".join(args))
         self.assertIn("--idempotency-key", args)
         self.assertEqual(json.loads(first.kwargs["input"])["text"], '‹at user_id="all">客户</at>')
+        self.assertEqual(json.loads(run.call_args.kwargs["input"])["text"],
+                         '<at user_id="all"></at> ‹at user_id="all">客户</at>')
 
     def test_unapproved_members_block_the_send_before_issuing_the_command(self):
         adapter = self.setup_adapter()
@@ -64,6 +67,23 @@ class FeishuLiveTest(unittest.TestCase):
                 with self.assertRaisesRegex(ChannelError, "feishu_members_mismatch"):
                     adapter.send("sample", "op1")
                 self.assertEqual(run.call_count, 3)
+
+    def test_additional_bot_roster_must_match_explicitly_allowed_app_ids(self):
+        adapter = FeishuLive("oc_test", ["ou_staff"], app_id="cli_test", allowed_bot_app_ids=["cli_assistant"])
+        allowed = {**_MEMBERS, "bots": [*_MEMBERS["bots"], {"app_id": "cli_assistant"}]}
+        with patch("omni_service.feishu_live.subprocess.run",
+                   side_effect=map(_cli_result, [_IDENTITY, _data(_GROUP), _data(allowed)])):
+            adapter.preflight()
+        for membership in (_MEMBERS, {**allowed, "bots": [*allowed["bots"], {"app_id": "cli_other"}]}):
+            with self.subTest(membership=membership), patch(
+                "omni_service.feishu_live.subprocess.run",
+                side_effect=map(_cli_result, [_IDENTITY, _data(_GROUP), _data(membership)]),
+            ):
+                with self.assertRaisesRegex(ChannelError, "feishu_members_mismatch"):
+                    adapter.preflight()
+        for invalid in (None, "cli_assistant", ["ou_staff"], [None]):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ChannelError, "feishu_invalid_config"):
+                FeishuLive("oc_test", ["ou_staff"], app_id="cli_test", allowed_bot_app_ids=invalid)
 
     def test_receipt_must_confirm_group_and_message(self):
         adapter = self.setup_adapter()
@@ -102,22 +122,26 @@ class FeishuLiveTest(unittest.TestCase):
             {"chat_id": "oc_outside"}, {"sender_id": "ou_other"}, {"sender_type": "bot"},
             {"message_type": "post"}, {"chat_type": "p2p"}, {"create_time": "bad"},
             {"event_id": "ev_first"}, {"event_id": "ev_retry"},
+            {"message_id": "om_mention", "content": "员工内部协调", "has_mentions": True},
         )]
         lines = "\n".join(json.dumps(event) for event in events)
         with tempfile.TemporaryDirectory() as directory:
             adapter = self._stub_cli(directory, (
                 "arg = sys.argv[sys.argv.index('--jq') + 1]\n"
                 "assert 'oc_test' in arg and 'ou_staff' in arg and 'text' in arg\n"
+                "assert 'has_mentions:' in arg and '.mentions' in arg\n"
                 "assert '--timeout' in sys.argv\n"
                 "print('[event] ready event_key=im.message.receive_v1', file=sys.stderr)\n"
                 f"print({lines!r})\n"
                 "print('[event] exited (reason: timeout)', file=sys.stderr)\n"
             ))
             accepted = list(adapter.events(duration=1))
-        self.assertEqual(len(accepted), 2)
+        self.assertEqual(len(accepted), 3)
         self.assertEqual(accepted[0], accepted[1])
         self.assertEqual((accepted[0].text, accepted[0].event_id, accepted[0].timestamp),
                          ("收到", "om_test", 1700000000))
+        self.assertFalse(accepted[0].has_mentions)
+        self.assertTrue(accepted[2].has_mentions)
 
     def test_persistent_stream_stops_or_reports_unexpected_exit(self):
         with tempfile.TemporaryDirectory() as directory:

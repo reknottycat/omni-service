@@ -38,7 +38,10 @@ class TranslationTests(unittest.TestCase):
                                           api_key="sample-key")
 
     def add_response(self, text, *, finish_reason="stop", fenced=False):
-        content = json.dumps({"translation": text}, ensure_ascii=False)
+        self.add_fields_response({"translation": text}, finish_reason=finish_reason, fenced=fenced)
+
+    def add_fields_response(self, fields, *, finish_reason="stop", fenced=False):
+        content = json.dumps(fields, ensure_ascii=False)
         if fenced:
             content = f"```json\n{content}\n```"
         response = {"choices": [{"message": {"content": content}, "finish_reason": finish_reason}]}
@@ -91,3 +94,26 @@ class TranslationTests(unittest.TestCase):
         with self.assertRaisesRegex(ChannelError, "^translation_unavailable$"):
             self.translator.translate("Please confirm.", "en", "ru")
         self.assertEqual(self.requests, [])
+
+    def test_extracts_requested_intake_fields_without_translating_them(self):
+        message = 'Мы ООО «Амур». Нужно перевезти 18 тонн кукурузы из Хабаровска.'
+        extracted = {"company": "ООО «Амур»", "cargo": "кукурузы", "quantity": "18 тонн", "origin": "Хабаровска"}
+        fields = (*extracted, "destination")
+        self.add_fields_response({**extracted, "destination": None}, fenced=True)
+        self.assertEqual(self.translator.extract_intake(message, fields), extracted)
+        path, authorization, payload = self.requests[0]
+        self.assertEqual((path, authorization), ("/upstream/model/v1/chat/completions", "Bearer sample-key"))
+        self.assertEqual(payload["response_format"], {"type": "json_object"})
+        self.assertNotIn("tools", payload)
+        self.assertIn(", ".join(fields), payload["messages"][0]["content"])
+        self.assertEqual(payload["messages"][1], {"role": "user", "content": message})
+
+    def test_rejects_intake_output_with_wrong_shape_and_sanitizes_errors(self):
+        self.add_fields_response({"cargo": "玉米"})
+        self.add_fields_response({"quantity": 18})
+        self.add_fields_response({"quantity": "18 吨"}, finish_reason="length")
+        self.responses.append((503, {}, b"upstream error containing sample-key"))
+        for _ in range(4):
+            with self.assertRaisesRegex(ChannelError, "^intake_unavailable$"):
+                self.translator.extract_intake("需要 18 吨玉米。", ("quantity",))
+        self.assertEqual(len(self.requests), 4)

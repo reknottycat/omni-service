@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS members (
  conversation_id TEXT NOT NULL REFERENCES conversations(id), user_id TEXT NOT NULL,
  PRIMARY KEY(conversation_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS intake_sessions (
+ conversation_id TEXT PRIMARY KEY REFERENCES conversations(id),
+ facts TEXT NOT NULL DEFAULT '{}', source_messages TEXT NOT NULL DEFAULT '{}',
+ handoff_reason TEXT
+);
 CREATE TABLE IF NOT EXISTS messages (
  id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id),
  direction TEXT NOT NULL, source_channel TEXT NOT NULL, source_id TEXT NOT NULL,

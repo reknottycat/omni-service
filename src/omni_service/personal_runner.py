@@ -12,6 +12,7 @@ import re
 import threading
 
 from .feishu_live import FeishuLive
+from .intake import Intake
 from .language import SimulationLanguage
 from .local_translation import LocalTranslation
 from .models import ChannelError
@@ -29,7 +30,7 @@ class PersonalBridge(Service):
         self.api = api
         self.feishu = feishu
         self.scope = connection_id, str(peer)
-        super().__init__(db_path, None, members=sorted(feishu.staff_ids), **kwargs)
+        super().__init__(db_path, None, members=sorted(feishu.staff_ids), label_replies=True, **kwargs)
         try:
             policy = TelegramPersonal(expected_owner_id=owner, allowed_chat_ids=[peer])
             self.telegram = TelegramPoller(api, policy, self.store, connection_id, clock=self.clock)
@@ -51,7 +52,7 @@ class PersonalBridge(Service):
                                    [(self.cid, staff) for staff in self.default_members])
                 elif (saved is None or saved["binding"] != binding or len(rows) != 1
                       or (rows[0]["channel"], rows[0]["account_id"], rows[0]["chat_id"], rows[0]["room_id"])
-                      != ("telegram", *self.scope, feishu.chat_id) or rows[0]["mode"] != "manual"):
+                      != ("telegram", *self.scope, feishu.chat_id)):
                     raise ChannelError("personal_db_binding_mismatch")
                 else:
                     self.cid = rows[0]["id"]
@@ -80,15 +81,17 @@ class PersonalBridge(Service):
         if event.user_id != str(self.telegram.policy.owner_id):
             return super()._customer_event(db, event)
         conv = self._conversation(db, self.cid)
-        self._cancel_ai(db, self.cid)
         duplicate = db.execute("""SELECT 1 FROM messages WHERE conversation_id=? AND
             source_channel='telegram' AND source_id=?""", (self.cid, event.message_id)).fetchone()
         if not duplicate:
+            self._cancel_ai(db, self.cid)
+            self._finish_intake(db, self.cid, 'owner_reply')
+            db.execute("UPDATE conversations SET mode='manual' WHERE id=?", (self.cid,))
             mid = self._message(db, self.cid, direction="outbound", source_channel="telegram",
                                 source_id=event.message_id, author_id=event.user_id, text=event.text,
                                 status="sent", language=self.language.detect(event.text, conv["language"]))
             self._queue(db, self.cid, "feishu", "send", "owner:" + mid,
-                        {"text": "Telegram 本人已回复：" + event.text})
+                        {"text": "[人工客服] Telegram 本人已回复：" + event.text})
         return {"status": "owner_mirrored", "conversation_id": self.cid}
 
     def _request(self, db, item, conv):
@@ -168,8 +171,8 @@ def run(bridge):
     thread = threading.Thread(target=receive, daemon=True)
     thread.start()
     try:
-        print("OmniService Telegram–Feishu pilot started. Translation:",
-              bridge.language.provider_name, flush=True)
+        print("OmniService Telegram–Feishu pilot started. Translation:", bridge.language.provider_name,
+              "AI intake:", "on" if bridge.intake_enabled else "off", flush=True)
         while not stop.is_set():
             try:
                 for event in bridge.telegram.poll(timeout=2):
@@ -205,6 +208,14 @@ def translation_provider(config):
                             timeout=config.get("timeout", 30))
 
 
+def intake_provider(config, language):
+    if not isinstance(config, dict) or type(config.get("enabled", False)) is not bool:
+        raise ChannelError("invalid_intake_config")
+    simulated = isinstance(language, SimulationLanguage)
+    extract = (lambda _text, _fields: {}) if simulated else language.extract_intake
+    return Intake(extract, max_replies=config.get("max_replies", 5), simulated=simulated), config.get("enabled", False)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["check", "discover", "enable-secretary", "run"])
@@ -238,7 +249,8 @@ def main():
             return 0
         feishu_config = config["feishu"]
         feishu = FeishuLive(feishu_config["chat_id"], feishu_config["staff_ids"],
-                            app_id=feishu_config["app_id"], profile=feishu_config.get("profile"))
+                            app_id=feishu_config["app_id"], profile=feishu_config.get("profile"),
+                            allowed_bot_app_ids=feishu_config.get("allowed_bot_app_ids", []))
         feishu.preflight()
         connection = Connection.from_update(api.call("getBusinessConnection",
             {"business_connection_id": telegram["connection_id"]}))
@@ -251,9 +263,10 @@ def main():
                 or peers[0] <= 0 or peers[0] == connection.owner_id):
             raise ChannelError("invalid_test_contact")
         language = translation_provider(config["translation"])
+        intake, intake_enabled = intake_provider(config.get("intake", {}), language)
         if args.action == "check":
             print("Telegram connection and Feishu group verified. Translation configuration:",
-                  language.provider_name)
+                  language.provider_name, "AI intake:", "on" if intake_enabled else "off")
             return 0
         if config["mode"] != "personal-text-pilot" or args.db is None:
             raise ChannelError("pilot_mode_required")
@@ -267,8 +280,9 @@ def main():
             bridge = PersonalBridge(
                 args.db, api, feishu, owner=connection.owner_id, peer=peers[0],
                 connection_id=connection.connection_id, bot_id=bot["id"],
-                language=language)
+                language=language, intake=intake, intake_enabled=intake_enabled)
             try:
+                bridge.set_intake_enabled(intake_enabled)
                 run(bridge)
             finally:
                 bridge.close()

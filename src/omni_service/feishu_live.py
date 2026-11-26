@@ -9,6 +9,7 @@ import time
 from contextlib import suppress
 from hashlib import sha256
 
+from .channels import feishu_text
 from .models import ChannelError, InboundEvent
 
 
@@ -26,15 +27,18 @@ def _id(value, prefix):
 
 
 class FeishuLive:
-    def __init__(self, chat_id, staff_ids, *, app_id, profile=None, cli="lark-cli"):
+    def __init__(self, chat_id, staff_ids, *, app_id, profile=None, cli="lark-cli", allowed_bot_app_ids=()):
         staff = tuple(staff_ids) if isinstance(staff_ids, (list, tuple, set, frozenset)) else ()
         if (not _id(chat_id, "oc_") or not _id(app_id, "cli_") or not staff
                 or not all(_id(staff_id, "ou_") for staff_id in staff)
+                or not isinstance(allowed_bot_app_ids, (list, tuple, set, frozenset))
+                or not all(_id(bot_app_id, "cli_") for bot_app_id in allowed_bot_app_ids)
                 or profile is not None and (not isinstance(profile, str) or not profile)):
             raise ChannelError("feishu_invalid_config")
         self.chat_id = chat_id
         self.app_id = app_id
         self.staff_ids = frozenset(staff)
+        self.bot_app_ids = frozenset((app_id, *allowed_bot_app_ids))
         self._command = [cli, f"--profile={profile or app_id}"]
         self._env = {**os.environ, "LARKSUITE_CLI_NO_UPDATE_NOTIFIER": "1",
                      "LARKSUITE_CLI_NO_SKILLS_NOTIFIER": "1"}
@@ -87,20 +91,21 @@ class FeishuLive:
                 or not isinstance(bots, list) or len(users) != len(self.staff_ids)
                 or not all(isinstance(user, dict) and _id(user.get("member_id"), "ou_") for user in users)
                 or {user["member_id"] for user in users} != self.staff_ids
-                or len(bots) != 1 or not isinstance(bots[0], dict) or bots[0].get("app_id") != self.app_id):
+                or len(bots) != len(self.bot_app_ids)
+                or not all(isinstance(bot, dict) and _id(bot.get("app_id"), "cli_") for bot in bots)
+                or {bot["app_id"] for bot in bots} != self.bot_app_ids):
             raise ChannelError("feishu_members_mismatch")
 
-    def send(self, text, operation_id):
+    def send(self, text, operation_id, *, mention_all=False):
         """Send bot text to the scoped group and return the confirmed message ID."""
         if not isinstance(text, str) or not text.strip() or not isinstance(operation_id, str) or not operation_id:
             raise ChannelError("feishu_invalid_payload")
+        content = feishu_text(text, mention_all=mention_all)
         self.preflight()
         key = sha256(f"{self.app_id}:{self.chat_id}:{operation_id}".encode()).hexdigest()[:48]
-        # A customer's plain text must not turn into an @mention in the service group.
-        plain_text = re.sub(r"<at(?=\s|>)", "‹at", text, flags=re.IGNORECASE)
         receipt = self._bot_data(["im", "+messages-send", "--chat-id", self.chat_id,
                                   "--content", "-", "--msg-type", "text", "--idempotency-key", key],
-                                 input_text=json.dumps({"text": plain_text}, ensure_ascii=False),
+                                 input_text=json.dumps({"text": content}, ensure_ascii=False),
                                  error="delivery_unknown")
         if receipt.get("chat_id") != self.chat_id or not _id(receipt.get("message_id"), "om_"):
             raise ChannelError("delivery_unknown")
@@ -113,7 +118,8 @@ class FeishuLive:
             f'select(.type == "{_EVENT}" and .chat_id == {chat} and .chat_type == "group" '
             f'and .sender_type == "user" and .message_type == "text" and '
             f'(.sender_id as $sender | {staff} | index($sender) != null)) | '
-            '{type, chat_id, chat_type, sender_type, message_type, sender_id, message_id, create_time, content}'
+            '{type, chat_id, chat_type, sender_type, message_type, sender_id, message_id, create_time, content, '
+            'has_mentions: (.mentions != null and .mentions != [])}'
         )
 
     def _parse_event(self, line):
@@ -132,7 +138,8 @@ class FeishuLive:
             return None
         # Feishu may assign a new event ID to re-delivery of the same message.
         return InboundEvent("feishu", self.app_id, message_id, self.chat_id, event["sender_id"],
-                            message_id, text=text, timestamp=int(created) / 1000)
+                            message_id, text=text, timestamp=int(created) / 1000,
+                            has_mentions=event.get("has_mentions", False) is not False)
 
     def events(self, stop=None, *, duration=0):
         """Consume approved text events until stopped, or for a bounded CLI session."""

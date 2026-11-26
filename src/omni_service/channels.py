@@ -35,6 +35,7 @@ CAPABILITIES = {
                "customer_delete_events": True, "create_room": True, "add_members": True},
 }
 capabilities = CAPABILITIES
+_FEISHU_MENTION_TAG = re.compile(r"<at(?=\s|>)", re.IGNORECASE)
 
 
 def _channel(channel):
@@ -258,10 +259,12 @@ def _feishu(account, payload):
         attachments = (Attachment(kind, remote_id, _text(content.get("file_name", ""))),)
     else:
         raise ChannelError("unsupported_media", "Unsupported Feishu message type")
+    mentions = msg.get("mentions")
+    has_mentions = (mentions is not None and mentions != []) or _FEISHU_MENTION_TAG.search(text) is not None
     return [InboundEvent("feishu", account, event_id, _id(msg.get("chat_id")), user_id,
                          _id(msg.get("message_id")), text,
                          timestamp=_time(msg.get("create_time"), milliseconds=True),
-                         attachments=attachments)]
+                         attachments=attachments, has_mentions=has_mentions)]
 
 
 def parse_events(channel: str, account_id: str, payload: dict) -> list[InboundEvent]:
@@ -295,13 +298,23 @@ def _media(attachment):
     return kind, _id(attachment.remote_id, "destination remote_id")
 
 
+def feishu_text(text, *, mention_all=False):
+    """Escape mention markup in message text before adding a trusted @all."""
+    if type(mention_all) is not bool:
+        raise ChannelError("invalid_payload", "Feishu @all flag must be a boolean")
+    plain_text = _FEISHU_MENTION_TAG.sub("‹at", text)
+    return '<at user_id="all"></at> ' + plain_text if mention_all else plain_text
+
+
 def send_request(channel, account_id, chat_id, text, *, token="simulation-token",
                  recipient_type="chat", attachment: Attachment | None = None,
-                 api_version="v27.0") -> Request:
+                 api_version="v27.0", mention_all=False) -> Request:
     """Build an official API request. The caller owns service-window enforcement."""
     _channel(channel)
     account_id, chat_id = _id(account_id, "account_id"), _id(chat_id, "chat_id")
     text = _text(text)
+    if type(mention_all) is not bool or (mention_all and (channel != "feishu" or attachment is not None)):
+        raise ChannelError("invalid_payload", "@all is only supported for Feishu text")
     if not text and attachment is None:
         raise ChannelError("invalid_payload", "Cannot send an empty message")
     if len(text) > {"telegram": 4096, "max": 4000, "whatsapp": 4096, "feishu": 20000}[channel]:
@@ -352,7 +365,9 @@ def send_request(channel, account_id, chat_id, text, *, token="simulation-token"
             raise ChannelError("unsupported", "Feishu media has no caption; send separate text")
         content = {"image_key" if kind == "image" else "file_key": remote_id}
     else:
-        content = {"text": text}
+        content = {"text": feishu_text(text, mention_all=mention_all)}
+        if len(content["text"]) > 20000:
+            raise ChannelError("invalid_payload", "Message exceeds platform text limit")
     body = {"receive_id": chat_id, "msg_type": kind or "text",
             "content": json.dumps(content, ensure_ascii=False, separators=(",", ":"))}
     return Request("POST", "/open-apis/im/v1/messages?receive_id_type=chat_id", body, headers)

@@ -11,7 +11,8 @@
     "app_id": "",
     "profile": "",
     "chat_id": "",
-    "staff_ids": []
+    "staff_ids": [],
+    "allowed_bot_app_ids": []
   },
   "translation": {
     "mode": "private-model",
@@ -19,6 +20,10 @@
     "model": "",
     "api_key_env": "TRANSLATION_API_KEY",
     "timeout": 30
+  },
+  "intake": {
+    "enabled": false,
+    "max_replies": 5
   },
   "llm": {
     "base_url": "",

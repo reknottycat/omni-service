@@ -83,3 +83,5 @@ PYTHONPATH=src python3.12 -m omni_service.company_accounts serve
 每个实例启动前检查同一 Linux 用户下启用的公司配置。Telegram 机器人、原账号、业务连接、飞书应用、管理端口及管理回调地址发生重复时，相关实例会报告冲突，避免共用轮询和事件接收。各公司数据目录保持隔离。互不信任的公司应使用不同 Linux 用户或容器，此时公司列表仅显示当前 Linux 用户的实例，跨用户的重复配置不在自动检查范围内。
 
 复验 `PYTHONPATH=src python3.12 -m unittest discover -s tests -p test_company_accounts.py -v`。三公司模拟使用同一个客户 ID 分别建立独立会话，覆盖公司间群路由、配置冲突、权限文件和管理页本机访问检查。真实多公司平台授权和同时在线尚待对应公司账号的验收。
+
+2026-11-26 在 DGX Linux aarch64 / Python 3.12.3 上对源码 `0910eb6` 执行 `bash scripts/acceptance.sh`，231 项通过，0 失败、0 错误、0 跳过。三公司模拟使用各自的 Telegram 连接和飞书应用，验证同一客户分别收到各自会话中的回复。管理页使用三组模拟配置进行浏览器检查。机器可读结果和日志位于 `artifacts/dgx-companies-20261126/`。

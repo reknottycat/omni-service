@@ -99,3 +99,7 @@ DGX Linux aarch64 / Python 3.12.3 对 `8ec76c8` 执行 `bash scripts/acceptance.
 ## 2026-11-26 团队部署与接入复验
 
 DGX Linux aarch64 / Python 3.12.3 对 `8d596ab` 执行 `bash scripts/acceptance.sh`，227 项通过，0 失败、0 错误、0 跳过。覆盖团队初始化、应用扫码协议、Telegram 配对隔离、飞书定向与管理员审批邀请、客服交接轮转、安装器预检和失败回滚。源码 SHA256 为 `da481940814ef5e6b60f5e1f3470c92bff3dff6ac5c8f8a3f0220546c6860365`。报告及日志位于 `artifacts/dgx-onboarding-20261126/`。首轮 `cb10485` 的 226 项中，管理默认设置字段兼容断言失败，原始结果保存在同目录的 `initial/`。
+
+## 2026-11-26 多公司实例复验
+
+DGX Linux aarch64 / Python 3.12.3 对 `0910eb6` 执行 `bash scripts/acceptance.sh`，231 项通过，0 失败、0 错误、0 跳过。`test_company_accounts.py` 覆盖三家公司的独立业务连接、客户群与回复，以及重复配置、私有配置权限和本机管理页访问。源码 SHA256 为 `1051b804e67bdd0c8700c64d9733cd0853a938cd5da10f6ada65b4eccb7bd6b6`。报告及日志位于 `artifacts/dgx-companies-20261126/`。 [部署说明](../personal-deployment.md#多公司和多个-telegram-原账号)

@@ -1,0 +1,28 @@
+{
+  "mode": "disabled",
+  "telegram": {
+    "expected_owner_id": null,
+    "allowed_chat_ids": [],
+    "bot_token_env": "TELEGRAM_BOT_TOKEN"
+  },
+  "feishu": {
+    "app_id": "",
+    "app_secret_env": "FEISHU_APP_SECRET"
+  },
+  "translation": {
+    "base_url": "",
+    "model": "",
+    "api_key_env": "TRANSLATION_API_KEY"
+  },
+  "llm": {
+    "base_url": "",
+    "model": "",
+    "api_key_env": "LLM_API_KEY"
+  },
+  "whatsapp": {
+    "mode": "blocked"
+  },
+  "max": {
+    "mode": "blocked"
+  }
+}

@@ -46,6 +46,7 @@ class TelegramPersonal:
                        "edited_business_message", "deleted_business_messages")
 
     def __init__(self, *, expected_owner_id, allowed_chat_ids=()):
+        allowed_chat_ids = tuple(allowed_chat_ids)
         if not _positive(expected_owner_id) or not all(_positive(x) for x in allowed_chat_ids):
             raise ChannelError("invalid_policy")
         self.owner_id = expected_owner_id

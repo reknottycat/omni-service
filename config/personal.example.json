@@ -1,15 +1,20 @@
 {
   "mode": "disabled",
   "telegram": {
+    "bot_username": "ExampleOmniServiceBot",
+    "connection_id": "",
     "expected_owner_id": null,
     "allowed_chat_ids": [],
     "bot_token_env": "TELEGRAM_BOT_TOKEN"
   },
   "feishu": {
     "app_id": "",
-    "app_secret_env": "FEISHU_APP_SECRET"
+    "profile": "",
+    "chat_id": "",
+    "staff_ids": []
   },
   "translation": {
+    "mode": "fixtures",
     "base_url": "",
     "model": "",
     "api_key_env": "TRANSLATION_API_KEY"

@@ -371,6 +371,10 @@ class Service:
         return channels.send_request(channel, conv['account_id'], target, payload['text'],
                                      recipient_type=payload.get('recipient_type', 'chat'))
 
+    def _deliver(self, item, conv, request):
+        payload = self.transport.send(item['channel'], request)
+        return channels.parse_response(item['channel'], item['operation'], payload)
+
     def drain(self):
         outcomes = []
         with self._drain_lock:
@@ -407,8 +411,7 @@ class Service:
                 if item is None:
                     break
                 try:
-                    payload = self.transport.send(item['channel'], request)
-                    external_id = channels.parse_response(item['channel'], item['operation'], payload)
+                    external_id = self._deliver(item, conv, request)
                 except ChannelError as exc:
                     with self.store.transaction() as db:
                         self._failure(db, item, exc)

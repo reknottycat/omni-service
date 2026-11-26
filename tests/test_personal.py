@@ -28,6 +28,13 @@ class PersonalContract(unittest.TestCase):
         self.assertEqual(self.bridge.parse(message(chat={"id": 20, "type": "group"})), [])
         self.assertEqual(self.bridge.parse(message(business_connection_id="other")), [])
 
+    def test_allowlist_iterator_is_retained_and_validated(self):
+        bridge = TelegramPersonal(expected_owner_id=10, allowed_chat_ids=iter([20]))
+        bridge.apply_connection(connection())
+        self.assertEqual(bridge.parse(message())[0].role, "customer")
+        with self.assertRaises(ChannelError):
+            TelegramPersonal(expected_owner_id=10, allowed_chat_ids=iter([20, -1]))
+
     def test_owner_customer_and_echo_are_distinct(self):
         result, = self.bridge.parse(message())
         self.assertEqual((result.role, result.event.account_id, result.event.chat_id),

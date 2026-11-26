@@ -80,7 +80,7 @@ def _time(value, *, milliseconds=False):
     return result / 1000 if milliseconds else result
 
 
-def _name(user):
+def profile_name(user):
     return " ".join(_text(user.get(k, ""), nullable=True) for k in ("first_name", "last_name")).strip()
 
 
@@ -115,7 +115,7 @@ def _telegram(account, payload):
         raise ChannelError("invalid_payload", "Message has no supported content")
     return [InboundEvent("telegram", account, event_id,
                          _id(chat.get("id"), "chat.id"), _id(sender.get("id"), "from.id"),
-                         _id(msg.get("message_id")), text, _name(sender),
+                         _id(msg.get("message_id")), text, profile_name(sender),
                          _text(sender.get("language_code", "")),
                          "edit" if key == "edited_message" else "message",
                          timestamp=_time(msg.get("edit_date", msg.get("date"))),
@@ -161,7 +161,7 @@ def _max(account, payload):
     normalized = "edit" if event_type == "message_edited" else "message"
     eid = f"{normalized}:{chat_id}:{mid}" + (f":{timestamp}" if normalized == "edit" else "")
     return [InboundEvent("max", account, eid, chat_id, user_id, mid, text,
-                         _name(sender), _text(payload.get("user_locale", "")), normalized,
+                         profile_name(sender), _text(payload.get("user_locale", "")), normalized,
                          timestamp=timestamp, recipient_type=recipient_type,
                          attachments=tuple(attachments))]
 

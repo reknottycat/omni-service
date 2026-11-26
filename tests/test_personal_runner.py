@@ -25,10 +25,14 @@ class TelegramFixture:
                     "c1" if self.known_receipt else "wrong", "message_id": 90}
         raise AssertionError(method)
 
-    def update(self, uid, text, *, chat=20, sender=20, echo=False):
+    def update(self, uid, text, *, chat=20, sender=20, echo=False, first_name=None, last_name=None):
         message = {"business_connection_id": "c1", "message_id": uid, "date": 1000,
                    "chat": {"id": chat, "type": "private"}, "from": {"id": sender, "is_bot": False},
                    "text": text}
+        if first_name is not None:
+            message["from"]["first_name"] = first_name
+        if last_name is not None:
+            message["from"]["last_name"] = last_name
         if echo:
             message["sender_business_bot"] = {"id": 88}
         self.updates.append({"update_id": uid, "business_message": message})
@@ -74,12 +78,12 @@ class BridgeAcceptance(unittest.TestCase):
 
     def test_two_way_text_owner_echo_and_replay(self):
         self.telegram.update(1, "PRIVATE", chat=30, sender=30)
-        self.telegram.update(2, "Здравствуйте")
+        self.telegram.update(2, "Здравствуйте", first_name="Sandra", last_name="Perez")
         self.telegram.update(3, "BOT ECHO", sender=10, echo=True)
         self.telegram.update(4, "Owner answer", sender=10)
         self.poll_and_drain()
         self.assertEqual(len(self.feishu.sent), 2)
-        self.assertIn("中文: 你好", self.feishu.sent[0])
+        self.assertEqual(self.feishu.sent[0], "Sandra Perez (telegram): Здравствуйте\n中文: 你好")
         self.assertIn("Telegram 本人已回复：Owner answer", self.feishu.sent)
         self.bridge.receive_feishu(staff(who="ou_unapproved"))
         self.bridge.receive_feishu(staff(room="oc_wrong"))
@@ -119,7 +123,7 @@ class BridgeAcceptance(unittest.TestCase):
                                                       "enabled": True, "can_reply": True}])
         self.bridge.telegram.api = api
         self.poll_and_drain()
-        self.assertIn("Здравствуйте", self.feishu.sent[0])
+        self.assertEqual(self.feishu.sent[0], "客户 (telegram): Здравствуйте\n中文: 你好")
 
     def test_revocation_blocks_pending_reply(self):
         self.telegram.update(2, "Здравствуйте")

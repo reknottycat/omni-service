@@ -4,6 +4,8 @@ This is an opt-in boundary for a future live runner, not a replacement for the
 P0 bot transport. Filter before passing any text to storage, AI or Feishu.
 """
 from dataclasses import dataclass
+
+from .channels import profile_name
 from .models import ChannelError, InboundEvent
 
 
@@ -112,9 +114,13 @@ class TelegramPersonal:
             body = data.get("text")
             if not isinstance(body, str) or not body.strip():
                 return []  # media remains unsupported, not a text success
+            try:
+                sender_name = " ".join(profile_name(sender).split())
+            except ChannelError:
+                sender_name = ""  # optional display metadata must not drop the message
             return [PersonalEvent(role, InboundEvent(
                 "telegram", cid, str(uid), str(chat_id), str(sender_id), str(mid),
-                text=body, event_type=kind, timestamp=float(date)))]
+                text=body, sender_name=sender_name, event_type=kind, timestamp=float(date)))]
         return []
 
     def send_payload(self, cid, chat_id, text, *, last_incoming_at, now):

@@ -481,7 +481,7 @@ def configure(args, credentials, config):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("action", choices=("configure", "register-feishu", "prepare-feishu", "check-feishu-scopes", "check", "run"))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--secrets-file", type=Path, required=True)

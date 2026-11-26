@@ -116,7 +116,7 @@ def ensure_sdk(tools):
     lock = ROOT / "requirements-onboarding.lock"
     name = f"python-{sys.implementation.cache_tag}-{_hash(lock)[:24]}"
     venv = tools / name
-    test_import = "from lark_oapi import aregister_app; assert callable(aregister_app)"
+    test_import = "from importlib.metadata import version; from lark_oapi import aregister_app; assert version('lark-oapi') == '1.9.0' and callable(aregister_app)"
     if venv.is_symlink():
         raise SetupError("私有飞书 SDK 路径不能是符号链接。")
     if not venv.exists():
@@ -151,7 +151,7 @@ def main(argv=None):
     if separator in setup:
         i = setup.index(separator)
         setup, options = setup[:i], setup[i + 1:]
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("team")
     parser.add_argument("action", choices=("prepare", "register-feishu", "configure", "check-feishu-scopes"))
     parser.add_argument("--tdlib-source", type=Path, help="可选：用固定校验的官方源码包离线构建 TDLib")

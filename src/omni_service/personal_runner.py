@@ -13,6 +13,7 @@ import threading
 
 from .feishu_live import FeishuLive
 from .language import SimulationLanguage
+from .local_translation import LocalTranslation
 from .models import ChannelError
 from .personal import Connection, TelegramPersonal
 from .service import Service, _id
@@ -151,7 +152,8 @@ def run(bridge):
     thread = threading.Thread(target=receive, daemon=True)
     thread.start()
     try:
-        print("OmniService Telegram–Feishu pilot started (fixture translation).", flush=True)
+        print("OmniService Telegram–Feishu pilot started. Translation:",
+              bridge.language.provider_name, flush=True)
         while not stop.is_set():
             try:
                 for event in bridge.telegram.poll(timeout=2):
@@ -174,6 +176,17 @@ def run(bridge):
     finally:
         stop.set()
         thread.join(timeout=4)
+
+
+def translation_provider(config):
+    if config["mode"] == "fixtures":
+        return SimulationLanguage()
+    if config["mode"] != "private-model":
+        raise ChannelError("invalid_translation_config")
+    key_env = config.get("api_key_env")
+    return LocalTranslation(config["base_url"], config["model"],
+                            api_key=os.environ.get(key_env) if key_env else None,
+                            timeout=config.get("timeout", 30))
 
 
 def main():
@@ -230,10 +243,12 @@ def main():
         if (not isinstance(peers, list) or len(peers) != 1 or type(peers[0]) is not int
                 or peers[0] <= 0 or peers[0] == connection.owner_id):
             raise ChannelError("invalid_test_contact")
+        language = translation_provider(config["translation"])
         if args.action == "check":
-            print("Telegram connection and Feishu group verified.")
+            print("Telegram connection and Feishu group verified. Translation configuration:",
+                  language.provider_name)
             return 0
-        if config["mode"] != "personal-text-pilot" or config["translation"]["mode"] != "fixtures" or args.db is None:
+        if config["mode"] != "personal-text-pilot" or args.db is None:
             raise ChannelError("pilot_mode_required")
         os.umask(0o077)
         args.db.parent.mkdir(parents=True, exist_ok=True)
@@ -245,7 +260,7 @@ def main():
             bridge = PersonalBridge(
                 args.db, api, feishu, owner=connection.owner_id, peer=peers[0],
                 connection_id=connection.connection_id, bot_id=bot["id"],
-                language=SimulationLanguage())
+                language=language)
             try:
                 run(bridge)
             finally:

@@ -4,7 +4,7 @@
 
 ## 用户准备
 
-- Telegram：手机/桌面客户端已登录；在 https://t.me/BotFather 创建专用测试 Bot，开启 Secretary Mode；在个人账号设置中连接它（菜单名称因版本而异）。只允许指定测试联系人，允许回复与删除机器人自己发送的消息；不要授予删除所有消息、修改个人资料、资金等权限。Bot Token 仅在部署主机密钥配置中保存。确认自己的数字用户 ID、授权测试联系人（其 chat ID 可在受限联调时获得）。不要提供个人账号密码、验证码或 session 文件。官方：https://core.telegram.org/bots/features#business-bots 及 https://core.telegram.org/api/bots/connected-business-bots 。回复受最近 24 小时收到消息的限制。
+- Telegram：手机/桌面客户端已登录；在 https://t.me/BotFather 创建专用测试 Bot，开启 Secretary Mode；在原个人账号的「设置 → 聊天自动化」连接它。Telegram 官方确认此入口对普通账号开放，无需 Premium。旧版客户端可能在「Telegram 企业版」显示相关入口。只允许指定测试联系人，允许回复与删除机器人自己发送的消息；不要授予删除所有消息、修改个人资料、资金等权限。Bot Token 仅在部署主机密钥配置中保存。确认自己的数字用户 ID、授权测试联系人（其 chat ID 可在受限联调时获得）。不要提供个人账号密码、验证码或 session 文件。官方：https://core.telegram.org/bots/features#business-bots 及 https://core.telegram.org/api/bots/connected-business-bots 。回复受最近 24 小时收到消息的限制。
 - 飞书：可先创建自己的测试组织/工作区，管理员创建企业自建应用，开启机器人、长连接事件及群聊消息读取/发送/建群/成员权限。提供 App ID（非密钥）、管理员及测试员工 Open ID；App Secret 本机保存。无需公网。官方：https://open.feishu.cn/
 - WhatsApp：现有号码及手机可正常登录即可；先评估官方 Business 原号码方案，官方 Cloud API 的接收通常需要 HTTPS Webhook，暂缓；非官方关联设备有封号及协议风险，不自动启用。无需提供 Facebook 密码或短信验证码。
 - MAX：现有账号登录不等于接口授权。官方 Open Client API 明确限制服务器桥接和向第三方基础设施转移数据，当前个人桥接标为 blocked，等待平台明确允许的路径。https://legal.max.ru/openclient-docs
@@ -16,7 +16,7 @@
 |---|---|---|
 | P1-A | done | Telegram 契约测试已在 DGX 通过，含默认拒绝白名单、本人及回环分类、代发和撤回请求构造 |
 | P1-B | verify | 独立入口已实现长轮询、持久游标、会话过滤、本人回复镜像和带连接 ID 的原账号代发。待真实私聊双向验收与撤回接入 |
-| P1-C | verify | 飞书机器人身份、长连接握手和私有测试群成员核验已通过，普通群消息送达待验。当前使用固定译文，M6 翻译和 DGX AI 待接入 |
+| P1-C | verify | 飞书机器人身份、长连接握手和私有测试群成员核验已通过，普通群消息送达待验。DGX 中俄实际译文和飞书普通消息收发已验证，跨平台联调与自动接待待验 |
 | P1-D | blocked | WhatsApp 原号码合法接入方式确认及测试 |
 | P1-E | blocked | MAX 平台明确允许该桥接场景 |
 | P1-F | todo | Linux 行为及回归证据、两名测试身份真实端到端、重启/撤回/隐私隔离 |
@@ -43,8 +43,13 @@ PYTHONPATH=src python3.12 -m omni_service.personal_runner run --config artifacts
 
 `discover` 只报告 Telegram 连接状态和绑定标识。填写 `connection_id`、`expected_owner_id` 和唯一的 `allowed_chat_ids` 后才可运行桥接。服务端以 Telegram 返回的当前权限为准。飞书预检按实际成员列表校验指定员工和应用，群跨组织、成员不匹配或缺少相应权限都会停止。
 
-测试联系人在 Telegram 向原个人账号发送 `Здравствуйте`，飞书员工应在测试群看到原文和 `你好`。员工发送 `您好，我来帮您处理。`，Telegram 联系人应收到俄译，回执包含预期私聊 ID 和商用连接 ID。重启后重放同一消息，接收方应只看到一次。此入口仅处理普通文字并显式使用固定译文，不启用 AI、媒体、编辑或撤回。
+测试联系人正常给原 Telegram 账号发俄文，飞书员工应在测试群看到原文和中文意思。员工在群内按普通方式回复中文，测试联系人应从原账号收到俄文，回执包含预期私聊 ID 和连接 ID。重启后重放同一消息，接收方应只看到一次。真实联调用 `translation.mode=private-model`，固定译文模式仅用于合成回归。此入口当前处理普通文字，自动接待、媒体、编辑和撤回分别验收。
 
 2026-11-26 在 DGX Linux aarch64 / Python 3.12.3 上从提交 `c5aeed5` 运行 `bash scripts/acceptance.sh`，111 项全部通过，0 失败、0 跳过，源码 SHA256 为 `923d6e7e3107ca6767986a12fd264b713345bc88bad30c330f17572c9a60229b`。原始结果在本机 `artifacts/dgx-pilot-20261126/acceptance.json` 和 `acceptance.log`。包括双向固定译文、重放、权限撤销、错误回执处理的合成用例。
 
-真实联调由协调负责人跟进。Telegram 专用机器人已创建，Bot API 核实身份、Secretary Mode 和无 Webhook，连接发现返回空数组。恢复条件是选定测试联系人、用 Telegram 客户端仅对该会话授权并取得连接 ID。飞书应用起初以 `99991672` 拒绝群成员查询，获得用户确认后开通 `im:chat.members:read`。实际预检已确认群为内部私有群，名单与配置一致，长连接握手通过。普通群消息实际收发仍待验证。
+真实联调由协调负责人跟进。Telegram Bot API 已核实专用机器人身份、Secretary Mode 和无 Webhook。专用机器人收到测试账号的 `/start`，数字身份已写入本机唯一白名单。连接发现仍返回空数组，待 Telegram 主账号仅授权该私聊并取得连接 ID。测试账号 ID 及凭据保留在本机配置中。
+
+飞书应用起初以 `99991672` 拒绝群成员查询，获得用户确认后开通 `im:chat.members:read`。实际预检已确认群为内部私有群，名单与配置一致，长连接握手通过。获得用户确认后已开通 `im:message.group_msg`，并实际收到测试群内不带 @ 的人员文字。单独通过桥接发送器把 DGX 俄译中样本发到测试群，取得飞书消息回执。
+
+
+DGX 私有模型 `qwen3-vl:4b-instruct` 已经通过桥接翻译入口实测两条自然物流样本。核对了哈巴罗夫斯克、同江、18 吨玉米、12 月 5 日、人民币 8600 元及不含报关费。原始输入、译文及飞书投递回执保存在本机 `artifacts/personal-pilot/translation-check.json`。Telegram 端仍以看到原账号真实发出回执和 Sandra 收到消息为验收条件。

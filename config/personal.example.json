@@ -14,10 +14,11 @@
     "staff_ids": []
   },
   "translation": {
-    "mode": "fixtures",
+    "mode": "private-model",
     "base_url": "",
     "model": "",
-    "api_key_env": "TRANSLATION_API_KEY"
+    "api_key_env": "TRANSLATION_API_KEY",
+    "timeout": 30
   },
   "llm": {
     "base_url": "",

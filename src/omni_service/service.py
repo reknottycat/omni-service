@@ -97,7 +97,7 @@ class Service:
                         {'text': display, 'recipient_type': conv['recipient_type']}, mid)
         elif status != 'media_pending':
             self._audit(db, cid, status, {'message_id': mid})
-            notice = ('模拟翻译未收录此短语，消息未发送，请修改内容后重试。'
+            notice = ('翻译不可用，消息未发送，请修改内容后重试。'
                       if status == 'translation_unavailable' else 'WhatsApp 客服窗口已过期，消息未发送，需要获批模板。')
             self._notify(db, cid, status + ':' + mid, notice + ' 消息 ' + mid)
         else:
@@ -111,7 +111,7 @@ class Service:
         try:
             translated = self.language.translate(text, message['language'], 'zh')
         except ChannelError:
-            translated = '[模拟翻译未收录此短语]'
+            translated = '[翻译不可用]'
         if message['kind'] == 'media':
             text = '[媒体待转码/上传] ' + text
         body = f"{message['sender_name'] or '客户'} ({conv['channel']}): {text}"

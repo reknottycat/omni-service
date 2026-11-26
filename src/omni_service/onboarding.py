@@ -26,6 +26,7 @@ from .models import ChannelError
 from .personal import Connection, TelegramPersonal
 from .personal_runner import main as run_bridge
 from .telegram_live import TelegramAPI, enable_secretary, telegram_ready, telegram_setup_link
+from .telegram_tdlib import RECIPIENT_FLAGS, application_credentials, connect_account, valid_owner
 
 
 _KEYS = frozenset({
@@ -41,8 +42,12 @@ _SETUP_HINTS = {
     'secret_input_requires_terminal': '请从交互终端输入密钥，或使用仅当前用户可读的凭据文件。',
     'feishu_provision_sdk_missing': '请安装 requirements-onboarding.txt，或用 --feishu-app 复用现有应用。',
     'feishu_setup_unavailable': '请检查此飞书应用已发布、登录身份在可见范围内，并重试。',
-    'telegram_pairing_timed_out': '请用原账号扫码点「开始」并重新保存聊天自动化授权，然后重试。',
+    'telegram_pairing_timed_out': 'Telegram 未返回可验证的绑定回执。请检查机器人绑定状态后重试。',
     'telegram_pairing_backlog': '专用机器人的待处理队列已满。请核对这枚 Token 是否属于新的专用机器人。',
+    'telegram_setup_wrong_owner': '登录的 Telegram 账号与 --telegram-owner 不符。',
+    'telegram_setup_other_bot_connected': '该原账号已经连接另一机器人，程序没有替换。',
+    'telegram_setup_binding_unverified': '平台回读的聊天范围、机器人身份或回复权与请求不符。',
+    'tdlib_unavailable': '请提供受信任的官方 libtdjson 动态库的绝对路径。',
     'model_key_requires_tls': '使用 API Key 时，非本机模型网关需要 HTTPS。',
 }
 
@@ -211,20 +216,37 @@ def paired_connection(api, updates, nonce, issued_at):
     return current
 
 
-def _telegram_pair(api, env):
+def _telegram_pair(api, env, *, bind_account=None, pending=None, save_pending=None):
     bot = enable_secretary(api, telegram_ready(api))
     issued_at = int(time.time())
     nonce = secrets.token_urlsafe(24)
-    link = telegram_setup_link(bot["username"], nonce)
-    print(f"用 Telegram 原账号打开以下链接并点「开始」：\n{link}", flush=True)
-    _render_qr(link, env)
-    print("在原账号「设置 → 聊天自动化」连接该机器人，选择授权聊天，并允许回复。", flush=True)
+    owner = None
+    if bind_account is None:
+        link = telegram_setup_link(bot["username"], nonce)
+        print(f"用 Telegram 原账号打开以下链接并点「开始」：\n{link}", flush=True)
+        _render_qr(link, env)
+        print("在原账号「设置 → 聊天自动化」连接该机器人，选择授权聊天，并允许回复。", flush=True)
+    else:
+        if (isinstance(pending, dict) and pending.get("bot_id") == bot["id"]
+                and type(pending.get("issued_at")) is int
+                and 0 <= issued_at - pending["issued_at"] < 23 * 3600
+                and type(pending.get("owner")) is int and 0 < pending["owner"] < 2**52
+                and isinstance(pending.get("nonce"), str)
+                and re.fullmatch(r"[A-Za-z0-9_-]{32}", pending["nonce"])):
+            nonce, issued_at, owner = pending["nonce"], pending["issued_at"], pending["owner"]
+            print("已复用新号登录后的绑定请求，正在核对 Telegram 回执。", flush=True)
+        else:
+            owner = bind_account(bot, nonce)
+            if save_pending is not None:
+                save_pending({"bot_id": bot["id"], "issued_at": issued_at, "owner": owner, "nonce": nonce})
     deadline = time.monotonic() + 420
     while time.monotonic() < deadline:
         updates = api.call("getUpdates", {"timeout": 5, "limit": 100,
                                           "allowed_updates": ["message", *TelegramPersonal.allowed_updates]})
         connection = paired_connection(api, updates, nonce, issued_at)
         if connection is not None:
+            if owner is not None and connection.owner_id != owner:
+                raise ChannelError("telegram_setup_wrong_owner")
             return bot, connection
         if len(updates) == 100:
             raise ChannelError('telegram_pairing_backlog')
@@ -234,7 +256,7 @@ def _telegram_pair(api, env):
 
 def _ask(credentials, key, title, *, optional=False):
     value = credentials.get(key)
-    if not value:
+    if not value and not (optional and key in credentials):
         with warnings.catch_warnings():
             warnings.simplefilter('error', getpass.GetPassWarning)
             try:
@@ -252,6 +274,82 @@ def _render_qr(link, env):
         _lark(["auth", "qrcode", link, "--ascii"], env, show=True)
     except ChannelError:
         pass  # The official link remains available without terminal rendering.
+
+
+def _register_feishu(args, credentials, config):
+    if config.get("mode") != "disabled":
+        raise ChannelError("invalid_setup_config")
+    app = config["feishu"].get("app_id")
+    secret = credentials.get("OMNI_FEISHU_APP_SECRET")
+    if app and _APP_ID.fullmatch(app) and secret:
+        print(f"已复用此实例登记的飞书应用 {app}。", flush=True)
+        return app, secret
+    if app or secret:
+        # A pre-existing credential without its matching ID must never be overwritten.
+        raise ChannelError("invalid_setup_config")
+    app_name = args.feishu_app_name or "OmniService"
+    if not 1 <= len(app_name.strip()) <= 32 or not app_name.isprintable():
+        raise ChannelError("invalid_feishu_app_name")
+
+    def show_verification_url(link):
+        print(f"用飞书扫码或打开官方链接，核对并确认创建此应用：\n{link}", flush=True)
+        _render_qr(link, _lark_environment(args.config.parent))
+
+    app, secret = provision_feishu(show_verification_url=show_verification_url, app_name=app_name.strip())
+    if not _APP_ID.fullmatch(app) or not secret or not _secret_value(secret):
+        raise ChannelError("feishu_setup_identity_unverified")
+    credentials["OMNI_FEISHU_APP_SECRET"] = secret
+    config["feishu"].update(app_id=app, profile=app)
+    _save_profile(args, credentials, config)
+    print(f"飞书已确认创建 {app}。请按组织要求登记管理页回调和完成发布审核。", flush=True)
+    return app, secret
+
+
+def _account_binder(args, env):
+    options = (args.telegram_owner, args.telegram_login, args.telegram_recipients,
+               args.telegram_exclude_chat_id, args.tdlib_http_proxy, args.tdlib_app_credentials)
+    if args.tdlib_library is None:
+        if any(options):
+            raise ChannelError("invalid_telegram_scope")
+        return None
+    if not args.tdlib_library.is_absolute() or not args.tdlib_library.is_file():
+        raise ChannelError("tdlib_unavailable")
+    if not valid_owner(args.telegram_owner):
+        raise ChannelError("telegram_setup_wrong_owner")
+    application = (application_credentials(args.tdlib_app_credentials)
+                   if args.tdlib_app_credentials is not None else None)
+    selectors = args.telegram_recipients
+    excluded = args.telegram_exclude_chat_id
+    if (len(selectors) != len(set(selectors)) or len(excluded) != len(set(excluded))
+            or any(not 0 < peer < 2**52 for peer in excluded)
+            or (args.chat_scope == "connection" and not selectors)
+            or (args.chat_scope == "allowlist" and (selectors or excluded))):
+        raise ChannelError("invalid_telegram_scope")
+    proxy = None
+    if args.tdlib_http_proxy:
+        try:
+            value = urlsplit(args.tdlib_http_proxy)
+            address = ipaddress.ip_address(value.hostname)
+            if (value.scheme != "http" or not value.port or value.username is not None
+                    or value.path not in ("", "/") or value.query or value.fragment
+                    or not (address.is_private or address in ipaddress.ip_network("100.64.0.0/10"))):
+                raise ValueError
+            proxy = (str(address), value.port)
+        except ValueError:
+            raise ChannelError("invalid_telegram_proxy") from None
+
+    def show_qr(link):
+        print(f"在新号 Telegram「设置 → 设备 → 连接桌面设备」中扫码：\n{link}", flush=True)
+        _render_qr(link, env)
+
+    def bind(bot, nonce):
+        return connect_account(args.tdlib_library, args.config.parent, bot=bot,
+                               expected_owner=args.telegram_owner, nonce=nonce,
+                               included=args.test_chat_id, excluded=excluded, selectors=selectors,
+                               login=args.telegram_login or "qr", show_qr=show_qr, proxy=proxy,
+                               application=application)
+
+    return bind
 
 
 def configure(args, credentials, config):
@@ -273,6 +371,8 @@ def configure(args, credentials, config):
     app = args.feishu_app or saved_app
     if (app and not _APP_ID.fullmatch(app)) or (saved_app and app != saved_app):
         raise ChannelError('invalid_setup_config')
+    env = _lark_environment(args.config.parent)
+    bind_account = _account_binder(args, env)
     telegram_token = _ask(credentials, "TELEGRAM_BOT_TOKEN", "Telegram Bot Token: ")
     model_key = _ask(credentials, "TRANSLATION_API_KEY", "翻译模型 API Key（无可直接回车）: ", optional=True)
     signing_key = credentials.get("OMNI_ADMIN_SIGNING_KEY") or secrets.token_hex(32)
@@ -290,27 +390,42 @@ def configure(args, credentials, config):
     if app:
         app_secret = _ask(credentials, "OMNI_FEISHU_APP_SECRET", "飞书 App Secret: ")
     else:
-        def show_verification_url(link):
-            print(f'使用飞书扫描二维码创建应用，或打开以下官方链接：\n{link}', flush=True)
-            _render_qr(link, _lark_environment(args.config.parent))
-
-        app, app_secret = provision_feishu(show_verification_url=show_verification_url)
-        if not _APP_ID.fullmatch(app) or not _secret_value(app_secret):
-            raise ChannelError('feishu_setup_identity_unverified')
-        credentials['OMNI_FEISHU_APP_SECRET'] = app_secret
-        config['feishu'].update(app_id=app, profile=app)
+        app, app_secret = _register_feishu(args, credentials, config)
+    management = config["management"]
+    admins, tenant = management.get("admin_ids"), management.get("tenant_key")
+    if (saved_app == app and isinstance(admins, list) and len(admins) == 1
+            and _OPEN_ID.fullmatch(admins[0]) and isinstance(tenant, str) and _TENANT.fullmatch(tenant)):
+        _prepare_feishu(app, app_secret, args.config.parent)
+        admin, organization = admins[0], tenant
+        print("已复用此应用在本实例验证过的飞书管理员。", flush=True)
+    else:
+        admin, organization = _feishu_owner(app, app_secret, args.config.parent)
+        config["feishu"].update(app_id=app, profile=app)
+        management.update(admin_ids=[admin], tenant_key=organization)
         _save_profile(args, credentials, config)
-        print('飞书应用已保存。请在应用后台登记管理页的 OAuth 回调地址并完成必要审批。', flush=True)
-    admin, organization = _feishu_owner(app, app_secret, args.config.parent)
     api = TelegramAPI(telegram_token, proxy_url=credentials.get("TELEGRAM_HTTPS_PROXY") or None,
                       tunnel_port=int(credentials["TELEGRAM_TLS_TUNNEL_PORT"])
                       if credentials.get("TELEGRAM_TLS_TUNNEL_PORT") else None)
-    bot, connection = _telegram_pair(api, _lark_environment(args.config.parent))
+    pairing = {}
+    if bind_account is not None:
+        signature = [args.telegram_owner.lstrip("@").casefold(), scopes, sorted(args.test_chat_id),
+                     sorted(args.telegram_recipients), sorted(args.telegram_exclude_chat_id)]
+        checkpoint = config["telegram"].get("setup_pairing")
+
+        def save_pending(proof):
+            config["telegram"]["setup_pairing"] = {"scope": signature, "proof": proof}
+            _save_profile(args, credentials, config)
+
+        pairing = {"bind_account": bind_account, "save_pending": save_pending}
+        if isinstance(checkpoint, dict) and checkpoint.get("scope") == signature:
+            pairing["pending"] = checkpoint.get("proof")
+    bot, connection = _telegram_pair(api, env, **pairing)
     if connection.owner_id in args.test_chat_id:
         raise ChannelError("invalid_telegram_scope")
     config["telegram"].update(bot_token_env="TELEGRAM_BOT_TOKEN", bot_username=bot["username"],
                               connection_id=connection.connection_id, expected_owner_id=connection.owner_id,
                               peer_scope=scopes, allowed_chat_ids=args.test_chat_id, welcome_preview_chat_ids=[])
+    config["telegram"].pop("setup_pairing", None)
     config["feishu"].update(app_id=app, profile=app, chat_id="",
                             handoff_staff_id=admin, staff_ids=[admin], allowed_bot_app_ids=[])
     config["translation"].update(mode="private-model", base_url=args.model_url, model=args.model,
@@ -326,11 +441,12 @@ def configure(args, credentials, config):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("configure", "prepare-feishu", "check", "run"))
+    parser.add_argument("action", choices=("configure", "register-feishu", "prepare-feishu", "check", "run"))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--secrets-file", type=Path, required=True)
     parser.add_argument("--db", type=Path)
     parser.add_argument("--feishu-app")
+    parser.add_argument("--feishu-app-name", help="首次通过飞书官方 SDK 创建应用时预填的名称")
     parser.add_argument("--callback-url")
     parser.add_argument("--model-url")
     parser.add_argument("--model")
@@ -338,6 +454,15 @@ def main(argv=None):
     parser.add_argument("--company-name", help="飞书服务群使用的公司名称")
     parser.add_argument("--chat-scope", choices=("connection", "allowlist"))
     parser.add_argument("--test-chat-id", action="append", type=int, default=[])
+    parser.add_argument("--tdlib-library", type=Path, help="启用 Telegram 命令行绑定，使用官方 libtdjson 的绝对路径")
+    parser.add_argument("--tdlib-app-credentials", type=Path, help="管理员预置的私有 Telegram API ID/hash JSON 文件")
+    parser.add_argument("--telegram-owner", help="预期原账号的 @用户名或用户 ID")
+    parser.add_argument("--telegram-login", choices=("qr", "phone"), help="Telegram 登录方式，默认扫码")
+    parser.add_argument("--telegram-recipients", action="append", choices=tuple(RECIPIENT_FLAGS), default=[],
+                        help="TDLib connection 范围中的 Telegram 聊天类别，可重复")
+    parser.add_argument("--telegram-exclude-chat-id", action="append", type=int, default=[],
+                        help="在 TDLib connection 范围内始终排除的 Telegram 私聊，可重复")
+    parser.add_argument("--tdlib-http-proxy", help="仅供临时 TDLib 登录使用的私网 HTTP CONNECT 代理")
     args = parser.parse_args(argv)
     os.umask(0o077)
     try:
@@ -345,10 +470,14 @@ def main(argv=None):
         args.secrets_file = args.secrets_file.absolute()
         if args.config == args.secrets_file or not args.config.parent.samefile(args.secrets_file.parent):
             raise ChannelError("invalid_setup_config")
-        if args.action == "configure":
+        if args.action in ("configure", "register-feishu"):
             with _setup_lock(args.config.with_suffix(".setup.lock")):
                 config = json.loads(args.config.read_text(encoding="utf-8"))
-                configure(args, read_credentials(args.secrets_file), config)
+                credentials = read_credentials(args.secrets_file)
+                if args.action == "register-feishu":
+                    _register_feishu(args, credentials, config)
+                else:
+                    configure(args, credentials, config)
             return 0
         credentials = read_credentials(args.secrets_file)
         if args.action == 'prepare-feishu':

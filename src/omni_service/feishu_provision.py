@@ -16,7 +16,7 @@ _BRIDGE_APP_SCOPES = (
 )
 
 
-def provision_feishu(*, show_verification_url):
+def provision_feishu(*, show_verification_url, app_name="OmniService"):
     """Return this new app's ID and secret after its owner confirms in Feishu."""
     try:
         from lark_oapi import aregister_app
@@ -36,7 +36,7 @@ def provision_feishu(*, show_verification_url):
     try:
         registration = aregister_app(
             on_qr_code=display, create_only=True, source="omniservice",
-            app_preset={"name": "OmniService", "desc": "在飞书客服群处理 Telegram 客户消息与附件"},
+            app_preset={"name": app_name, "desc": "在飞书客服群处理 Telegram 客户消息与附件"},
             addons={"preset": False,
                     "scopes": {"tenant": list(_BRIDGE_APP_SCOPES)},
                     "events": {"items": {"tenant": ["im.message.receive_v1"]}},

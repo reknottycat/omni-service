@@ -13,3 +13,6 @@ ts	phase	decision	why	evidence	result
 2026-11-26T10:58:52+08:00	delivery	提交源码并逐一核对远端42个文件的Git blob	将本地运行证据绑定到实际交付提交且不修改原始uncommitted字段	docs/evidence/source-tree-verification.json	all 42 blobs match 75a2cd32064c58eebd76fe7e973b749ade5a62a4
 2026-11-26T10:58:52+08:00	ci	单独登记GitHub Actions执行前失败	Job未运行任何step且日志不存在，当前未获得注释不能猜测根因	https://github.com/reknottycat/omni-service/actions/runs/45745662203	CI blocked; Linux mock acceptance passed
 2026-11-26T11:00:05+08:00	delivery	创建ready-for-review PR #2并完成P0进度回链	用户需要可审查交付和单一工作追踪；合并与远端CI单独记录	https://github.com/reknottycat/omni-service/pull/2	P0 done; PR open; CI blocked
+2026-11-26T13:54:35+08:00	start	继续P1完整开发；读取既有P0证据及P1 e70497	用户授权把当前无账号依赖的工作全部开发，保留原号路径与真实联调边界	Issue #3; PR #4; e70497abdd1c917d8facf5557cc8fa84156d2f9c	root负责配置运行器集成；personal_core负责持久桥接；local_models负责模型；platform_research负责平台客户端
+2026-11-26T14:20:51+08:00	review	修复原PR2和本轮独立审查的可复现问题	飞书账号绑定、未知镜像状态、取消AI、提前撤回、建群恢复与已知消息撤回必须符合真实结果	tests/test_review_regressions.py; tests/test_personal_service.py	原有3项与新增3项问题已修复；新增3项均独立HTTP复验通过
+2026-11-26T14:20:51+08:00	verification	冻结源码后统一Linux验收187项全部通过	证明整条原账号和飞书与本地模型链路及P0回归，避免只交未接线契约	docs/evidence/personal-local-run.json; docs/evidence/personal-demo.json; docs/evidence/personal-sdk-smoke.json	187 passed; 0 failures/errors/skips; source consistent; SDK1.9.0 actual dispatch/start-stop verified offline

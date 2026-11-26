@@ -2,6 +2,22 @@
 
 ## 当前目标
 
+**P1 · 个人账号可运行桥接开发已完成。** 2026-11-26 统一 Linux 验收为 **187 passed / 0 failures / 0 errors / 0 skipped**，包含 P0 回归和 P1 新增；源码摘要 `0f8a08b099c99b48e8def24f2fd55bf8b40653a58495a380889f8a9f58f0e969`。真实账号和 M6/DGX 尚未联调，继续由 Issue #3 跟踪。以下 P0 记录保留为历史基线。
+
+| ID / 状态 / 负责人 | 目标及交付 | 依赖 | 复验及可观察结果 |
+|---|---|---|---|
+| P1-A / done / personal_core | 原账号身份、白名单、权限、持久游标、接管和撤回 | P1 契约 | `test_personal.py`、`test_personal_service.py`：真实 loopback 请求、重启不重复、撤回优先取消 |
+| P1-B / done / platform_research、root | Telegram HTTP、飞书 REST/SDK、运行器和管理 API | P1-A；公开合同 | 客户端及运行器测试；SDK 独立检查 ACK 200/200/500 |
+| P1-C / done / local_models | M6/DGX 客户端、三种协议和物流知识库 | 模型接口合同 | 模型/知识库测试：实际 HTTP、批准来源及失败转人工 |
+| P1-D / done（调研/显式禁用）/ platform_research | WhatsApp 私人账号与官方 Business 共存差异 | 官方文档 | 真实私人号仍 blocked；不冒称已接通 |
+| P1-E / done（调研/显式禁用）/ platform_research | MAX 当前 Open Client API 条件 | 平台公开文件 | 个人号 live 配置禁止启用，等待允许的路线 |
+| P1-F / done / root、p1_independent_review | 演示、复核、缺陷修复与统一证据 | P1-A/B/C | 187 PASS；演示 9 项通过；3 项新增独立复现均修复 |
+| P1-G / done / root | 配置、员工 ID 工具、CLI、备份、部署模板和资料清单 | P1-A/B/C | 配置、准备工具、管理 HTTP 测试；见 `docs/setup.md` |
+| LIVE-01 / blocked / 账号持有人与联调负责人 | Telegram/飞书真实测试、M6/DGX 质量 | 本机授权、应用权限、端点 | 按 setup 真实清单取证；不影响开发验收 |
+| LIVE-02 / blocked / 账号持有人与平台 | WhatsApp 原号路线、MAX 允许的接口 | 平台条件与路线 | 不以 Bot 模拟冒充原号连接 |
+
+[当前证据](evidence/personal-acceptance.md) · [P1 PR #4](https://github.com/reknottycat/omni-service/pull/4) · [P1 Issue #3](https://github.com/reknottycat/omni-service/issues/3) · [用户准备](setup.md)。开发完成、CI、合并及真实联调分别标记。
+
 **P0 · Linux 三渠道模拟闭环。** 以 Telegram、俄罗斯 MAX、WhatsApp 为客户入口，飞书为 7 人团队工作端，完成自动翻译、AI/人工协作、撤回及可靠消息路由。完成标准见 [验收合同](acceptance.md)。真实账号、完整媒体、Chatwoot/NextBridge 生产联调与真实模型质量作为后续增量。
 
 当前记录更新于 2026-11-26。**P0 Linux 模拟验收已完成：87 项测试通过，15 项必选 AC 全部通过。** 源码提交 `75a2cd3`，交付 [PR #2](https://github.com/reknottycat/omni-service/pull/2) 已开启为 ready for review，尚未合并。远端 CI 未通过，作为独立阻塞记录。

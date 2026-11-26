@@ -1,10 +1,10 @@
-"""Fail-closed Telegram connected-account contract; no network or persistence.
+"""Fail-closed Telegram connected-account normalization and request contract.
 
-This is an opt-in boundary for a future live runner, not a replacement for the
-P0 bot transport. Filter before passing any text to storage, AI or Feishu.
+PersonalService supplies persistence. This boundary always filters a conversation
+before exposing its text to storage, language providers or the Feishu workspace.
 """
 from dataclasses import dataclass
-from .models import ChannelError, InboundEvent
+from .models import Attachment, ChannelError, InboundEvent
 
 
 def _positive(value):
@@ -46,6 +46,7 @@ class TelegramPersonal:
                        "edited_business_message", "deleted_business_messages")
 
     def __init__(self, *, expected_owner_id, allowed_chat_ids=()):
+        allowed_chat_ids = tuple(allowed_chat_ids)
         if not _positive(expected_owner_id) or not all(_positive(x) for x in allowed_chat_ids):
             raise ChannelError("invalid_policy")
         self.owner_id = expected_owner_id
@@ -67,7 +68,7 @@ class TelegramPersonal:
 
     def parse(self, update):
         """Return only approved private-chat events. No raw update logging."""
-        if not isinstance(update, dict) or not _positive(update.get("update_id")):
+        if not isinstance(update, dict) or type(update.get("update_id")) is not int or update["update_id"] < 0:
             return []
         if "business_connection" in update:
             self.apply_connection(update["business_connection"])
@@ -108,12 +109,33 @@ class TelegramPersonal:
                 role = "customer"
             else:
                 return []
-            body = data.get("text")
-            if not isinstance(body, str) or not body.strip():
-                return []  # media remains unsupported, not a text success
+            body = data.get("text", data.get("caption", ""))
+            if not isinstance(body, str) or len(body) > 4096:
+                return []
+            attachments = []
+            photos = data.get("photo")
+            if isinstance(photos, list) and photos and isinstance(photos[-1], dict):
+                file_id = photos[-1].get("file_id")
+                if isinstance(file_id, str) and file_id:
+                    attachments.append(Attachment("image", file_id, caption=body))
+            for field, media_kind in (("document", "file"), ("voice", "audio"), ("audio", "audio")):
+                media = data.get(field)
+                if isinstance(media, dict) and isinstance(media.get("file_id"), str) and media["file_id"]:
+                    name = media.get("file_name", "")
+                    attachments.append(Attachment(media_kind, media["file_id"],
+                                                  name if isinstance(name, str) else "", body))
+            unsupported = next((key for key in ("video", "video_note", "animation", "sticker", "location", "contact", "poll") if key in data), None)
+            if unsupported:
+                attachments.append(Attachment("unsupported", unsupported))
+            if not body.strip() and not attachments:
+                return []
+            name = " ".join(sender[key] for key in ("first_name", "last_name")
+                            if isinstance(sender.get(key), str))[:200]
+            hint = sender.get("language_code", "")
             return [PersonalEvent(role, InboundEvent(
                 "telegram", cid, str(uid), str(chat_id), str(sender_id), str(mid),
-                text=body, event_type=kind, timestamp=float(date)))]
+                text=body, sender_name=name, language_hint=hint if isinstance(hint, str) else "",
+                event_type=kind, timestamp=float(date), attachments=tuple(attachments)))]
         return []
 
     def send_payload(self, cid, chat_id, text, *, last_incoming_at, now):

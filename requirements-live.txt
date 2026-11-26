@@ -1,0 +1,2 @@
+# Optional official Feishu WebSocket event receiver; mock acceptance needs no SDK.
+lark-oapi==1.9.0

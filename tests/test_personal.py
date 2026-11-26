@@ -25,7 +25,9 @@ class PersonalContract(unittest.TestCase):
         empty.apply_connection(connection())
         self.assertEqual(empty.parse(message()), [])
         self.assertEqual(self.bridge.parse(message(chat=21, sender=21)), [])
-        self.assertEqual(self.bridge.parse(message(chat={"id": 20, "type": "group"})), [])
+        group = message()
+        group['business_message']['chat']['type'] = 'group'
+        self.assertEqual(self.bridge.parse(group), [])
         self.assertEqual(self.bridge.parse(message(business_connection_id="other")), [])
 
     def test_owner_customer_and_echo_are_distinct(self):
@@ -73,3 +75,21 @@ class PersonalContract(unittest.TestCase):
         self.assertEqual(method, "getUpdates")
         self.assertEqual(body["offset"], 101)
         self.assertNotIn("message", body["allowed_updates"])
+
+    def test_generator_allowlist_is_not_consumed_by_validation(self):
+        bridge = TelegramPersonal(expected_owner_id=10, allowed_chat_ids=(x for x in [20]))
+        bridge.apply_connection(connection())
+        self.assertEqual(len(bridge.parse(message())), 1)
+
+    def test_media_metadata_is_explicit_and_does_not_silently_disappear(self):
+        event = message(text='', photo=[{'file_id': 'source-photo'}])
+        item, = self.bridge.parse(event)
+        self.assertEqual(item.event.attachments[0].remote_id, 'source-photo')
+        self.assertEqual(item.event.attachments[0].kind, 'image')
+
+    def test_zero_update_id_is_accepted_without_loosening_message_identity(self):
+        update = message()
+        update['update_id'] = 0
+        self.assertEqual(len(self.bridge.parse(update)), 1)
+        update['business_message']['message_id'] = 0
+        self.assertEqual(self.bridge.parse(update), [])

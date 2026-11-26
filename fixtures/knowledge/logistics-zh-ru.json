@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "synthetic": true,
+  "description": "合成的中俄物流客服测试资料，未经业务审核，不含实际运价、时效承诺或实时运单数据。",
+  "entries": [
+    {
+      "id": "greeting",
+      "title": "开始咨询",
+      "tags": [
+        "你好",
+        "您好",
+        "hello",
+        "hi",
+        "здравств",
+        "привет"
+      ],
+      "facts": "欢迎客户提供物流需求。没有实际客服时间、价格或承诺。",
+      "answers": {
+        "zh": "您好！请告诉我您需要咨询的物流服务，以及发货地、目的地和货物品名。",
+        "ru": "Здравствуйте! Уточните, какая логистическая услуга вам нужна, а также пункт отправления, пункт назначения и наименование груза.",
+        "en": "Hello! Please tell us which logistics service you need, the origin, destination and type of cargo."
+      }
+    },
+    {
+      "id": "quote-details",
+      "title": "询价资料收集",
+      "tags": [
+        "报价",
+        "价格",
+        "多少钱",
+        "询价",
+        "运费",
+        "重量",
+        "体积",
+        "发货",
+        "寄货",
+        "стоим",
+        "цен",
+        "тариф",
+        "достав",
+        "перевоз",
+        "вес",
+        "объём",
+        "объем",
+        "груз",
+        "shipping",
+        "delivery",
+        "price",
+        "quote",
+        "freight",
+        "cargo"
+      ],
+      "facts": "询价需始发地、目的地、品名、重量、体积、件数、贸易条款和预计发运日期。还需说明是否危险品或温控。此知识库没有真实报价。",
+      "answers": {
+        "zh": "请提供始发地、目的地、货物品名、重量、体积、件数、贸易条款和预计发运日期，并说明是否有危险品或温控要求。运费需由员工根据这些资料确认，目前不能直接提供报价。",
+        "ru": "Пожалуйста, укажите пункт отправления, пункт назначения, наименование груза, вес, объём, количество мест, условия поставки и планируемую дату отправки. Уточните, есть ли опасный груз или требования к температуре. Сотрудник рассчитает стоимость после уточнения данных; готовой цены у меня нет.",
+        "en": "Please provide the origin, destination, cargo description, weight, volume, number of packages, trade terms and planned shipping date. Please mention any dangerous-goods or temperature-control requirements. A member of staff must confirm the freight charge after reviewing these details; I do not have a confirmed price."
+      }
+    },
+    {
+      "id": "common-documents",
+      "title": "常见单证",
+      "tags": [
+        "单证",
+        "文件",
+        "发票",
+        "装箱单",
+        "合同",
+        "документ",
+        "инвойс",
+        "упаковоч",
+        "контракт",
+        "documents",
+        "invoice",
+        "packing list",
+        "contract"
+      ],
+      "facts": "常见单证为合同、商业发票、装箱单和运输单据。实际要求取决于货物、监管要求和贸易条件，需要员工复核，不构成清关合规保证。",
+      "answers": {
+        "zh": "常见资料包括合同、商业发票、装箱单和运输单据。实际需要的单证会因货物、监管要求及贸易条件而变化，请提供货物品名和运输路线，由员工进一步确认。",
+        "ru": "Обычно требуются контракт, коммерческий инвойс, упаковочный лист и транспортные документы. Точный список зависит от товара, требований регулирования и условий поставки. Укажите наименование груза и маршрут, чтобы сотрудник уточнил требования.",
+        "en": "Common documents include the contract, commercial invoice, packing list and transport documents. The exact requirements depend on the goods, regulations and trade terms. Please provide the cargo description and route so that a member of staff can confirm the requirements."
+      }
+    },
+    {
+      "id": "transport-options",
+      "title": "运输方式及路线选择",
+      "tags": [
+        "路线",
+        "公路",
+        "铁路",
+        "海运",
+        "汽运",
+        "маршрут",
+        "автомобил",
+        "железнодорож",
+        "морск",
+        "rail",
+        "road",
+        "sea",
+        "route"
+      ],
+      "facts": "可以讨论公路、铁路和海运。具体选择取决于线路、口岸、货物条件、预算及时间需求。没有固定可承诺的时效。",
+      "answers": {
+        "zh": "可以根据货物和路线评估公路、铁路或海运。请提供发货地、目的地、品名、重量、体积以及期望的发运时间，员工会确认可用路线和预计时效。",
+        "ru": "В зависимости от груза и маршрута можно рассмотреть автомобильную, железнодорожную или морскую перевозку. Укажите пункт отправления, пункт назначения, наименование груза, вес, объём и желаемую дату отправки. Сотрудник уточнит доступные маршруты и ориентировочные сроки.",
+        "en": "Road, rail or sea transport can be considered according to the cargo and route. Please provide the origin, destination, cargo description, weight, volume and preferred shipping date. A member of staff will confirm available routes and estimated timing."
+      }
+    },
+    {
+      "id": "delivery-time",
+      "title": "运输时间需确认",
+      "tags": [
+        "多久",
+        "时效",
+        "几天",
+        "到货",
+        "срок",
+        "когда",
+        "сколько дней",
+        "how long",
+        "transit time",
+        "arrival"
+      ],
+      "facts": "实际时效因线路、口岸、装运安排和货物条件变化。需要员工确认；测试知识库没有固定天数或到货保证。",
+      "answers": {
+        "zh": "运输时间需要按具体路线、口岸、发运安排和货物条件确认。请提供发货地、目的地、货物品名和预计发运日期，由员工评估。",
+        "ru": "Срок перевозки зависит от маршрута, пограничного перехода, графика отправки и особенностей груза. Укажите пункт отправления, пункт назначения, наименование груза и планируемую дату отправки, чтобы сотрудник оценил сроки.",
+        "en": "Transit time depends on the route, border crossing, dispatch schedule and cargo. Please provide the origin, destination, cargo description and planned shipping date for a member of staff to assess."
+      }
+    },
+    {
+      "id": "tracking-reference",
+      "title": "运单查询转交",
+      "tags": [
+        "查单",
+        "物流进度",
+        "运单",
+        "订单号",
+        "отслеж",
+        "накладн",
+        "где груз",
+        "tracking",
+        "shipment status",
+        "order number"
+      ],
+      "facts": "当前知识库没有运单系统或实时运输状态。先收集订单或运单编号，员工查询。不能编造到货、签收或运输状态。",
+      "answers": {
+        "zh": "请提供订单号或运单号，我会请员工核实运输进度。当前知识库无法查询实时运单状态。",
+        "ru": "Пожалуйста, сообщите номер заказа или транспортной накладной, чтобы сотрудник проверил ход перевозки. В этой базе знаний нет доступа к статусу груза в реальном времени.",
+        "en": "Please provide the order or consignment number so that a member of staff can check progress. This knowledge base does not have access to live shipment status."
+      }
+    },
+    {
+      "id": "special-cargo",
+      "title": "特殊货物需人工审核",
+      "tags": [
+        "危险品",
+        "电池",
+        "温控",
+        "食品",
+        "药品",
+        "опасн",
+        "батар",
+        "температур",
+        "лекарств",
+        "dangerous goods",
+        "battery",
+        "temperature controlled",
+        "medicine"
+      ],
+      "facts": "特殊货物、危险品、温控、食品和药品的可运输性、文件和处理方式均需人工确认。",
+      "answers": {
+        "zh": "这类货物需要员工审核货物信息、运输条件和所需文件，不能直接确认可承运。",
+        "ru": "Для такого груза сотрудник должен проверить сведения о товаре, условия перевозки и необходимые документы. Возможность перевозки пока не подтверждена.",
+        "en": "A member of staff must review the cargo information, transport conditions and required documents before confirming whether it can be carried."
+      },
+      "requires_human": true
+    }
+  ]
+}

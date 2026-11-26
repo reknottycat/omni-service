@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS conversations (
  language TEXT NOT NULL DEFAULT 'und', language_at REAL NOT NULL DEFAULT 0,
  last_customer_at REAL NOT NULL DEFAULT 0, mode TEXT NOT NULL DEFAULT 'auto',
  room_id TEXT UNIQUE, room_status TEXT NOT NULL DEFAULT 'absent', created_at REAL NOT NULL,
+ feishu_account_id TEXT,
  UNIQUE(channel, account_id, chat_id)
 );
 CREATE TABLE IF NOT EXISTS members (
@@ -69,9 +70,11 @@ class Store:
         self.db.executescript(SCHEMA)
         if 'external_id' not in {row[1] for row in self.db.execute('PRAGMA table_info(outbox)')}:
             self.db.execute('ALTER TABLE outbox ADD COLUMN external_id TEXT')
+        if 'feishu_account_id' not in {row[1] for row in self.db.execute('PRAGMA table_info(conversations)')}:
+            self.db.execute('ALTER TABLE conversations ADD COLUMN feishu_account_id TEXT')
         with self.transaction() as db:
             db.execute("UPDATE outbox SET status='unknown', last_error='process_interrupted' WHERE status='inflight'")
-            db.execute("UPDATE messages SET status='delivery_unknown' WHERE id IN (SELECT message_id FROM outbox WHERE status='unknown' AND operation='send')")
+            db.execute("UPDATE messages SET status=CASE WHEN status='deleted' THEN status ELSE 'delivery_unknown' END WHERE id IN (SELECT message_id FROM outbox WHERE status='unknown' AND operation='send')")
             db.execute("UPDATE messages SET recall_status='delivery_unknown' WHERE id IN (SELECT message_id FROM outbox WHERE status='unknown' AND operation='delete')")
             db.execute("UPDATE conversations SET room_status='unknown' WHERE id IN (SELECT conversation_id FROM outbox WHERE status='unknown' AND operation='create_room')")
 

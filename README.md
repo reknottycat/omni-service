@@ -1,6 +1,8 @@
 # OmniService
 
-全渠道智能客服中枢。客户使用 Telegram、俄罗斯 MAX 或 WhatsApp，6–7 人团队在飞书服务会话中回复。员工普通消息自动翻译成客户语言并发送，AI 可接待和转人工，撤回结果按平台能力处理。
+面向跨平台客服的项目，目标是在飞书处理客户消息，并提供翻译、AI 接待和人工交接。
+
+**接入状态：俄罗斯 MAX 和 WhatsApp 的真实平台接入尚未实现和验收，目前只有模拟适配与测试。** Telegram–飞书另有个人账号接入代码，部署和验证范围见[团队部署](docs/personal-deployment.md)。不要把模拟测试结果当作真实平台已接通。
 
 ## 当前交付：P0 Linux 模拟闭环
 
@@ -8,7 +10,7 @@ Telegram–飞书团队接入见[团队部署](docs/personal-deployment.md)，�
 
 本仓库当前交付可运行的协议与会话验收台。HTTP webhook、渠道适配、SQLite 队列、会话状态及出站 HTTP 都执行实际代码；平台接收端和 AI/翻译使用确定性模拟服务。**这不是已接通真实账号的生产部署。**
 
-- Telegram / MAX / WhatsApp：一账号多客户、账号和客户隔离、批量回调与去重。
+- 模拟 Telegram / MAX / WhatsApp：一账号多客户、账号和客户隔离、批量回调与去重。
 - 飞书：自动/手动建群、加入员工、7 人普通回复默认对客、成员权限及原生撤回事件。
 - 语言：根据客户实际消息识别和记忆语言，员工中文自动翻译；当前中、俄、英、西模拟语料用于验证流程。
 - AI：已知知识问答自动接待，未知或人工请求建群；员工介入取消未发 AI 并暂停新自动回复，显式恢复后继续；已在途请求按实际回执处理。
@@ -24,11 +26,10 @@ Telegram–飞书团队接入见[团队部署](docs/personal-deployment.md)，�
 ```bash
 git clone https://github.com/reknottycat/omni-service.git
 cd omni-service
-git checkout feature/linux-mock-mvp
 bash scripts/acceptance.sh
 ```
 
-结果写入 `artifacts/acceptance.json` 和 `artifacts/acceptance.log`。失败返回非零退出码。报告记录每项测试结果、Linux/Python/SQLite 环境、源文件 SHA256 清单和源码总指纹。合并后可直接使用主分支，是否合并见关联 PR。
+结果写入 `artifacts/acceptance.json` 和 `artifacts/acceptance.log`。失败返回非零退出码。报告记录每项测试结果、Linux/Python/SQLite 环境、源文件 SHA256 清单和源码总指纹。默认分支为 `codex/public-release`；历史 PR 的合并状态另行记录。
 
 查看三个渠道的完整模拟对话：
 
@@ -96,4 +97,4 @@ flowchart TD
 - [官方渠道契约与来源](docs/channel-contracts.md)
 - [Linux 模拟验收证据](docs/evidence/linux-mock-acceptance.md)
 
-GitHub Actions 在 Linux 上执行同一验收脚本并保存报告。模拟验收、远端 CI、PR 合并与真实接入状态分别记录；不把本地样本规模外推成生产并发能力。
+仓库配置了 GitHub Actions，预期在 Linux 上运行同一验收脚本并保存报告。既往远端运行在执行步骤前失败，最新结果以 [Actions 运行记录](https://github.com/reknottycat/omni-service/actions)为准。模拟验收、远端 CI、PR 合并与真实接入状态分别记录；不把本地样本规模外推成生产并发能力。

@@ -220,7 +220,7 @@ def main():
             raise ChannelError("invalid_bot_username")
         token = getpass.getpass("Telegram bot token: ") if args.ask_token else os.environ.get(
             telegram["bot_token_env"])
-        api = TelegramAPI(token)
+        api = TelegramAPI(token, proxy_url=os.environ.get("TELEGRAM_HTTPS_PROXY"))
         bot = telegram_ready(api, username)
         if args.action == "enable-secretary":
             if bot.get("can_connect_to_business") is not True:

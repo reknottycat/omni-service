@@ -115,6 +115,18 @@ class TelegramPolling(unittest.TestCase):
 
 class TelegramTransport(unittest.TestCase):
     @patch("omni_service.telegram_live.http.client.HTTPSConnection")
+    def test_explicit_proxy_tunnels_only_to_telegram(self, tls):
+        conn = tls.return_value
+        conn.getresponse.return_value.status = 200
+        conn.getresponse.return_value.read.return_value = b'{"ok":true,"result":{"id":123}}'
+        api = TelegramAPI("123:synthetic", proxy_url="http://127.0.0.1:17890")
+        self.assertEqual(api.call("getMe"), {"id": 123})
+        tls.assert_called_once_with("127.0.0.1", 17890, timeout=10)
+        conn.set_tunnel.assert_called_once_with("api.telegram.org", 443)
+        with self.assertRaisesRegex(ChannelError, "invalid_telegram_proxy"):
+            TelegramAPI("123:synthetic", proxy_url="http://user:secret@127.0.0.1:17890")
+
+    @patch("omni_service.telegram_live.http.client.HTTPSConnection")
     def test_fixed_tls_endpoint_and_server_receipt(self, tls):
         conn = tls.return_value
         response = conn.getresponse.return_value

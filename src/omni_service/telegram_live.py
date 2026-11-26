@@ -1,9 +1,11 @@
 """Opt-in Telegram Business Bot API transport and acknowledged polling."""
 
 import http.client
+import ipaddress
 import json
 import re
 import time
+from urllib.parse import urlsplit
 
 from .models import ChannelError
 from .personal import Connection
@@ -15,10 +17,25 @@ class TelegramAPI:
         "sendMessage", "deleteBusinessMessages", "setMySettings",
     })
 
-    def __init__(self, token):
+    def __init__(self, token, *, proxy_url=None):
         if not isinstance(token, str) or not re.fullmatch(r"[0-9]+:[A-Za-z0-9_-]+", token):
             raise ChannelError("invalid_telegram_token")
         self._token = token
+        self._proxy = None
+        if proxy_url is not None:
+            try:
+                proxy = urlsplit(proxy_url)
+                host = "127.0.0.1" if proxy.hostname == "localhost" else proxy.hostname
+                address, port = ipaddress.ip_address(host), proxy.port
+                private = (address.is_loopback or address.is_private
+                           or address in ipaddress.ip_network("100.64.0.0/10"))
+                if (proxy.scheme != "http" or not private or not port or proxy.username is not None
+                        or proxy.password is not None or proxy.path not in ("", "/")
+                        or proxy.query or proxy.fragment):
+                    raise ValueError
+            except (TypeError, ValueError, AttributeError):
+                raise ChannelError("invalid_telegram_proxy") from None
+            self._proxy = str(address), port
 
     def call(self, method, payload=None):
         if method not in self._METHODS:
@@ -33,7 +50,10 @@ class TelegramAPI:
             body = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode()
         except (TypeError, ValueError, UnicodeError):
             raise ChannelError("invalid_payload") from None
-        connection = http.client.HTTPSConnection("api.telegram.org", timeout=poll_timeout + 10)
+        connection = http.client.HTTPSConnection(*(self._proxy or ("api.telegram.org",)),
+                                                  timeout=poll_timeout + 10)
+        if self._proxy:
+            connection.set_tunnel("api.telegram.org", 443)
         try:
             connection.request("POST", f"/bot{self._token}/{method}", body=body,
                                headers={"Content-Type": "application/json"})

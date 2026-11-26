@@ -53,3 +53,13 @@ PYTHONPATH=src python3.12 -m omni_service.personal_runner run --config artifacts
 
 
 DGX 私有模型 `qwen3-vl:4b-instruct` 已经通过桥接翻译入口实测两条自然物流样本。核对了哈巴罗夫斯克、同江、18 吨玉米、12 月 5 日、人民币 8600 元及不含报关费。原始输入、译文及飞书投递回执保存在本机 `artifacts/personal-pilot/translation-check.json`。Telegram 端仍以看到原账号真实发出回执和 Sandra 收到消息为验收条件。
+
+加入实际翻译后的源码提交 `e8d1e72` 在同一 DGX 环境通过完整模拟验收，115 项通过、0 失败、0 跳过。源码 SHA256 为 `23df07c551c1920ebc35e02320027c5c51dea0963cad5cacaa2aa76f33a438c5`，报告与日志在本机 `artifacts/dgx-translation-20261126/`。
+
+## 普通账号找不到连接入口时
+
+首选 [Telegram Web K](https://web.telegram.org/k/)。其公开源码在[编辑个人资料](https://github.com/morethanwords/tweb/blob/master/src/components/sidebarLeft/tabs/editProfile.tsx#L422-L472)提供独立的 Chat Automation，也可从[设置搜索](https://github.com/morethanwords/tweb/blob/master/src/lib/settingsSearch/openers.ts#L118-L125)打开。连接时选择 Only Selected、指定测试联系人、开启 Reply。当前 Web K 显示扫码登录，登录后的页面和连接回执还未实测。
+
+备选官方 [Telegram Desktop 7.4.6](https://github.com/telegramdesktop/tdesktop/releases/tag/v7.4.6)。[该版本源码](https://github.com/telegramdesktop/tdesktop/blob/v7.4.6/Telegram/SourceFiles/settings/sections/settings_business.cpp#L506-L516)对免费用户开放 Telegram Business 菜单下的 Chatbots，和本机 App Store 原生 Telegram 的菜单实现不同。在两者都不可用时，[TDLib](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_business_connected_bot.html)可以通过由本人授权的临时用户会话完成一次账号绑定；该方案尚未在本机测试。
+
+[Vercel Chat SDK 的 Telegram 适配器](https://github.com/vercel/chat/blob/e490e84f01dbf477a5d1a9e7eec16c3fe72a31ac/packages/adapter-telegram/src/index.ts#L1172-L1225)按连接 ID 和聊天 ID 隔离会话并过滤机器人回环。[Chatwoot 开发分支](https://github.com/chatwoot/chatwoot/blob/38258d313d147657be00acb4a5d7f6060422e34d/app/services/telegram/incoming_message_service.rb#L105-L118)持久化连接 ID，[回复时将其放入请求](https://github.com/chatwoot/chatwoot/blob/38258d313d147657be00acb4a5d7f6060422e34d/app/models/channel/telegram.rb#L157-L169)。OmniService 采用同一 Bot API 协议，入站用本机长轮询，无需公网 Webhook。当前缺口是原个人账号完成首次授权。

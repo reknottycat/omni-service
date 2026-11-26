@@ -131,6 +131,22 @@ def telegram_ready(api, username):
     return me
 
 
+def discover_connections(api):
+    # Telegram retains allowed_updates between calls. Keep business messages enabled
+    # before the first test message arrives, and leave all updates unacknowledged.
+    updates = api.call("getUpdates", {"timeout": 5,
+                        "allowed_updates": list(TelegramPersonal.allowed_updates)})
+    if not isinstance(updates, list):
+        raise ChannelError("invalid_telegram_updates")
+    connections = {}
+    for entry in updates:
+        if isinstance(entry, dict) and "business_connection" in entry:
+            connection = Connection.from_update(entry["business_connection"])
+            connections[connection.connection_id] = connection
+    return [{"connection_id": c.connection_id, "owner_id": c.owner_id,
+             "enabled": c.enabled, "can_reply": c.can_reply} for c in connections.values()]
+
+
 def run(bridge):
     stop = threading.Event()
     events = queue.Queue(maxsize=64)
@@ -216,18 +232,7 @@ def main():
         if bot.get("can_connect_to_business") is not True:
             raise ChannelError("telegram_secretary_disabled")
         if args.action == "discover":
-            updates = api.call("getUpdates", {"timeout": 5, "allowed_updates": ["business_connection"]})
-            # Only output binding metadata. Do not acknowledge or process chat data.
-            if not isinstance(updates, list):
-                raise ChannelError("invalid_telegram_updates")
-            connections = {}
-            for entry in updates:
-                if isinstance(entry, dict) and "business_connection" in entry:
-                    connection = Connection.from_update(entry["business_connection"])
-                    connections[connection.connection_id] = connection
-            print(json.dumps([{"connection_id": c.connection_id, "owner_id": c.owner_id,
-                               "enabled": c.enabled, "can_reply": c.can_reply}
-                              for c in connections.values()]))
+            print(json.dumps(discover_connections(api)))
             return 0
         feishu_config = config["feishu"]
         feishu = FeishuLive(feishu_config["chat_id"], feishu_config["staff_ids"],

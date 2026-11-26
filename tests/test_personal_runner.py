@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from omni_service.models import InboundEvent
-from omni_service.personal_runner import PersonalBridge
+from omni_service.personal_runner import PersonalBridge, discover_connections
 
 
 class TelegramFixture:
@@ -101,6 +101,25 @@ class BridgeAcceptance(unittest.TestCase):
         self.assertNotIn("PRIVATE", str(data))
         self.assertNotIn("BOT ECHO", str(data))
         self.assertEqual(data["mode"], "manual")
+
+    def test_discovery_leaves_first_customer_update_for_the_runner(self):
+        class StickySubscription(TelegramFixture):
+            def call(self, method, payload):
+                updates = super().call(method, {"offset": 0, **payload})
+                if method == "getUpdates":
+                    if "business_message" not in payload["allowed_updates"]:
+                        self.updates = [item for item in self.updates if "business_message" not in item]
+                    return [item for item in updates if any(key in item for key in payload["allowed_updates"])]
+                return updates
+
+        api = StickySubscription()
+        api.updates.append({"update_id": 1, "business_connection": api.call("getBusinessConnection", {})})
+        api.update(2, "Здравствуйте")
+        self.assertEqual(discover_connections(api), [{"connection_id": "c1", "owner_id": 10,
+                                                      "enabled": True, "can_reply": True}])
+        self.bridge.telegram.api = api
+        self.poll_and_drain()
+        self.assertIn("Здравствуйте", self.feishu.sent[0])
 
     def test_revocation_blocks_pending_reply(self):
         self.telegram.update(2, "Здравствуйте")

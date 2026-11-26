@@ -90,6 +90,8 @@ Mac arm64 / Python 3.12.16 通过上面的运行入口，使用真实 Telegram�
 
 管理员可打开指定飞书文档、读取完整预览并冻结版本，发布时选该版本，回退时选已发布过的版本。预览可选显式列入 `telegram.welcome_preview_chat_ids` 的测试会话发送，预览名单必须是 Telegram 允许名单的子集。文本保留标题、列表、强调及链接的可映射格式，图片由应用从文档资源读取后通过 Telegram `sendPhoto` 发送。真实 Telegram 业务连接已收到合成测试图片及匹配的说明。完整管理台使用本地模拟飞书身份和平台验收，真实工作台入口、真实 OAuth 及目标飞书文档读权待配置。 [Telegram 图片接口](https://core.telegram.org/bots/api#sendphoto)
 
+2026-11-26 在 DGX Linux aarch64 / Python 3.12.3 以 `1fa88af` 执行 `bash scripts/acceptance.sh`，188 项通过，0 失败、0 错误、0 跳过。覆盖原卡片终态更新、房间权限、默认设置冻结、图文版本发布及回退。源码 SHA256 为 `2a94c6826fcf3a488ddc5c655d2c795ec1cabf8e5e6296c87ad88129f94060c3`。报告在本机 `artifacts/dgx-management-20261126/acceptance.json`。Mac 完整模拟套件的旧三渠道千客户并发用例在当前版本及纯 Git 复验均出现 loopback 连接重置；Mac 的真实卡片专项按平台回执与客户端观察单独验收。
+
 `/标签 开`、`/标签 关`、`/标签 状态` 只控制飞书新消息的来源标识，默认关闭。开启后显示 `[用户]`、`[AI]` 或 `[同事]`。审批预览仍显示完整对客译文和 Telegram 标签，便于对照实际发出的版本。配置允许额外内部群机器人时，通过 `feishu.allowed_bot_app_ids` 指定并核对成员名单。
 
 每日主动推送、群晨报、飞书每日文档和会话知识库留在后续范围。[历史会话本体规划](intake-knowledge.md)

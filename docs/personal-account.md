@@ -14,9 +14,9 @@
 
 | ID | 状态 | 完成条件 |
 |---|---|---|
-| P1-A | verify | Telegram 连接、授权私聊白名单、身份/回环分类、代发和撤回请求构造；运行 tests/test_personal.py 并保留证据 |
+| P1-A | done | Telegram 契约测试已在 DGX 通过，含默认拒绝白名单、本人及回环分类、代发和撤回请求构造 |
 | P1-B | verify | 独立入口已实现长轮询、持久游标、会话过滤、本人回复镜像和带连接 ID 的原账号代发。待真实私聊双向验收与撤回接入 |
-| P1-C | verify | 飞书机器人身份和长连接握手成功；私有测试群已创建，成员表读取权限及普通群消息送达待验。当前使用固定译文，M6 翻译和 DGX AI 待接入 |
+| P1-C | verify | 飞书机器人身份、长连接握手和私有测试群成员核验已通过，普通群消息送达待验。当前使用固定译文，M6 翻译和 DGX AI 待接入 |
 | P1-D | blocked | WhatsApp 原号码合法接入方式确认及测试 |
 | P1-E | blocked | MAX 平台明确允许该桥接场景 |
 | P1-F | todo | Linux 行为及回归证据、两名测试身份真实端到端、重启/撤回/隐私隔离 |
@@ -45,4 +45,6 @@ PYTHONPATH=src python3.12 -m omni_service.personal_runner run --config artifacts
 
 测试联系人在 Telegram 向原个人账号发送 `Здравствуйте`，飞书员工应在测试群看到原文和 `你好`。员工发送 `您好，我来帮您处理。`，Telegram 联系人应收到俄译，回执包含预期私聊 ID 和商用连接 ID。重启后重放同一消息，接收方应只看到一次。此入口仅处理普通文字并显式使用固定译文，不启用 AI、媒体、编辑或撤回。
 
-`2026-11-26` 真实联调阻塞由协调负责人跟进。Telegram 专用测试机器人已创建且开启 Secretary Mode，等待选定测试联系人并绑定。飞书测试群已创建，机器人身份及消息长连接握手正常，`im +chat-members-list --as bot` 返回 `99991672`，待应用取得 `im:chat.members:read` 并验证普通群消息。上述平台操作未发送真实客户消息。
+2026-11-26 在 DGX Linux aarch64 / Python 3.12.3 上从提交 `c5aeed5` 运行 `bash scripts/acceptance.sh`，111 项全部通过，0 失败、0 跳过，源码 SHA256 为 `923d6e7e3107ca6767986a12fd264b713345bc88bad30c330f17572c9a60229b`。原始结果在本机 `artifacts/dgx-pilot-20261126/acceptance.json` 和 `acceptance.log`。包括双向固定译文、重放、权限撤销、错误回执处理的合成用例。
+
+真实联调由协调负责人跟进。Telegram 专用机器人已创建，Bot API 核实身份、Secretary Mode 和无 Webhook，连接发现返回空数组。恢复条件是选定测试联系人、用 Telegram 客户端仅对该会话授权并取得连接 ID。飞书应用起初以 `99991672` 拒绝群成员查询，获得用户确认后开通 `im:chat.members:read`。实际预检已确认群为内部私有群，名单与配置一致，长连接握手通过。普通群消息实际收发仍待验证。

@@ -91,3 +91,7 @@ HTTP 测试创建 **1,000 个不同客户会话**，分布在 Telegram / MAX / W
 首次源码提交触发的 [GitHub Actions 运行](https://github.com/reknottycat/omni-service/actions/runs/45745662203) 返回 `failure`。Job `139660956297` 的 `steps=[]`、`runner_name=''`，日志读取返回 404 `BlobNotFound`。连接器不能读取该 check 的 annotations；浏览器未登录私有仓库，未获得进一步原因。已在进度中登记为独立 CI 阻塞，不修改其状态、不擅自支付或变更账户权限。
 
 本轮没有证明真实账号接通、翻译质量、真实 LLM/RAG、生产容量或完整媒体转存。人工接管取消未发送 AI 任务，并停止生成新自动回复；已经进入网络发送的 AI 请求只能按实际回执处理。媒体保持 `media_pending`；未知投递需核对，当前没有生产级自动对账恢复界面。后续完整范围保留在验收合同 B-01 至 B-10。
+
+## 2026-11-26 Telegram–飞书附件与客户指令防护复验
+
+DGX Linux aarch64 / Python 3.12.3 对 `8ec76c8` 执行 `bash scripts/acceptance.sh`，201 项通过，0 失败、0 错误、0 跳过。 `test_live_media.py` 覆盖双向图片和文件、错房间与未授权人员、未知回执重启不重发、客户冒用审批和配置指令。源码 SHA256 为 `4161e78170cc8284910ce9dab35765797fb576622cecc49841b17088b698c0c5`。原始报告 `artifacts/dgx-media-20261126/acceptance.json`。 [对应 Mac 试点](../personal-account.md#2026-11-26-双向附件与-telegram-客户指令防护)

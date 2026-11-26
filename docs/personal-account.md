@@ -127,3 +127,18 @@ DGX 直连 Telegram 超时，飞书 HTTPS 和本机翻译已通。使用 DGX 已
 已实测从 DGX 经美国主机调用 `getMe` 和 `getWebhookInfo` 成功，且确认 Secretary Mode 开启。测试结束已关闭临时转发。Linux 真实联调仍需为该应用配置飞书凭据并复验双向收发及重启。整个链路只运行一个 Telegram 长轮询实例。
 
 包含美国 SSH 转发支持的提交 `cdb3bfc` 在 DGX 完整模拟验收通过 118 项，源码指纹 `58d0416af863da4c277945077cd2e7ef68148613de75d9b0fc235beb63179a87`。原始报告与日志见本机 `artifacts/dgx-us-egress-20261126/`。
+
+## 2026-11-26 双向附件与 Telegram 客户指令防护
+
+| 任务 / 状态 / 负责人 | 交付物 | 依赖 | 复验与通过条件 |
+|---|---|---|---|
+| P1-G / done / 协调负责人 | `media.py`、Telegram 和飞书适配器及 `personal_runner.py` 双向传递原生图片与附件 | 原 Telegram 业务连接、对应飞书群的成员校验和消息资源权限 | `PYTHONPATH=src python3 -m unittest discover -s tests -p test_live_media.py -v`。核对双向回执、隔离、带 @ 的附件留群、重放和重启 |
+| P1-H / done / 协调负责人 | `customer_security.py`、`service.py` 和个人桥接配置中的客户指令防护 | 可信平台身份，角色由服务端判定 | 同上。测试预览中的审批指令从 Telegram 发来也无法审批，疑似指令原样留群，跳过模型且保持既有语言 |
+
+Telegram 与飞书在各自私聊和服务群之间传递图片、PDF 和其他文件。常见图片以图片呈现，语音和视频可作为原文件传递。桥接当前接收独立的原生附件消息。图片上限 10 MB，其他文件上限 20 MB。来源说明与译文可以在飞书中作为紧邻消息显示。飞书普通附件随所在会话发给客户，带 @ 的消息和群内机器人消息留在飞书。飞书应用沿用原权限，并使用消息资源读取与上传能力。 [飞书消息 API](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1) · [Telegram 文件 API](https://core.telegram.org/bots/api#getfile)
+
+服务端配置 `security.customer_prompt_guard` 默认开启。客户角色由平台连接、聊天和发送者 ID 决定。被识别为疑似控制指令的客户文字保留在相应飞书群，当前来信不触发翻译、自动问询或 Agent 草稿，不改变已识别的回复语言。基本接待需要时提前转人工，首条固定欢迎仍照常发送。关闭该设置只关闭疑似指令筛查，身份、审批和群权限校验继续执行。附件按文件传递，内容不进入模型上下文。
+
+Mac arm64 / Python 3.12.16 运行 `8ec76c8`，使用现有两位测试账号与对应飞书试点群，合成 PNG 和 PDF 两边各发一次，四次投递均取得目的平台回执。两端客户端确认收到，客户从 Telegram 发送 `/标签 开` 后，飞书显示警示，来源标签仍关闭，回复语言保持俄语。试点记录在 `artifacts/personal-pilot/mac-media-acceptance.json`。其他媒体格式和真实 Linux 联调待按需验证。
+
+同一源码在 DGX Linux aarch64 / Python 3.12.3 执行 `bash scripts/acceptance.sh`，201 项通过，0 失败、0 错误、0 跳过。报告在 `artifacts/dgx-media-20261126/acceptance.json`，源码 SHA256 为 `4161e78170cc8284910ce9dab35765797fb576622cecc49841b17088b698c0c5`。

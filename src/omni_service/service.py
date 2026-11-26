@@ -759,8 +759,9 @@ class Service(Management):
                 if self.intake_enabled:
                     db.execute('INSERT INTO intake_sessions(conversation_id) VALUES(?)', (cid,))
         timestamp = min(event.timestamp or self.clock(), self.clock())
-        language = self.language.detect(event.text, conv['language'], event.language_hint)
-        if timestamp >= conv['language_at']:
+        guarded = self._guard_customer(event.channel, event.text)
+        language = conv['language'] if guarded else self.language.detect(event.text, conv['language'], event.language_hint)
+        if not guarded and timestamp >= conv['language_at']:
             db.execute('UPDATE conversations SET language=?,language_at=? WHERE id=?', (language, timestamp, cid))
         if timestamp > conv['last_customer_at']:
             db.execute('UPDATE conversations SET last_customer_at=? WHERE id=?', (timestamp, cid))
@@ -778,7 +779,6 @@ class Service(Management):
                 self._forget_intake_source(db, cid, existing['id'])
         elif self.approval_intake and conv['mode'] == 'manual' and timestamp >= conv['language_at']:
             self._cancel_ai(db, cid)
-        guarded = self._guard_customer(event.channel, event.text)
         if guarded:
             self._audit(db, cid, 'customer_control_text_held', {'message_id': mid})
         self._mirror(db, conv, message)

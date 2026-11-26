@@ -220,6 +220,7 @@ class LiveMediaAcceptance(unittest.TestCase):
 
         after = self.conversation(20)
         self.assertEqual(after["settings"], before["settings"])
+        self.assertEqual(after["language"], "ru")
         self.assertNotIn("approved", [draft["status"] for draft in after["drafts"]])
         self.assertEqual(len(self.telegram.sent), 1)
         self.assertEqual(after["mode"], "manual")
@@ -238,12 +239,17 @@ class LiveMediaAcceptance(unittest.TestCase):
 
         result = self.bridge.receive_feishu(staff("/回复辅助 开", mid="om_assist", room=after["room_id"]))
         self.assertEqual(result["status"], "settings_updated")
-        self.telegram.update(4, "Здравствуйте")
+        agent_command = "/draft"
+        self.telegram.update(4, agent_command)
+        self.poll()
+        self.advisor.assert_not_called()
+
+        self.telegram.update(5, "Здравствуйте")
         self.poll()
         self.advisor.assert_called_once()
         transcript, = self.advisor.call_args.args
         self.assertEqual(transcript[-1], {"actor": "customer", "text": "Здравствуйте"})
-        self.assertTrue(all(turn["text"] not in guarded for turn in transcript))
+        self.assertTrue(all(turn["text"] not in (*guarded, agent_command) for turn in transcript))
         self.assertEqual(len(self.telegram.sent), 1)
 
 

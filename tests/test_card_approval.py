@@ -119,8 +119,10 @@ class CardApprovalAcceptance(unittest.TestCase):
         self.assertTrue(any(part.get("content") == draft["customer_text"] for part in objects))
         buttons = {part["text"]["content"]: part["behaviors"][0]["value"]
                    for part in objects if part.get("tag") == "button"}
+        options = (("发送", "approve"), ("取消", "reject"), ("撤回", "recall")) if draft["kind"] == "agent_draft" else (
+            ("可以发送", "approve"), ("不可以发送", "reject"))
         expected = {label: {"omni_action": decision, "draft_id": draft["id"], "version": draft["version"]}
-                    for label, decision in (("可以发送", "approve"), ("不可以发送", "reject"))}
+                    for label, decision in options}
         self.assertEqual(buttons, expected)
         return state["room_id"], preview["external_id"], draft, buttons
 
@@ -225,7 +227,7 @@ class CardApprovalAcceptance(unittest.TestCase):
         self.drain()
         _, receipt, draft, buttons = self.card_for(cid_a)
         self.assertEqual(len(self.sent_to("101")), 1)
-        self.assertEqual(self.webhook("feishu", self.action(room_a, receipt, buttons["可以发送"]))[0], 200)
+        self.assertEqual(self.webhook("feishu", self.action(room_a, receipt, buttons["发送"]))[0], 200)
         self.drain()
         self.assertEqual(self.sent_to("101")[-1], draft["customer_text"])
 
@@ -299,8 +301,92 @@ class CardApprovalAcceptance(unittest.TestCase):
         self.drain()
         self.assertEqual(len(self.sent_to("101")), 2)
 
+    def agent_card(self):
+        cid = self.customer(COMPLETE)
+        self.drain()
+        room = self.conversation(cid)["room_id"]
+        self.staff(room, "/回复辅助 开")
+        self.assertEqual(self.staff(room, "/draft")["status"], "draft_queued")
+        self.drain()
+        return cid, *self.card_for(cid)
+
+    def assert_agent_card(self, receipt, title, disabled):
+        card = next(item["card"] for item in self.platforms.messages
+                    if item["channel"] == "feishu" and item["message_id"] == receipt)
+        self.assertEqual(card["header"]["title"]["content"], title)
+        buttons = {part["text"]["content"]: part.get("disabled", False)
+                   for part in card_objects(card) if part.get("tag") == "button"}
+        self.assertEqual(buttons, dict(zip(("发送", "取消", "撤回"), disabled, strict=True)))
+
+    def click_agent_card(self, room, receipt, value, *, actor=STAFF):
+        code, result = self.webhook("feishu", self.action(room, receipt, value, actor=actor))
+        self.assertEqual(code, 200, result)
+        return result["results"][0]
+
+    def agent_deletes(self):
+        return [request["body"] for request in self.platforms.requests
+                if request["channel"] == "telegram" and request["operation"] == "delete"]
+
+    def test_agent_card_enables_recall_only_after_receipt_and_deletes_exactly_once(self):
+        cid, room, receipt, draft, buttons = self.agent_card()
+        self.assert_agent_card(receipt, "对客译文待确认", (False, False, True))
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["撤回"])["status"], "recall_not_sent")
+        sent = self.click_agent_card(room, receipt, buttons["发送"])
+        self.assertEqual(sent["status"], "approved")
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["取消"])["status"], "duplicate_approval")
+        self.platforms.fail_next("telegram", "send", status=429, headers={"Retry-After": "30"})
+        self.drain()
+        self.assert_agent_card(receipt, "等待 Telegram 确认发送", (True, True, True))
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["撤回"])["status"], "recall_not_sent")
+        self.assertEqual(self.agent_deletes(), [])
+
+        self.now += 31
+        self.drain()
+        self.assert_agent_card(receipt, "Telegram 已确认发送", (True, True, False))
+        expected_id = next(item["message_id"] for item in self.platforms.messages
+                           if item["channel"] == "telegram" and item["text"] == draft["customer_text"])
+        self.assertEqual(self.click_agent_card(room, "om_unrelated", buttons["撤回"])["status"], "approval_stale")
+        self.assertEqual(self.webhook("feishu", self.action(room, receipt, buttons["撤回"],
+                                                           actor=UNAUTHORIZED))[0], 403)
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["撤回"])["status"], "pending")
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["撤回"])["status"], "pending")
+        self.drain()
+        self.assert_agent_card(receipt, "Telegram 已确认撤回", (True, True, True))
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["撤回"])["status"], "deleted")
+        self.drain()
+        self.assertEqual(self.agent_deletes(), [{"chat_id": "101", "message_id": int(expected_id)}])
+        self.assertEqual([item["message_id"] for item in self.platforms.messages
+                          if item["channel"] == "telegram" and item.get("deleted")], [expected_id])
+        delivered = next(row for row in self.conversation(cid)["messages"] if row["id"] == sent["message_id"])
+        self.assertEqual((delivered["status"], delivered["recall_status"]), ("deleted", "deleted"))
+
+    def test_agent_card_keeps_unknown_recall_disabled_without_redispatch(self):
+        _cid, room, receipt, draft, buttons = self.agent_card()
+        self.click_agent_card(room, receipt, buttons["发送"])
+        self.drain()
+        self.platforms.fail_next("telegram", "delete", status=502)
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["撤回"])["status"], "pending")
+        self.drain()
+        self.assert_agent_card(receipt, "撤回结果未确认", (True, True, True))
+        self.assertEqual(self.click_agent_card(room, receipt, buttons["撤回"])["status"], "delivery_unknown")
+        self.drain()
+        self.assertEqual(len(self.agent_deletes()), 1)
+        self.assertIn(draft["customer_text"], self.sent_to("101"))
+
 
 class FinalizedApprovalCardTest(unittest.TestCase):
+    def test_existing_agent_card_gains_recall_without_changing_its_callback_binding(self):
+        draft_id, version = "draft_" + "f" * 32, "1234567890abcdef"
+        card = build_approval_card(draft_id=draft_id, version=version, customer_text="Здравствуйте!")
+        final = finalize_approval_card(card, "sent", agent_recall=True)
+        buttons = {part["element_id"]: part for part in card_objects(final) if part.get("tag") == "button"}
+        self.assertTrue(buttons["approve"]["disabled"])
+        self.assertTrue(buttons["reject"]["disabled"])
+        self.assertFalse(buttons["recall"]["disabled"])
+        self.assertEqual(buttons["recall"]["behaviors"][0]["value"], {
+            "omni_action": "recall", "draft_id": draft_id, "version": version,
+        })
+
     def test_cancelled_card_keeps_exact_preview_and_callback_version(self):
         text = "[AI] Точная версия, <текст> и & символы."
         version = "1234567890abcdef"

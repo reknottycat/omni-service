@@ -19,6 +19,18 @@ _FINAL_HEADERS = {
     'rejected': ('已拒绝发送', 'grey'),
     'cancelled': ('草稿已取消', 'grey'),
 }
+_AGENT_HEADERS = {
+    **_FINAL_HEADERS,
+    'approved': ('等待 Telegram 确认发送', 'blue'),
+    'sent': ('Telegram 已确认发送', 'green'),
+    'send_failed': ('发送失败', 'red'),
+    'send_unknown': ('发送结果未确认', 'orange'),
+    'recall_pending': ('等待 Telegram 确认撤回', 'blue'),
+    'recall_deleted': ('Telegram 已确认撤回', 'green'),
+    'recall_failed': ('撤回失败', 'red'),
+    'recall_unsupported': ('当前授权不支持撤回', 'grey'),
+    'recall_unknown': ('撤回结果未确认', 'orange'),
+}
 
 
 def _matches(pattern, value):
@@ -29,7 +41,16 @@ def _plain(content, **style):
     return {'tag': 'plain_text', 'content': content, **style}
 
 
-def build_approval_card(*, draft_id, version, customer_text, reference=''):
+def _decision_button(label, decision, style, draft_id, version):
+    return {
+        'tag': 'button', 'element_id': decision, 'text': _plain(label), 'type': style,
+        'behaviors': [{'type': 'callback', 'value': {
+            'omni_action': decision, 'draft_id': draft_id, 'version': version,
+        }}],
+    }
+
+
+def build_approval_card(*, draft_id, version, customer_text, reference='', agent_recall=False):
     if (not _matches(_DRAFT_ID, draft_id) or not _matches(_VERSION, version)
             or not isinstance(customer_text, str) or not customer_text.strip()
             or not isinstance(reference, str)):
@@ -39,14 +60,11 @@ def build_approval_card(*, draft_id, version, customer_text, reference=''):
     if reference:
         elements.append({'tag': 'div', 'element_id': 'staff_reference',
                          'text': _plain(reference, text_size='notation', text_color='grey')})
-    for label, decision, style in (('可以发送', 'approve', 'primary_filled'),
-                                   ('不可以发送', 'reject', 'danger')):
-        elements.append({
-            'tag': 'button', 'element_id': decision, 'text': _plain(label), 'type': style,
-            'behaviors': [{'type': 'callback', 'value': {
-                'omni_action': decision, 'draft_id': draft_id, 'version': version,
-            }}],
-        })
+    send, cancel = ('发送', '取消') if agent_recall else ('可以发送', '不可以发送')
+    elements.extend((_decision_button(send, 'approve', 'primary_filled', draft_id, version),
+                     _decision_button(cancel, 'reject', 'danger', draft_id, version)))
+    if agent_recall:
+        elements.append(dict(_decision_button('撤回', 'recall', 'danger', draft_id, version), disabled=True))
     return {
         'schema': '2.0',
         'config': {'width_mode': 'default', 'enable_forward': False, 'update_multi': True},
@@ -55,10 +73,11 @@ def build_approval_card(*, draft_id, version, customer_text, reference=''):
     }
 
 
-def finalize_approval_card(card, status):
-    """Preserve the published preview while disabling both of its decisions."""
+def finalize_approval_card(card, status, *, agent_recall=False):
+    """Preserve the published preview and update its permitted actions."""
+    headers = _AGENT_HEADERS if agent_recall else _FINAL_HEADERS
     if (not isinstance(card, dict) or card.get('schema') != '2.0'
-            or not isinstance(status, str) or status not in _FINAL_HEADERS):
+            or not isinstance(status, str) or status not in headers):
         raise ChannelError('invalid_payload')
     updated = deepcopy(card)
     config, header, body = updated.get('config'), updated.get('header'), updated.get('body')
@@ -67,13 +86,29 @@ def finalize_approval_card(card, status):
         raise ChannelError('invalid_payload')
     decisions = [element for element in elements if isinstance(element, dict) and element.get('tag') == 'button']
     button_ids = [button.get('element_id') for button in decisions]
-    if len(decisions) != 2 or 'approve' not in button_ids or 'reject' not in button_ids:
+    expected = [('approve', 'reject')]
+    if agent_recall:
+        expected.append(('approve', 'recall', 'reject'))
+    if tuple(sorted(button_ids, key=str)) not in expected:
         raise ChannelError('invalid_payload')
-    title, template = _FINAL_HEADERS[status]
+    if agent_recall and 'recall' not in button_ids:
+        # Backfill the button on Agent cards published before recall was available.
+        send = decisions[button_ids.index('approve')]
+        try:
+            value = send['behaviors'][0]['value']
+            draft_id, version = value['draft_id'], value['version']
+            if not _matches(_DRAFT_ID, draft_id) or not _matches(_VERSION, version):
+                raise ChannelError('invalid_payload')
+        except (KeyError, IndexError, TypeError):
+            raise ChannelError('invalid_payload') from None
+        recall = _decision_button('撤回', 'recall', 'danger', draft_id, version)
+        elements.append(recall)
+        decisions.append(recall)
+    title, template = headers[status]
     config['update_multi'] = True
     header.update(title=_plain(title), template=template)
     for button in decisions:
-        button['disabled'] = True
+        button['disabled'] = button['element_id'] != 'recall' or status != 'sent'
     return updated
 
 
@@ -82,7 +117,7 @@ def card_decision(*, app_id, event_id, chat_id, user_id, message_id, value):
             or not _matches(_EVENT_ID, event_id) or not _matches(_CHAT_ID, chat_id)
             or not _matches(_USER_ID, user_id) or not _matches(_MESSAGE_ID, message_id)
             or not isinstance(value, dict) or value.keys() != _VALUE_FIELDS
-            or value['omni_action'] not in ('approve', 'reject')
+            or value['omni_action'] not in ('approve', 'reject', 'recall')
             or not _matches(_DRAFT_ID, value['draft_id']) or not _matches(_VERSION, value['version'])):
         raise ChannelError('invalid_payload')
     return DraftDecision(app_id, event_id, chat_id, user_id, message_id,

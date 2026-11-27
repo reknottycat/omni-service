@@ -4,6 +4,7 @@ import argparse
 from dataclasses import replace
 import fcntl
 import getpass
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -155,8 +156,13 @@ class PersonalBridge(Service):
 
     def receive_feishu(self, event):
         if (event.channel != "feishu" or event.account_id != self.feishu.app_id
-                or event.event_type != "message"
                 or event.timestamp < self.started_at or not self.room_allowed(event.chat_id)):
+            return
+        if event.event_type == "delete" and event.user_id == "":
+            # Feishu omits the actor. Service resolves the original staff reply in this room
+            # and retains a scoped tombstone if its message event has not arrived yet.
+            return self.ingest(event)
+        if event.event_type != "message":
             return
         control = (event.text.lstrip().startswith(("/", "／")) and not event.has_mentions
                    and "@" not in event.text and "＠" not in event.text)
@@ -228,6 +234,11 @@ class PersonalBridge(Service):
         self._queue(db, cid, 'feishu', 'send', 'media-caption:' + mid, {'text': body})
         self._queue(db, cid, 'feishu', 'send', 'mirror:' + mid, {'relay_media': True}, mid)
 
+    def _delete_ai_mirror(self, db, cid, mid):
+        # Preserve the Feishu audit trail already delivered; only cancel an unsent history notice.
+        db.execute("""UPDATE outbox SET status='cancelled'
+            WHERE conversation_id=? AND operation_key=? AND status='pending'""", (cid, 'history-ai:' + mid))
+
     def _outgoing(self, db, conv, text, *, author='AI', source_channel='ai', source_id=None,
                   sender_name='', parent_id=None, already_translated=False, attachments=()):
         if source_channel != 'feishu' or not _relay_attachment(attachments):
@@ -267,6 +278,29 @@ class PersonalBridge(Service):
                 "SELECT user_id FROM members WHERE conversation_id=?", (conv["id"],)))
         if management:
             payload["feishu_staff_ids"] = members
+        if channel == "telegram" and operation == "delete":
+            receipt = db.execute("""
+                SELECT msg.external_id
+                FROM messages AS msg
+                JOIN outbox AS sent ON sent.message_id=msg.id AND sent.conversation_id=msg.conversation_id
+                WHERE msg.id=? AND msg.conversation_id=? AND msg.direction='outbound'
+                  AND msg.status='sent' AND msg.recall_status='pending'
+                  AND sent.channel='telegram' AND sent.operation='send' AND sent.status='sent'
+                  AND sent.operation_key='out:' || msg.id AND sent.external_id=msg.external_id
+                  AND ((msg.source_channel='feishu' AND msg.author_id<>'AI' AND EXISTS (
+                         SELECT 1 FROM members WHERE conversation_id=msg.conversation_id AND user_id=msg.author_id
+                      )) OR (msg.source_channel='agent_draft' AND msg.author_id='AI' AND EXISTS (
+                         SELECT 1 FROM reply_drafts
+                         WHERE id=msg.source_id AND conversation_id=msg.conversation_id AND message_id=msg.id
+                           AND kind='agent_draft' AND status='approved'
+                      )))""", (item["message_id"], conv["id"])).fetchone()
+            external_id = payload.get("external_id")
+            if (not conv["room_id"] or conv["room_status"] != "ready" or receipt is None
+                    or item["operation_key"] != "recall:" + item["message_id"]
+                    or external_id != receipt["external_id"]
+                    or not isinstance(external_id, str) or not re.fullmatch(r"[1-9][0-9]*", external_id)):
+                raise ChannelError("forbidden")
+            return payload
         if self.managed and channel == "feishu" and operation == "create_room":
             if (conv["room_id"] is None and conv["room_status"] == "pending"
                     and (management or members == self.feishu.staff_ids)):
@@ -304,7 +338,8 @@ class PersonalBridge(Service):
     def _deliver(self, item, conv, request):
         # Revocation also blocks delivery of already queued Telegram content.
         connection = self.telegram.refresh()
-        if not connection.enabled or not connection.can_reply:
+        deleting = item["channel"] == "telegram" and item["operation"] == "delete"
+        if not connection.enabled or (not deleting and not connection.can_reply):
             raise ChannelError("authorization_failed")
         staff_options = {"staff_ids": request["feishu_staff_ids"]} if "feishu_staff_ids" in request else {}
         attachment = request.get('relay_attachment')
@@ -339,6 +374,15 @@ class PersonalBridge(Service):
                 self.feishu.preflight(conv["room_id"], **staff_options)
             elif not self.managed:
                 self.feishu.preflight(**staff_options)
+        if deleting:
+            chat_id, message_id = int(conv["chat_id"]), int(request["external_id"])
+            method, payload = self.telegram.policy.delete_payload(
+                connection.connection_id, chat_id, message_id,
+                confirmed_sent=(conv["account_id"], chat_id, message_id))
+            result = self.api.call(method, payload)
+            if result is not True:
+                raise ChannelError("platform_rejected" if result is False else "delivery_unknown")
+            return request["external_id"]
         text, photo = request["text"], request.get("welcome_photo")
         method, payload = self.telegram.policy.send_payload(
             connection.connection_id, int(conv["chat_id"]), (text or ".") if photo or attachment else text,
@@ -379,17 +423,18 @@ def discover_connections(api):
              "enabled": c.enabled, "can_reply": c.can_reply} for c in connections.values()]
 
 
-def run(bridge, *, admin_server=None):
+def run(bridge, *, admin_server=None, feishu_sdk=None):
     stop = threading.Event()
     events = queue.Queue(maxsize=64)
 
     def receive(source, consumer, options):
         while not stop.is_set():
             try:
-                for event in consumer(stop, **options):
+                for value in consumer(stop, **options):
+                    item = value if source == "sdk" else (source, value)
                     while not stop.is_set():
                         try:
-                            events.put((source, event), timeout=0.25)
+                            events.put(item, timeout=0.25)
                             break
                         except queue.Full:
                             continue
@@ -402,9 +447,14 @@ def run(bridge, *, admin_server=None):
     card_options = {"room_allowed": bridge.room_allowed}
     if managed_membership:
         message_options["managed_membership"] = card_options["managed_membership"] = True
-    consumers = [("message", bridge.feishu.events, message_options)]
-    if bridge.approval_cards:
-        consumers.append(("card", bridge.feishu.card_events, card_options))
+    if feishu_sdk is not None:
+        consumers = [("sdk", bridge.feishu.sdk_events, {
+            **message_options, **feishu_sdk, "approval_cards": bridge.approval_cards,
+        })]
+    else:
+        consumers = [("message", bridge.feishu.events, message_options)]
+        if bridge.approval_cards:
+            consumers.append(("card", bridge.feishu.card_events, card_options))
     threads = [threading.Thread(target=receive, args=consumer, daemon=True) for consumer in consumers]
     admin_thread = None
     try:
@@ -554,7 +604,8 @@ def main(argv=None):
         managed = mode == "personal-managed"
         feishu_config = config["feishu"]
         cards_configured = feishu_config.get("approval_cards", managed)
-        if type(cards_configured) is not bool:
+        native_recall = feishu_config.get("native_recall", False)
+        if type(cards_configured) is not bool or type(native_recall) is not bool:
             raise ChannelError("feishu_invalid_config")
         room = feishu_config.get("chat_id")
         if (managed and room not in (None, "")) or (not managed and not room):
@@ -595,6 +646,19 @@ def main(argv=None):
                 or len(set(preview_peers)) != len(preview_peers)):
             raise ChannelError("invalid_welcome_preview_contact")
         management = management_providers(config.get("management"), feishu)
+        feishu_sdk = None
+        if native_recall:
+            if not managed or management is None:
+                raise ChannelError("feishu_recall_requires_management")
+            if not connection.can_delete_sent:
+                raise ChannelError("telegram_recall_permission_missing")
+            if importlib.util.find_spec("lark_oapi") is None:
+                raise ChannelError("feishu_recall_sdk_unavailable")
+            identity_config = config["management"]
+            feishu_sdk = {
+                "app_secret": os.environ[identity_config["app_secret_env"]],
+                "tenant_key": identity_config["tenant_key"],
+            }
         language = translation_provider(config["translation"])
         intake, intake_enabled = intake_provider(config.get("intake", {}), language)
         intake_enabled = managed or intake_enabled
@@ -605,6 +669,7 @@ def main(argv=None):
             audience = "Feishu application identity" if managed else "Feishu group"
             print("Telegram connection and", audience, "verified. Translation:", language.provider_name,
                   "Intake:", "on" if intake_enabled else "off", "Approval cards:", "on" if approval_cards else "off",
+                  "Staff recall:", "on" if native_recall else "off",
                   "Agent default:", "on" if agent_enabled else "off",
                   "Customer prompt guard:", "on" if prompt_guard else "off",
                   "Management configuration:", "present" if management else "disabled")
@@ -639,7 +704,7 @@ def main(argv=None):
                         bridge.configure_management(management["admin_ids"],
                                                     welcome_document=management["welcome_document"],
                                                     preview_peers=preview_peers)
-                        run(bridge, admin_server=server)
+                        run(bridge, admin_server=server, feishu_sdk=feishu_sdk)
             finally:
                 bridge.close()
         return 0

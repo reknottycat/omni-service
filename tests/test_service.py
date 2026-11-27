@@ -1,8 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+from datetime import datetime, timezone
+import os
 from pathlib import Path
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 
 from omni_service.models import Attachment, ChannelError, InboundEvent, Request
 from omni_service.service import Service
@@ -51,6 +55,38 @@ class ServiceTests(unittest.TestCase):
 
     def message(self, cid, mid):
         return next(m for m in self.service.get_conversation(cid)['messages'] if m['id'] == mid)
+
+    def test_room_title_uses_customer_business_and_server_creation_date(self):
+        self.addCleanup(time.tzset)
+        self.enterContext(patch.dict(os.environ, {'TZ': 'UTC'}))
+        time.tzset()
+        self.service.close()
+        self.service = Service(self.path, self.transport, clock=lambda: self.now, company_name='中俄物流')
+        self.service.configure_management(['employee-1'])
+        self.now = datetime(2026, 11, 26, 23, 55, tzinfo=timezone.utc).timestamp()
+        event = replace(self.customer(), sender_name='Алексей')
+        first = self.service.ingest(event)['conversation_id']
+        self.service.handoff(first)
+        self.service.drain()
+
+        self.service.admin_update_defaults('employee-1', {'business_label': '设备售后'})
+        self.open_room('max', chat='102')
+        self.now += 600
+        self.service.admin_update_defaults('employee-1', {'business_label': ''})
+        event = replace(self.customer('whatsapp', chat='103', event='open-103'), sender_name='')
+        last = self.service.ingest(event)['conversation_id']
+        self.service.handoff(last)
+        self.service.drain()
+
+        names = [request['body']['name'] for request in self.platforms.requests
+                 if request['operation'] == 'create_room']
+        self.assertEqual(names, [
+            'Алексей｜中俄物流｜TG·2026-11-26',
+            'Customer｜设备售后｜MAX·2026-11-26',
+            '新客户｜WA·2026-11-27',
+        ])
+        first_room = self.service.get_conversation(first)['room_id']
+        self.assertEqual(self.platforms.rooms[first_room]['name'], names[0])
 
     def test_three_channels_automatically_reply_in_detected_language(self):
         for channel in ('telegram', 'max', 'whatsapp'):

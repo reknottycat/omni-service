@@ -119,6 +119,7 @@ class OnboardingContracts(unittest.TestCase):
                     self.assertEqual(lark.call_args_list[index].args[0][0], "--profile=cli_example")
             actual = json.loads(config.read_text())
             self.assertEqual(actual["mode"], "personal-managed")
+            self.assertEqual(actual["company_name"], "")
             self.assertEqual(actual["management"]["admin_ids"], ["ou_admin"])
             self.assertEqual(actual["management"]["port"], 9090)
             self.assertEqual(actual["telegram"]["expected_owner_id"], 10)

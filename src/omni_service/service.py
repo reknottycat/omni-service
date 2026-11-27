@@ -1,10 +1,12 @@
 """Durable customer conversations, translation, and platform delivery."""
 
 from dataclasses import asdict
+from datetime import datetime
 import hashlib
 import json
 import threading
 import time
+from unicodedata import category
 import uuid
 
 from . import channels
@@ -35,6 +37,8 @@ _ROOM_RULES = ('本群的普通文字消息会翻译后发给客户。'
 _APPROVAL_RULES = _ROOM_RULES + ' 机器人草稿须由客服按预览中的 /approve 指令逐条批准。'
 _PREFERENCE_COMMANDS = {'/回复辅助': 'reply_assist', '/标签': 'show_labels'}
 _APPROVAL_COMMANDS = {'/自动回复': 'auto_reply', '/审批': 'approval_required'}
+_ROOM_CHANNELS = {'telegram': 'TG', 'max': 'MAX', 'whatsapp': 'WA'}
+_ROOM_NAME_LIMIT = 60
 
 
 def _json(value):
@@ -43,6 +47,13 @@ def _json(value):
 
 def _id(prefix):
     return prefix + uuid.uuid4().hex
+
+
+def _room_name_part(text):
+    return ' '.join(''.join(
+        '·' if char in '|｜' else (' ' if category(char).startswith('C') else char)
+        for char in text
+    ).split())
 
 
 class Service(Management):
@@ -362,11 +373,11 @@ class Service(Management):
                 self._queue(db, cid, 'feishu', 'delete', 'delete-ai-history:' + mid,
                             {'external_id': mirror['external_id']})
 
-    def _ensure_service_room(self, db, cid, staff_ids=None):
+    def _ensure_service_room(self, db, cid, staff_ids=None, *, customer_name=''):
         conv = self._conversation(db, cid)
+        config = self._management(db)
         if staff_ids is None:
             saved = [row['user_id'] for row in db.execute('SELECT user_id FROM members WHERE conversation_id=? ORDER BY rowid', (cid,))]
-            config = self._management(db)
             staff_ids = saved or (config['staff_ids'] if config else self.default_members)
         selected = tuple(dict.fromkeys(staff_ids))
         if not selected or any(not isinstance(s, str) or not s for s in selected):
@@ -377,10 +388,19 @@ class Service(Management):
                 self._queue(db, cid, 'feishu', 'add_member', 'member:' + cid + ':' + staff,
                             {'members': [staff]})
         if conv['room_status'] == 'absent':
+            if not customer_name:
+                sender = db.execute("""SELECT sender_name FROM messages WHERE conversation_id=?
+                    AND direction='inbound' AND status!='deleted' AND sender_name!=''
+                    ORDER BY rowid DESC LIMIT 1""", (cid,)).fetchone()
+                customer_name = sender['sender_name'] if sender else ''
+            customer = _room_name_part(customer_name) or '新客户'
+            business = _room_name_part(self._business_label(config))
+            day = datetime.fromtimestamp(self.clock()).date().isoformat()
+            channel = _ROOM_CHANNELS[conv['channel']]
+            suffix = ('｜' + business if business else '') + f'｜{channel}·{day}'
             db.execute("UPDATE conversations SET room_status='pending' WHERE id=?", (cid,))
             self._queue(db, cid, 'feishu', 'create_room', 'room:' + cid,
-                        {'name': ('OmniService ' + self.company_name + ' ' if self.company_name else 'OmniService ')
-                                 + cid[-8:]})
+                        {'name': customer[:_ROOM_NAME_LIMIT - len(suffix)].rstrip() + suffix})
             self._queue(db, cid, 'feishu', 'send', 'room-rules:' + cid,
                         {'text': self._room_rules(db, cid) if self.approval_intake else _ROOM_RULES, 'mention_all': True})
         return selected
@@ -758,7 +778,7 @@ class Service(Management):
             first_contact = db.execute('SELECT 1 FROM messages WHERE conversation_id=?', (cid,)).fetchone() is None
             if first_contact:
                 self._snapshot_defaults(db, cid)
-                self._ensure_service_room(db, cid)
+                self._ensure_service_room(db, cid, customer_name=event.sender_name)
                 mode = 'auto' if self.intake_enabled else 'manual'
                 db.execute('UPDATE conversations SET mode=? WHERE id=?', (mode, cid))
                 if self.intake_enabled:

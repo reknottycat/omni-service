@@ -59,6 +59,9 @@ class Management:
         row = db.execute('SELECT settings FROM management_config WHERE singleton=1').fetchone()
         return json.loads(row['settings']) if row else None
 
+    def _business_label(self, config):
+        return (config or {}).get('business_label', self.company_name)
+
     def _save_management(self, db, config):
         db.execute('UPDATE management_config SET settings=? WHERE singleton=1', (json.dumps(config),))
 
@@ -179,8 +182,11 @@ class Management:
             return {'role': role, 'conversations': rooms,
                     'admin_ids': config['admin_ids'] if role == 'admin' else [],
                     'staff_ids': config['staff_ids'] if role == 'admin' else [],
-                    'defaults': {key: config[key] for key in ('staff_ids','handoff_staff_id','reply_assist','show_labels','welcome_document')}
-                    if role == 'admin' else {},
+                    'defaults': {
+                        **{key: config[key] for key in (
+                            'staff_ids', 'handoff_staff_id', 'reply_assist', 'show_labels', 'welcome_document')},
+                        'business_label': self._business_label(config),
+                    } if role == 'admin' else {},
                     'handoff_strategy': config.get('handoff_strategy', 'fixed') if role == 'admin' else None,
                     'commands': [{'id': key, 'label': label, 'policy': self._command_policy(db, key), 'default_policy': 'room_member'}
                                  for key, label in COMMANDS.items()],
@@ -205,9 +211,18 @@ class Management:
         with self.store.transaction() as db:
             config = self._require_admin(db, actor)
             if not isinstance(updates, dict) or not set(updates) <= {
-                    'staff_ids','handoff_staff_id','handoff_strategy','reply_assist','show_labels','welcome_document'}:
+                    'staff_ids', 'handoff_staff_id', 'handoff_strategy', 'reply_assist', 'show_labels',
+                    'welcome_document', 'business_label'}:
                 raise ChannelError('invalid_admin_settings')
             config.update(updates)
+            if 'business_label' in updates:
+                label = config['business_label']
+                if not isinstance(label, str):
+                    raise ChannelError('invalid_admin_settings')
+                label = label.strip()
+                if len(label) > 40 or any(ord(char) < 32 or ord(char) == 127 for char in label):
+                    raise ChannelError('invalid_admin_settings')
+                config['business_label'] = label
             config['staff_ids'] = _identities(config['staff_ids'])
             if (config['handoff_staff_id'] not in config['staff_ids']
                     or config.get('handoff_strategy', 'fixed') not in ('fixed', 'round_robin')

@@ -234,7 +234,8 @@ def install(args):
             f"OMNI_ADMIN_SIGNING_KEY={secrets.token_hex(32)}\n"
             "# TELEGRAM_HTTPS_PROXY=\n# TELEGRAM_TLS_TUNNEL_PORT=\n# LLM_API_KEY=\n"
         ).encode())
-        cli = shutil.which("lark-cli")
+        managed = config_root / "tools" / "lark-cli"
+        cli = str(managed) if managed.is_file() and os.access(managed, os.X_OK) else shutil.which("lark-cli")
         path_dirs = [str(Path(cli).absolute().parent)] if cli else []
         path_dirs.extend((str(home / ".local/bin"), "/usr/local/bin", "/usr/bin", "/bin"))
         path_dirs.extend(part for part in os.get_exec_path() if Path(part).is_absolute())
@@ -257,7 +258,7 @@ def install(args):
             print("已准备部署文件。本次未调用系统服务。")
             return
         if cli is None:
-            raise InstallationError("配置已保存。请先安装官方 lark-cli，并将其加入 PATH。")
+            raise InstallationError("配置已保存。请用 OmniService 接入入口加 --managed-dependencies 准备其私有飞书组件。")
         check_bridge(release, config, credentials, additions)
         activate_unit(unit, previous, text)
         print("系统服务已启动。通过服务日志检查平台连接。")

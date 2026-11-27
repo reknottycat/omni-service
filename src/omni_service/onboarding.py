@@ -16,13 +16,14 @@ import subprocess
 import tempfile
 import time
 import warnings
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 from .admin_auth import FeishuAdminAuth
 from .company_accounts import CompanyConfigurationError, validate_company
-from .feishu_provision import provision_feishu
+from .feishu_provision import BRIDGE_APP_SCOPES, provision_feishu
 from .local_translation import LocalTranslation
 from .models import ChannelError
+from .onboarding_tools import ensure_lark_cli
 from .personal import Connection, TelegramPersonal
 from .personal_runner import main as run_bridge
 from .telegram_live import TelegramAPI, enable_secretary, telegram_ready, telegram_setup_link
@@ -43,11 +44,19 @@ _SETUP_HINTS = {
     'feishu_provision_sdk_missing': '请安装 requirements-onboarding.txt，或用 --feishu-app 复用现有应用。',
     'feishu_setup_unavailable': '请检查此飞书应用已发布、登录身份在可见范围内，并重试。',
     'telegram_pairing_timed_out': 'Telegram 未返回可验证的绑定回执。请检查机器人绑定状态后重试。',
+    'telegram_setup_send_failed': 'Telegram 未发出给专用机器人的验证消息，未记录为待确认；可重跑接入命令。已有同一机器人，不需要解绑。',
+    'telegram_setup_send_unknown': '未核实 Telegram 是否发出验证消息，未记录为待确认，也没有自动重发。确认专用机器人状态后再重跑接入。',
+    'feishu_app_scopes_unverified': '未能读回当前飞书应用权限；不代表权限缺失，请核对网络、CLI 版本和应用状态。',
+    'feishu_app_scopes_missing': '请在上方官方页面批量申请列出的权限，完成组织要求的发布或审批后重查。',
     'telegram_pairing_backlog': '专用机器人的待处理队列已满。请核对这枚 Token 是否属于新的专用机器人。',
     'telegram_setup_wrong_owner': '登录的 Telegram 账号与 --telegram-owner 不符。',
     'telegram_setup_other_bot_connected': '该原账号已经连接另一机器人，程序没有替换。',
     'telegram_setup_binding_unverified': '平台回读的聊天范围、机器人身份或回复权与请求不符。',
-    'tdlib_unavailable': '请提供受信任的官方 libtdjson 动态库的绝对路径。',
+    'tdlib_unavailable': '当前安装包缺少兼容的官方 TDLib 组件，请联系部署者补齐，不需要用户单独安装 CLI。',
+    'lark_cli_install_failed': '安装官方飞书组件失败，请检查连接；未使用未校验的下载。',
+    'lark_cli_package_unverified': '飞书组件的发布校验不符，已拒绝运行。',
+    'lark_cli_private_tools_required': '实例的 tools 目录必须是当前用户私有的普通目录。',
+    'lark_cli_platform_unsupported': '当前平台没有固定校验的飞书组件。',
     'model_key_requires_tls': '使用 API Key 时，非本机模型网关需要 HTTPS。',
 }
 
@@ -113,6 +122,9 @@ def _lark_environment(config_directory):
     # A host may already be administering another Feishu application.
     env = {key: value for key, value in os.environ.items()
            if key not in _KEYS and not key.startswith("LARKSUITE_CLI_")}
+    tools = config_directory / "tools"
+    if (tools / "lark-cli").is_file():
+        env["PATH"] = str(tools) + os.pathsep + env.get("PATH", os.defpath)
     return {**env, "LARKSUITE_CLI_CONFIG_DIR": str(config_directory / "lark"),
             "LARKSUITE_CLI_DATA_DIR": str(config_directory / "lark-data"),
             "LARKSUITE_CLI_NO_UPDATE_NOTIFIER": "1", "LARKSUITE_CLI_NO_SKILLS_NOTIFIER": "1"}
@@ -144,6 +156,27 @@ def _prepare_feishu(app_id, secret, directory, *, name=None):
             or identity.get("available") is not True):
         raise ChannelError("feishu_identity_mismatch")
     return profile, env
+
+
+def _check_feishu_scopes(app_id, secret, directory, *, name=None):
+    profile, env = _prepare_feishu(app_id, secret, directory, name=name)
+    try:
+        result = _lark([profile, "auth", "scopes", "--json"], env)
+    except ChannelError:
+        raise ChannelError("feishu_app_scopes_unverified") from None
+    scopes = result.get("scopes") if isinstance(result, dict) else None
+    if (not isinstance(scopes, list) or not all(isinstance(s, str) for s in scopes)
+            or result.get("appId") != app_id or result.get("brand") != "feishu"
+            or "userScopes" in result or "tokenType" in result):
+        raise ChannelError("feishu_app_scopes_unverified")
+    missing = sorted(set(BRIDGE_APP_SCOPES).difference(scopes))
+    if missing:
+        print("飞书应用权限缺少：" + " ".join(missing), flush=True)
+        url = "https://open.feishu.cn/page/scope-apply?" + urlencode({"clientID": app_id, "scopes": ",".join(missing)})
+        print(f"请用有应用管理权限的飞书账号打开：{url}", flush=True)
+        _render_qr(url, env)
+        raise ChannelError("feishu_app_scopes_missing")
+    print("飞书已列出客服所需应用权限；不代表事件订阅、发版审批或真实收发已通过。", flush=True)
 
 
 def _feishu_owner(app_id, secret, directory):
@@ -227,7 +260,8 @@ def _telegram_pair(api, env, *, bind_account=None, pending=None, save_pending=No
         _render_qr(link, env)
         print("在原账号「设置 → 聊天自动化」连接该机器人，选择授权聊天，并允许回复。", flush=True)
     else:
-        if (isinstance(pending, dict) and pending.get("bot_id") == bot["id"]
+        if (isinstance(pending, dict) and pending.get("tdlib_send_confirmed") is True
+                and pending.get("bot_id") == bot["id"]
                 and type(pending.get("issued_at")) is int
                 and 0 <= issued_at - pending["issued_at"] < 23 * 3600
                 and type(pending.get("owner")) is int and 0 < pending["owner"] < 2**52
@@ -238,7 +272,8 @@ def _telegram_pair(api, env, *, bind_account=None, pending=None, save_pending=No
         else:
             owner = bind_account(bot, nonce)
             if save_pending is not None:
-                save_pending({"bot_id": bot["id"], "issued_at": issued_at, "owner": owner, "nonce": nonce})
+                save_pending({"bot_id": bot["id"], "issued_at": issued_at, "owner": owner, "nonce": nonce,
+                              "tdlib_send_confirmed": True})
     deadline = time.monotonic() + 420
     while time.monotonic() < deadline:
         updates = api.call("getUpdates", {"timeout": 5, "limit": 100,
@@ -372,6 +407,10 @@ def configure(args, credentials, config):
     if (app and not _APP_ID.fullmatch(app)) or (saved_app and app != saved_app):
         raise ChannelError('invalid_setup_config')
     env = _lark_environment(args.config.parent)
+    if args.managed_dependencies and args.telegram_owner and args.tdlib_library is None:
+        import sys
+        suffix = "dylib" if sys.platform == "darwin" else "so"
+        args.tdlib_library = args.config.parent / "tools" / f"libtdjson.{suffix}"
     bind_account = _account_binder(args, env)
     telegram_token = _ask(credentials, "TELEGRAM_BOT_TOKEN", "Telegram Bot Token: ")
     model_key = _ask(credentials, "TRANSLATION_API_KEY", "翻译模型 API Key（无可直接回车）: ", optional=True)
@@ -403,6 +442,8 @@ def configure(args, credentials, config):
         config["feishu"].update(app_id=app, profile=app)
         management.update(admin_ids=[admin], tenant_key=organization)
         _save_profile(args, credentials, config)
+    if args.managed_dependencies:
+        _check_feishu_scopes(app, app_secret, args.config.parent)
     api = TelegramAPI(telegram_token, proxy_url=credentials.get("TELEGRAM_HTTPS_PROXY") or None,
                       tunnel_port=int(credentials["TELEGRAM_TLS_TUNNEL_PORT"])
                       if credentials.get("TELEGRAM_TLS_TUNNEL_PORT") else None)
@@ -436,15 +477,17 @@ def configure(args, credentials, config):
     config['company_name'] = company_name.strip()
     config["mode"] = "personal-managed"
     _save_profile(args, credentials, config)
-    print("已写入服务配置。启动前请完成飞书应用审批及事件订阅，然后运行 check。", flush=True)
+    print("已写入服务配置。可先用 check-feishu-scopes 核对权限；完成组织要求的发布和事件配置后运行 check。", flush=True)
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("configure", "register-feishu", "prepare-feishu", "check", "run"))
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument("action", choices=("configure", "register-feishu", "prepare-feishu", "check-feishu-scopes", "check", "run"))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--secrets-file", type=Path, required=True)
     parser.add_argument("--db", type=Path)
+    parser.add_argument("--managed-dependencies", action="store_true",
+                        help="由 OmniService 验证和安装官方飞书组件到这个实例")
     parser.add_argument("--feishu-app")
     parser.add_argument("--feishu-app-name", help="首次通过飞书官方 SDK 创建应用时预填的名称")
     parser.add_argument("--callback-url")
@@ -474,20 +517,28 @@ def main(argv=None):
             with _setup_lock(args.config.with_suffix(".setup.lock")):
                 config = json.loads(args.config.read_text(encoding="utf-8"))
                 credentials = read_credentials(args.secrets_file)
+                if args.managed_dependencies:
+                    ensure_lark_cli(args.config.parent)
                 if args.action == "register-feishu":
                     _register_feishu(args, credentials, config)
                 else:
                     configure(args, credentials, config)
             return 0
         credentials = read_credentials(args.secrets_file)
-        if args.action == 'prepare-feishu':
+        if args.action in ('prepare-feishu', 'check-feishu-scopes'):
             config = json.loads(args.config.read_text(encoding='utf-8'))['feishu']
             if not _APP_ID.fullmatch(config['app_id']) or not credentials.get('OMNI_FEISHU_APP_SECRET'):
                 raise ChannelError('invalid_setup_config')
             with _setup_lock(args.config.with_suffix('.setup.lock')):
-                _prepare_feishu(config['app_id'], credentials['OMNI_FEISHU_APP_SECRET'],
-                                args.config.parent, name=config.get('profile'))
-            print('飞书应用已写入此团队的独立配置。')
+                if args.managed_dependencies:
+                    ensure_lark_cli(args.config.parent)
+                if args.action == 'check-feishu-scopes':
+                    _check_feishu_scopes(config['app_id'], credentials['OMNI_FEISHU_APP_SECRET'],
+                                         args.config.parent, name=config.get('profile'))
+                else:
+                    _prepare_feishu(config['app_id'], credentials['OMNI_FEISHU_APP_SECRET'],
+                                    args.config.parent, name=config.get('profile'))
+                    print('飞书应用已写入此团队的独立配置。')
             return 0
         if args.config.name == 'personal.json' and args.config.parent.parent.name == 'omni-service':
             validate_company(args.config.parent.parent, args.config.parent.name)

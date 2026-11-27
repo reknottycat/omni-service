@@ -82,6 +82,51 @@ class ReviewReceiptTest(unittest.TestCase):
         self.save(tested_commit=self.head, tested_tree=self.git("rev-parse", self.head + "^{tree}"))
         self.assertEqual(self.run_check("enforce", tested=self.head), (1, "invalid"))
 
+    def test_missing_review_uses_only_base_agents_then_builtin(self):
+        self.git("checkout", "-q", "--detach", self.base)
+        self.git("rm", "REVIEW.md")
+        (self.root / "AGENTS.md").write_text("base agents policy\n")
+        self.git("add", "AGENTS.md")
+        self.git("commit", "-qm", "base with agents")
+        base_agents = self.git("rev-parse", "HEAD")
+        self.git("rm", "AGENTS.md")
+        self.git("commit", "-qm", "base with no project policy")
+        base_empty = self.git("rev-parse", "HEAD")
+
+        for base, source, content in (
+            (base_agents, "AGENTS.md", b"base agents policy\n"),
+            (base_empty, "builtin-v1", CHECK.BASELINE_V1),
+        ):
+            with self.subTest(source=source):
+                self.git("checkout", "-q", "--detach", base)
+                (self.root / "REVIEW.md").write_text("candidate-only policy\n")
+                self.git("add", "REVIEW.md")
+                self.git("commit", "-qm", "candidate tries to supply policy")
+                head = self.git("rev-parse", "HEAD")
+                self.git("checkout", "-q", "--detach", base)
+                self.git("merge", "--no-ff", "-qm", "combine", head)
+                tested = self.git("rev-parse", "HEAD")
+                policy = subprocess.run([sys.executable, str(SCRIPT), "--show-policy", "--base", base],
+                                        cwd=self.root, env=self.env, capture_output=True, check=True)
+                digest = hashlib.sha256(content).hexdigest()
+                self.assertEqual(json.loads(policy.stdout), {"source": source, "policy_sha256": digest})
+                self.save(head=head, base=base, tested_commit=tested,
+                          tested_tree=self.git("rev-parse", "HEAD^{tree}"), policy_sha256=digest)
+                self.assertEqual(self.run_check("enforce", head=head, base=base, tested=tested), (0, "pass"))
+                self.save(head=head, base=base, tested_commit=tested, tested_tree=self.git("rev-parse", "HEAD^{tree}"),
+                          policy_sha256=hashlib.sha256(b"candidate-only policy\n").hexdigest())
+                self.assertEqual(self.run_check("enforce", head=head, base=base, tested=tested), (1, "invalid"))
+
+    def test_existing_empty_review_is_not_a_missing_rule(self):
+        self.git("checkout", "-q", "--detach", self.base)
+        (self.root / "REVIEW.md").write_text("")
+        self.git("add", "REVIEW.md")
+        self.git("commit", "-qm", "base with empty rules")
+        check = subprocess.run([sys.executable, str(SCRIPT), "--show-policy", "--base", self.git("rev-parse", "HEAD")],
+                               cwd=self.root, env=self.env, capture_output=True)
+        self.assertEqual(check.returncode, 1)
+        self.assertEqual(json.loads(check.stdout)["result"], "invalid")
+
     def test_duplicate_or_oversized_receipts_fail_closed(self):
         self.receipt.write_text('{"decision":"pass","decision":"block"}')
         self.assertEqual(self.run_check("enforce"), (1, "invalid"))

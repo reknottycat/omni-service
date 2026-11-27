@@ -209,7 +209,12 @@ class Service(Management):
         db.execute("""UPDATE outbox SET status='cancelled' WHERE conversation_id=? AND operation='send'
             AND status='pending' AND message_id IN (SELECT id FROM messages WHERE author_id='AI'
                 AND source_channel!='ai_welcome' AND (? IS NULL OR source_channel=?))""", (cid, source, source))
-        db.execute("UPDATE messages SET status='cancelled' WHERE conversation_id=? AND author_id='AI' AND status='queued' AND id IN (SELECT message_id FROM outbox WHERE status='cancelled')", (cid,))
+        cancelled = db.execute("""UPDATE messages SET status='cancelled'
+            WHERE conversation_id=? AND author_id='AI' AND status='queued'
+            AND id IN (SELECT message_id FROM outbox WHERE status='cancelled')
+            RETURNING id""", (cid,)).fetchall()
+        for row in cancelled:
+            self._queue_agent_card_for_message(db, row['id'])
 
     def _cancel_drafts(self, db, cid, *, kind=None):
         pending = db.execute('''SELECT id FROM reply_drafts WHERE conversation_id=?
@@ -223,18 +228,72 @@ class Service(Management):
             self._queue_closed_card(db, cid, row['id'], 'cancelled')
 
     def _queue_closed_card(self, db, cid, draft_id, status):
-        preview = db.execute('''SELECT external_id,payload FROM outbox WHERE operation_key=?
-            AND conversation_id=? AND status='sent' AND external_id IS NOT NULL''', ('notice:draft:' + draft_id, cid)).fetchone()
+        preview = db.execute('''SELECT preview.external_id,preview.payload,d.kind,c.channel
+            FROM outbox preview JOIN conversations c ON c.id=preview.conversation_id
+            JOIN reply_drafts d ON d.id=? AND d.conversation_id=c.id
+            WHERE preview.operation_key=? AND c.id=? AND preview.status='sent'
+            AND preview.external_id IS NOT NULL''', (draft_id, 'notice:draft:' + draft_id, cid)).fetchone()
         if preview is not None and (card := json.loads(preview['payload']).get('card')):
-            self._queue(db, cid, 'feishu', 'update_card', 'card-state:' + draft_id,
-                        {'card_message_id': preview['external_id'], 'card': finalize_approval_card(card, status)})
+            key = 'card-state:' + draft_id
+            agent_recall = (preview['kind'], preview['channel']) == ('agent_draft', 'telegram')
+            if agent_recall:
+                status = self._agent_card_state(db, cid, draft_id, status)
+                # A stale rate-limited patch must not replace a more recent card.
+                stage_key = key + ':' + status
+                db.execute("""UPDATE outbox SET status='cancelled' WHERE conversation_id=?
+                    AND channel='feishu' AND operation='update_card' AND status='pending'
+                    AND (operation_key=? OR instr(operation_key,?)=1) AND operation_key!=?""",
+                           (cid, key, key + ':', stage_key))
+                key = stage_key
+            self._queue(db, cid, 'feishu', 'update_card', key, {
+                'card_message_id': preview['external_id'],
+                'card': finalize_approval_card(card, status, agent_recall=agent_recall),
+            })
+
+    def _agent_card_message(self, db, cid, draft_id):
+        return db.execute('''SELECT m.id,m.status,m.recall_status,
+            (m.external_id=sent.external_id AND m.external_id!='') AS confirmed
+            FROM reply_drafts d JOIN messages m ON m.id=d.message_id AND m.conversation_id=d.conversation_id
+            LEFT JOIN outbox sent ON sent.operation_key='out:' || m.id AND sent.message_id=m.id
+                AND sent.conversation_id=m.conversation_id AND sent.channel='telegram'
+                AND sent.operation='send' AND sent.status='sent'
+            WHERE d.id=? AND d.conversation_id=? AND d.kind='agent_draft' AND d.status='approved'
+                AND d.approved_by IS NOT NULL AND m.direction='outbound' AND m.author_id='AI'
+                AND m.source_channel=d.kind AND m.source_id=d.id''', (draft_id, cid)).fetchone()
+
+    def _agent_card_state(self, db, cid, draft_id, status):
+        if status != 'approved':
+            return status
+        message = self._agent_card_message(db, cid, draft_id)
+        if message is None:
+            return status
+        if message['confirmed']:
+            return {
+                'pending': 'recall_pending',
+                'deleted': 'recall_deleted',
+                'failed': 'recall_failed',
+                'unsupported': 'recall_unsupported',
+                'delivery_unknown': 'recall_unknown',
+            }.get(message['recall_status'], 'sent' if message['status'] == 'sent' else status)
+        return {'cancelled': 'cancelled', 'failed': 'send_failed',
+                'delivery_unknown': 'send_unknown'}.get(message['status'], status)
+
+    def _queue_agent_card_for_message(self, db, mid):
+        if self.approval_cards and mid:
+            message = db.execute("""SELECT m.conversation_id,m.source_id
+                FROM messages m JOIN conversations c ON c.id=m.conversation_id
+                WHERE m.id=? AND m.source_channel='agent_draft' AND c.channel='telegram'""", (mid,)).fetchone()
+            if message is not None:
+                self._queue_closed_card(db, message['conversation_id'], message['source_id'], 'approved')
 
     def _reconcile_closed_cards(self):
         with self.store.transaction() as db:
             rows = db.execute('''SELECT d.conversation_id,d.id,d.status FROM reply_drafts d
+                JOIN conversations c ON c.id=d.conversation_id
                 JOIN outbox preview ON preview.operation_key='notice:draft:' || d.id AND preview.status='sent'
                 LEFT JOIN outbox patch ON patch.operation_key='card-state:' || d.id
-                WHERE d.status IN ('approved','rejected','cancelled') AND patch.id IS NULL
+                WHERE d.status IN ('approved','rejected','cancelled')
+                AND (patch.id IS NULL OR (d.kind='agent_draft' AND c.channel='telegram'))
                 AND json_type(preview.payload,'$.card')='object' ''').fetchall()
             for row in rows:
                 self._queue_closed_card(db, row['conversation_id'], row['id'], row['status'])
@@ -485,7 +544,7 @@ class Service(Management):
                 return draft_id
         if self.approval_cards:
             card = build_approval_card(draft_id=draft_id, version=version, customer_text=customer_text,
-                                       reference=reference)
+                                       reference=reference, agent_recall=(kind, conv['channel']) == ('agent_draft', 'telegram'))
             self._queue(db, cid, 'feishu', 'send', 'notice:draft:' + draft_id, {'card': card})
         else:
             self._notify(db, cid, 'draft:' + draft_id,
@@ -508,12 +567,21 @@ class Service(Management):
         cid = conv['id']
         draft = db.execute('SELECT * FROM reply_drafts WHERE id=? AND conversation_id=? AND version=?',
                            (draft_id, cid, version)).fetchone()
-        if draft is None or draft['status'] == 'cancelled' or draft['language'] != conv['language']:
+        if draft is None or draft['status'] == 'cancelled':
             return {'status': 'approval_stale', 'conversation_id': cid}
         preview = db.execute("SELECT external_id,payload FROM outbox WHERE operation_key=? AND status='sent'",
                              ('notice:draft:' + draft['id'],)).fetchone()
         if card_message_id and (preview is None or preview['external_id'] != card_message_id
                                 or 'card' not in json.loads(preview['payload'])):
+            return {'status': 'approval_stale', 'conversation_id': cid}
+        if decision == 'recall':
+            if not card_message_id or (draft['kind'], conv['channel']) != ('agent_draft', 'telegram'):
+                return {'status': 'approval_stale', 'conversation_id': cid}
+            message = self._agent_card_message(db, cid, draft_id)
+            if not message or not message['confirmed'] or message['status'] not in ('sent', 'deleted'):
+                return {'status': 'recall_not_sent', 'conversation_id': cid}
+            return self._recall(db, message['id'], cid, actor)
+        if draft['language'] != conv['language']:
             return {'status': 'approval_stale', 'conversation_id': cid}
         if draft['status'] == 'approved':
             return {'status': 'duplicate_approval', 'conversation_id': cid}
@@ -542,6 +610,8 @@ class Service(Management):
                             parent_id=draft['parent_id'], status='queued')
         db.execute("UPDATE reply_drafts SET status='approved',approved_by=?,message_id=? WHERE id=?",
                    (actor, mid, draft['id']))
+        if self.approval_cards and actor is not None and (draft['kind'], conv['channel']) == ('agent_draft', 'telegram'):
+            self._queue_closed_card(db, cid, draft['id'], 'approved')
         self._queue(db, cid, conv['channel'], 'send', 'out:' + mid,
                     {'text': draft['customer_text'], 'recipient_type': conv['recipient_type']}, mid)
         self._audit(db, cid, 'reply_approved', {'draft_id': draft['id'], 'version': draft['version'],
@@ -549,7 +619,7 @@ class Service(Management):
         return {'status': 'approved', 'conversation_id': cid, 'message_id': mid}
 
     def decide_draft(self, event):
-        if (not isinstance(event, DraftDecision) or event.decision not in ('approve', 'reject')
+        if (not isinstance(event, DraftDecision) or event.decision not in ('approve', 'reject', 'recall')
                 or not all(isinstance(value, str) and value for value in asdict(event).values())):
             raise ChannelError('invalid_payload')
         digest = hashlib.sha256(_json(asdict(event)).encode()).hexdigest()
@@ -572,7 +642,8 @@ class Service(Management):
                                         event.decision, card_message_id=event.message_id)
             if result['status'] in ('approved', 'rejected'):
                 self._queue_closed_card(db, cid, event.draft_id, result['status'])
-            self._approval_feedback(db, cid, 'card-decision:' + event.event_id, result['status'])
+            if event.decision != 'recall':
+                self._approval_feedback(db, cid, 'card-decision:' + event.event_id, result['status'])
             db.execute("INSERT INTO inbox VALUES('feishu-card',?,?,?,?)",
                        (event.app_id, event.event_id, digest, _json(result)))
             return result
@@ -931,8 +1002,9 @@ class Service(Management):
         if row is None:
             raise ChannelError('not_found', 'No outbound message exists in this conversation.')
         message = dict(row)
-        if message['recall_status'] in ('pending', 'deleted', 'cancelled'):
-            return {'status': message['recall_status'], 'message_id': mid, 'conversation_id': cid}
+        previous = message['recall_status']
+        if previous is not None and (previous != 'pending' or message['status'] != 'delivery_unknown'):
+            return {'status': previous, 'message_id': mid, 'conversation_id': cid}
         inflight = db.execute("SELECT 1 FROM outbox WHERE message_id=? AND operation='send' AND status='inflight'", (mid,)).fetchone()
         if message['status'] in ('queued', 'translation_unavailable', 'blocked_window', 'media_pending', 'failed') and not inflight:
             db.execute("UPDATE outbox SET status='cancelled' WHERE message_id=? AND status='pending'", (mid,))
@@ -947,9 +1019,12 @@ class Service(Management):
         else:
             status = 'pending'
             db.execute("UPDATE messages SET recall_status='pending' WHERE id=?", (mid,))
+            self._queue_agent_card_for_message(db, mid)
             if message['external_id']:
                 self._queue(db, cid, conv['channel'], 'delete', 'recall:' + mid,
                             {'external_id': message['external_id']}, mid)
+        if status != 'pending':
+            self._queue_agent_card_for_message(db, mid)
         self._audit(db, cid, 'recall_requested', {'message_id': mid, 'actor': actor, 'status': status})
         if status in ('unsupported', 'delivery_unknown', 'cancelled'):
             notice = {'unsupported': '此平台不支持撤回已发送消息，原消息仍可能对客户可见。',
@@ -1104,6 +1179,16 @@ class Service(Management):
     def _failure(self, db, item, exc):
         retryable = exc.code in ('rate_limited', '429')
         unknown = exc.code in ('delivery_unknown', 'timeout', 'invalid_response')
+        if retryable and item['operation'] == 'send' and item['message_id'] and db.execute(
+            """UPDATE messages SET status='cancelled',recall_status='cancelled'
+                WHERE id=? AND direction='outbound' AND recall_status='pending'""", (item['message_id'],)
+        ).rowcount:
+            mid, cid = item['message_id'], item['conversation_id']
+            db.execute("UPDATE outbox SET status='cancelled',last_error=? WHERE id=?", (exc.code, item['id']))
+            self._audit(db, cid, 'delivery_failure', {'outbox_id': item['id'], 'error': exc.code, 'state': 'cancelled'})
+            self._notify(db, cid, 'recall:cancelled:' + mid, '消息已在发送前取消。消息 ' + mid)
+            self._queue_agent_card_for_message(db, mid)
+            return
         if retryable and item['attempts'] < 3:
             status = 'pending'
             db.execute("UPDATE outbox SET status='pending',available_at=?,last_error=? WHERE id=?",
@@ -1125,6 +1210,8 @@ class Service(Management):
                     message = db.execute('SELECT source_channel FROM messages WHERE id=?', (item['message_id'],)).fetchone()
                     if message and message['source_channel'] == 'intake_question':
                         self._handoff(db, item['conversation_id'], intake_reason='reply_not_confirmed')
+            if item['channel'] == 'telegram' and item['operation'] in ('send', 'delete'):
+                self._queue_agent_card_for_message(db, item['message_id'])
         self._audit(db, item['conversation_id'], 'delivery_failure', {'outbox_id': item['id'], 'error': exc.code, 'state': status})
         if status != 'pending' and item['channel'] != 'feishu':
             action = '撤回' if item['operation'] == 'delete' else '发送'
@@ -1168,4 +1255,6 @@ class Service(Management):
                 self._delete_ai_mirror(db, item['conversation_id'], item['message_id'])
                 self._notify(db, item['conversation_id'], 'deleted:' + item['message_id'],
                              '平台已确认删除对应消息。消息 ' + item['message_id'])
+        if item['channel'] == 'telegram' and item['operation'] in ('send', 'delete'):
+            self._queue_agent_card_for_message(db, item['message_id'])
         self._audit(db, item['conversation_id'], 'delivery_confirmed', {'outbox_id': item['id'], 'external_id': external_id})

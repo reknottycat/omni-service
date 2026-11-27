@@ -7,6 +7,7 @@ import re
 import selectors
 import stat
 import subprocess
+import sys
 import tempfile
 import time
 from contextlib import suppress
@@ -15,13 +16,15 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import NAMESPACE_URL, uuid5
 
-from .approval_card import CARD_ACTION, card_decision
+from .approval_card import CARD_ACTION, card_decision, parse_feishu_card_action
 from .channels import feishu_text
+from .feishu_sdk import RECALL_EVENT, SDK_STREAM
 from .media import MAX_FILE_BYTES, MAX_IMAGE_BYTES, MediaBlob, normalize_blob, safe_filename
 from .models import Attachment, ChannelError, InboundEvent
 
 
 _EVENT = "im.message.receive_v1"
+_NATIVE_MENTION = re.compile(r"<at(?=\s|>)", re.IGNORECASE)
 _MAX_LINE = 256 * 1024
 _CLI_TIMEOUT = 15
 _MEDIA_TIMEOUT = 60
@@ -39,7 +42,7 @@ _MEDIA_FILE = re.compile(
 )
 _EVENT_LOSS_PREFIXES = (b"WARN: event seq gap", b"WARN: consume backpressure",
                         b"WARN: dropping oversized frame", b"WARN: sink write failed",
-                        b"WARN: Process error", b"WARN: JQ error")
+                        b"WARN: Process error", b"WARN: JQ error", b"WARN: sdk connection lost")
 
 
 def _id(value, prefix):
@@ -73,6 +76,17 @@ def _event_attachment(message_type, content):
         with suppress(ValueError):
             name = safe_filename(json.loads(f'"{encoded_name}"'), fallback)
     return Attachment("audio" if tag == "audio" else "file", key, name)
+
+
+def _sdk_attachment(message_type, content):
+    kind = {"image": "image", "audio": "audio", "file": "file", "media": "file", "video": "file"}.get(message_type)
+    if kind is None:
+        return None
+    key = content.get("image_key" if kind == "image" else "file_key")
+    if not _resource_id(key, kind):
+        return None
+    fallback = {"video": "video.mp4", "media": "video.mp4", "audio": "audio.opus"}.get(message_type, "")
+    return Attachment(kind, key, safe_filename(content.get("file_name"), fallback=fallback))
 
 
 def _downloaded_blob(directory, receipt, kind, name):
@@ -464,6 +478,116 @@ class FeishuLive:
         yield from self._events(CARD_ACTION, self._card_filter(managed_membership), self._parse_card_event,
                                 stop, duration, room_allowed, managed_membership)
 
+    def _parse_sdk_event(self, line, room_allowed, managed_membership, *, tenant_key, approval_cards):
+        try:
+            wire = json.loads(line)
+        except (ValueError, UnicodeError, RecursionError):
+            raise ChannelError("feishu_invalid_event_stream") from None
+        if not isinstance(wire, dict) or wire.get("schema") != "2.0":
+            return None
+        header, event = wire.get("header"), wire.get("event")
+        if (not isinstance(header, dict) or not isinstance(event, dict)
+                or header.get("app_id") != self.app_id or header.get("tenant_key") != tenant_key):
+            return None
+        event_type = header.get("event_type")
+        if event_type == _EVENT:
+            return self._sdk_message(event, room_allowed, managed_membership)
+        if event_type == RECALL_EVENT:
+            chat_id, message_id, timestamp = event.get("chat_id"), event.get("message_id"), event.get("recall_time")
+            event_id = header.get("event_id")
+            if (event.get("recall_type") != "message_owner" or not self._sdk_room(chat_id, room_allowed)
+                    or not _id(message_id, "om_") or not isinstance(timestamp, str)
+                    or re.fullmatch(r"[0-9]{1,15}", timestamp) is None or not isinstance(event_id, str)
+                    or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", event_id) is None):
+                return None
+            return "recall", InboundEvent("feishu", self.app_id, event_id, chat_id, "", message_id,
+                                          event_type="delete", timestamp=int(timestamp) / 1000)
+        if event_type == CARD_ACTION and approval_cards:
+            try:
+                decision = parse_feishu_card_action(wire, app_id=self.app_id)
+            except ChannelError:
+                return None
+            if (self._sdk_room(decision.chat_id, room_allowed) and _id(decision.user_id, "ou_")
+                    and (managed_membership or decision.user_id in self.staff_ids)):
+                return "card", decision
+        return None
+
+    def _sdk_room(self, chat_id, room_allowed):
+        if not _id(chat_id, "oc_") or self.chat_id not in (None, chat_id):
+            return False
+        return room_allowed(chat_id) if room_allowed is not None else self.chat_id == chat_id
+
+    def _sdk_message(self, event, room_allowed, managed_membership):
+        sender, message = event.get("sender"), event.get("message")
+        if not isinstance(sender, dict) or not isinstance(message, dict) or sender.get("sender_type") != "user":
+            return None
+        ids = sender.get("sender_id")
+        sender_id = ids.get("open_id") if isinstance(ids, dict) else None
+        chat_id, message_id, created = message.get("chat_id"), message.get("message_id"), message.get("create_time")
+        if (message.get("chat_type") != "group" or not self._sdk_room(chat_id, room_allowed)
+                or not _id(sender_id, "ou_") or (not managed_membership and sender_id not in self.staff_ids)
+                or not _id(message_id, "om_") or not isinstance(created, str)
+                or re.fullmatch(r"[0-9]{1,15}", created) is None):
+            return None
+        try:
+            content = json.loads(message.get("content", ""))
+        except (ValueError, TypeError, RecursionError):
+            return None
+        if not isinstance(content, dict):
+            return None
+        kind = message.get("message_type")
+        if kind == "text":
+            text, attachments = content.get("text"), ()
+            if not isinstance(text, str) or not text.strip():
+                return None
+        elif isinstance(kind, str) and (attachment := _sdk_attachment(kind, content)):
+            text, attachments = "", (attachment,)
+        else:
+            return None
+        return "message", InboundEvent(
+            "feishu", self.app_id, message_id, chat_id, sender_id, message_id, text=text,
+            timestamp=int(created) / 1000, attachments=attachments,
+            has_mentions=message.get("mentions") not in (None, []) or bool(_NATIVE_MENTION.search(text)))
+
+    def sdk_events(self, stop=None, *, app_secret, tenant_key, approval_cards=False, duration=0,
+                   room_allowed=None, managed_membership=False):
+        """Consume messages, recalls and enabled card actions from one official SDK socket."""
+        if (not isinstance(app_secret, str) or re.fullmatch(r"[!-~]{1,512}", app_secret) is None
+                or not isinstance(tenant_key, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", tenant_key) is None
+                or type(approval_cards) is not bool):
+            raise ChannelError("feishu_invalid_sdk_config")
+        if type(duration) is not int or not 0 <= duration <= 3600:
+            raise ChannelError("feishu_invalid_duration")
+        if (type(managed_membership) is not bool or (room_allowed is not None and not callable(room_allowed))
+                or ((managed_membership or self.chat_id is None) and room_allowed is None)):
+            raise ChannelError("feishu_invalid_room_filter")
+        if stop is not None and stop.is_set():
+            return
+        self.preflight()
+        try:
+            process = subprocess.Popen((sys.executable, "-P", "-B", "-m", "omni_service.feishu_sdk"),
+                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       env=self._env)
+        except OSError:
+            raise ChannelError("feishu_stream_unavailable") from None
+        with process:
+            try:
+                settings = {"app_id": self.app_id, "app_secret": app_secret, "tenant_key": tenant_key,
+                            "approval_cards": approval_cards}
+                process.stdin.write(json.dumps(settings).encode() + b"\n")
+                process.stdin.flush()
+
+                def parse(line, rooms, managed):
+                    return self._parse_sdk_event(line, rooms, managed, tenant_key=tenant_key,
+                                                 approval_cards=approval_cards)
+
+                yield from self._read_stream(process, SDK_STREAM, parse, stop, duration, room_allowed,
+                                             managed_membership, parent_timeout=True)
+            except OSError:
+                raise ChannelError("feishu_stream_unavailable") from None
+            finally:
+                self._stop_stream(process)
+
     def _events(self, event_key, projection, parser, stop, duration, room_allowed, managed_membership):
         if type(duration) is not int or not 0 <= duration <= 3600:
             raise ChannelError("feishu_invalid_duration")
@@ -488,16 +612,20 @@ class FeishuLive:
                 yield from self._read_stream(process, event_key, parser, stop, duration,
                                              room_allowed, managed_membership)
             finally:
-                if process.poll() is None:
-                    with suppress(ProcessLookupError):
-                        process.terminate()
-                    try:
-                        process.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        # Neither consumer creates a server-side subscription.
-                        process.kill()
+                self._stop_stream(process)
 
-    def _read_stream(self, process, event_key, parser, stop, duration, room_allowed, managed_membership):
+    @staticmethod
+    def _stop_stream(process):
+        if process.poll() is None:
+            with suppress(ProcessLookupError):
+                process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+    def _read_stream(self, process, event_key, parser, stop, duration, room_allowed, managed_membership,
+                     *, parent_timeout=False):
         ready = timed_out = False
         ready_marker = f"[event] ready event_key={event_key}".encode()
         started = time.monotonic()
@@ -508,6 +636,8 @@ class FeishuLive:
                 if stop is not None and stop.is_set():
                     return
                 elapsed = time.monotonic() - started
+                if parent_timeout and ready and duration and elapsed > duration:
+                    return
                 if (not ready and elapsed > _CLI_TIMEOUT) or (duration and elapsed > duration + _CLI_TIMEOUT):
                     raise ChannelError("feishu_stream_timeout")
                 for key, _ in selector.select(timeout=0.25):

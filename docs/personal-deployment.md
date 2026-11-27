@@ -61,6 +61,14 @@ bash scripts/setup-personal.sh support register-feishu -- --feishu-app-name 'Omn
 
 跨组织协作使用同一个邀请入口和逐人的平台身份判定。正式启用需验证外部共享机器人返回的 Open ID、飞书外部群的实际属性及成员回执、管理员授予该会话的客服权限。只在某个会话实际分配了获准的外部同事时使用外部群。已有内部群增加外部同事时为这一会话单独新建或绑定外部群，历史消息和附件继续留在原群。当前可运行路径覆盖本组织邀请，外部账号的混合名单、群路由、回复、附件和审批回执待实测。 [飞书外部共享机器人](https://open.feishu.cn/document/develop-robots/add-bot-to-external-group?lang=zh-CN)
 
+## 启用飞书撤回和 Agent 卡片撤回
+
+在目标团队的飞书应用为长连接登记 `im.message.recalled_v1` 并发布。保留群消息和卡片回调，应用需有 `im:message:readonly`。在同一 Telegram 机器人连接授予「删除已发送消息」，用于撤回该机器人实际发到客户私聊的回复。
+
+保留管理员已验证的应用凭据和组织标识，在实例 Python 环境安装 `requirements-onboarding.txt`，然后为该实例设置 `feishu.native_recall` 为 `true` 并运行启动前检查。该模式使用一个官方 SDK 长连接接收群消息、撤回和卡片回调。升级时检查该应用原先由 CLI 拉起的事件总线，切换时只结束这个应用的旧连接，避免平台把事件分发给另一条连接。
+
+用获准的测试私聊验证两条路径：员工发送普通回复后在飞书原生撤回，以及 Agent 卡片确认送达后点击「撤回」。核对 Telegram 实际消息和飞书状态。发送前取消、已撤回和结果未知分别验收。
+
 ## 更新、迁移与检查
 
 ```bash

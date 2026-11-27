@@ -7,7 +7,7 @@ import unittest
 from omni_service.intake import Intake
 from omni_service.models import ChannelError
 from omni_service.personal_runner import PersonalBridge
-from test_personal_runner import TelegramFixture, staff
+from test_personal_runner import TelegramFixture, recall, staff
 
 
 class ManagedTelegram(TelegramFixture):
@@ -160,6 +160,56 @@ class ManagedBridgeAcceptance(unittest.TestCase):
         self.bridge.drain()
         self.assertEqual(len(self.feishu.create_requests), 1)
         self.assertEqual(len(self.telegram.sent), 1)
+
+    def test_native_recall_in_another_linked_room_cannot_delete_staff_or_customer_mirror(self):
+        self.telegram.delete_right = True
+        self.telegram.update(1, "Здравствуйте")
+        self.telegram.update(2, "Hello", chat=30, sender=30)
+        self.intake()
+        clients = self.conversations()
+        first, second = clients["20"], clients["30"]
+        customer_mirror = next(item["external_id"] for item in first["outbox"]
+                               if item["operation_key"].startswith("mirror:"))
+        event = staff(room=first["room_id"])
+        self.bridge.receive_feishu(event)
+        self.bridge.drain()
+        for unrelated in (recall(event, event_id="wrong-room", chat_id=second["room_id"]),
+                          recall(staff(mid=customer_mirror, room=first["room_id"]), event_id="mirror")):
+            self.assertEqual(self.bridge.receive_feishu(unrelated)["status"], "unknown_message")
+        self.bridge.drain()
+        self.assertEqual(self.telegram.deleted, [])
+        self.assertEqual(self.bridge.receive_feishu(recall(event))["status"], "pending")
+        self.bridge.drain()
+        self.assertEqual(self.telegram.deleted, [{"business_connection_id": "c1", "message_ids": [92]}])
+
+    def test_approved_agent_recall_uses_its_sent_receipt_and_keeps_the_welcome(self):
+        self.telegram.delete_right = True
+        self.telegram.update(1, "Здравствуйте")
+        self.intake()
+        first = self.conversations()["20"]
+        cid, room = first["id"], first["room_id"]
+        self.bridge.handoff(cid)
+        self.bridge.agent_advisor = lambda _transcript: "您好，我来帮您处理。"
+        self.bridge.set_agent_enabled(True)
+        self.bridge.receive_feishu(staff("/draft", mid="om_draft", room=room))
+        self.bridge.drain()
+        draft = self.conversations()["20"]["drafts"][-1]
+        self.assertEqual(draft["kind"], "agent_draft")
+        approved = self.bridge.receive_feishu(
+            staff(f"/approve {draft['id']} {draft['version']}", mid="om_approve", room=room))
+        self.assertEqual(approved["status"], "approved")
+        self.bridge.drain()
+        message_id = self.conversations()["20"]["drafts"][-1]["message_id"]
+        self.assertEqual(self.bridge.recall(message_id, cid, "ou_allowed")["status"], "pending")
+        self.bridge.drain()
+        self.assertEqual(self.telegram.deleted, [{"business_connection_id": "c1", "message_ids": [91]}])
+        state = self.conversations()["20"]
+        messages = state["messages"]
+        self.assertEqual(next(item for item in messages if item["id"] == message_id)["status"], "deleted")
+        self.assertEqual(next(item for item in messages if item["source_channel"] == "ai_welcome")["status"], "sent")
+        history = next(item for item in state["outbox"] if item["operation_key"] == "history-ai:" + message_id)
+        self.assertEqual(history["status"], "sent")
+        self.assertFalse(any(item["channel"] == "feishu" and item["operation"] == "delete" for item in state["outbox"]))
 
     def test_reopening_with_different_authorized_peers_fails_closed(self):
         with self.assertRaisesRegex(ChannelError, "personal_db_binding_mismatch"):

@@ -1,4 +1,6 @@
 import importlib.util
+import io
+from contextlib import redirect_stdout
 import json
 import os
 from pathlib import Path
@@ -24,9 +26,11 @@ class SetupPersonalTest(unittest.TestCase):
         patcher = patch.dict(os.environ, {"XDG_CONFIG_HOME": directory.name})
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.root = Path(directory.name) / "omni-service" / "support"
+        self.root = Path(directory.name).resolve() / "omni-service" / "support"
+        os.environ["XDG_CONFIG_HOME"] = str(Path(directory.name).resolve())
         self.tools = self.root / "tools"
         self.tools.mkdir(parents=True)
+        self.root.chmod(0o700)
         self.py = self.tools / "sdk" / "bin" / "python"
         self.binary = self.tools / ("libtdjson.dylib" if sys.platform == "darwin" else "libtdjson.so")
 
@@ -84,3 +88,30 @@ class SetupPersonalTest(unittest.TestCase):
             with self.assertRaisesRegex(setup.SetupError, "安装收据不匹配"):
                 setup.ensure_tdlib(self.tools)
             probe.assert_not_called()
+
+    def test_developer_credentials_are_private_and_status_is_local(self):
+        secret = "1234567890abcdef1234567890abcdef"
+        dest = self.root / "telegram-application.json"
+        out = io.StringIO()
+        with redirect_stdout(out), patch("omni_service.telegram_tdlib.private_input",
+                                          side_effect=["123456",secret]) as prompt:
+            self.assertEqual(setup.main(["support","telegram-app-status"]),1)
+            self.assertEqual(setup.main(["support","telegram-app-store"]),0)
+            self.assertEqual(setup.main(["support","telegram-app-status"]),0)
+            self.assertEqual(setup.main(["support","telegram-app-store"]),0)
+        self.assertEqual(prompt.call_count,2)
+        self.assertEqual(dest.stat().st_mode & 0o777,0o600)
+        self.assertEqual(json.loads(dest.read_text())["api_hash"],secret)
+        self.assertNotIn(secret,out.getvalue())
+        self.assertIn('"scope": "local_format_only"',out.getvalue())
+
+    def test_insecure_requested_storage_not_replaced(self):
+        dest = self.root / "telegram-application.json"
+        other = self.root / "ignore.json"
+        other.write_text("untouched")
+        dest.symlink_to(other)
+        with patch("omni_service.telegram_tdlib.private_input") as prompt:
+            self.assertEqual(setup.main(["support","telegram-app-store"]),1)
+        self.assertEqual(other.read_text(),"untouched")
+        self.assertTrue(dest.is_symlink())
+        prompt.assert_not_called()

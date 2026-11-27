@@ -24,6 +24,12 @@ bash scripts/setup-personal.sh support prepare
 
 安装者先准备实例参数、专用 Telegram Bot Token 和 Telegram 应用的 API ID/hash。使用者按提示在飞书和 Telegram 登录或确认授权，由程序写入配置并验证平台回执。已接入实例的启动和升级沿用保存的配置，无需再次登录 Telegram。
 
+#### 部署方只做一次的 Telegram 开发者配置
+
+1. 官方开发者后台 [API development tools](https://my.telegram.org/apps) 负责应用登记。由账号所有者在官方页面输入手机号和收到的 Telegram App 验证码（不是短信）；没有公开的开发者登记 CLI，不自动读取 App 消息，不把验证码交给 OmniService。
+2. 在服务主机的受信任终端，从已准备好的实例运行 `bash scripts/setup-personal.sh support telegram-app-store`。提示输入 `api_id / api_hash` 时不会回显，原值不会被日志、命令行或 Git 接收，文件仅当前用户可读，已有文件不会覆盖。
+3. `bash scripts/setup-personal.sh support telegram-app-status` 只检查本机文件格式和权限，不发短信、不登录、不绑定。以后同实例的 `configure -- --telegram-owner …` 自动使用它，不必再填写或转发。账号所有者仍在 Telegram App 扫描官方登录码，若平台要求额外的安全确认不得自动跳过。
+
 用同一个仓库入口续接；它自动使用该实例的私有组件。Telegram Bot Token 和开发者 [API ID/hash](https://core.telegram.org/api/obtaining_api_id) 分别用于 Bot API 和一次性用户绑定，不随仓库分发。可信部署者可将 API ID/hash 预置为仅本人能读的 JSON（字段 `api_id` 整数、`api_hash` 字符串），或在终端按隐藏输入提示填写。切勿提交到 Git。
 
 ```bash
@@ -32,7 +38,6 @@ bash scripts/setup-personal.sh support configure -- \
   --callback-url 'https://support.example.com/admin/auth/callback' \
   --model-url 'http://127.0.0.1:8000/v1' --model 'translation-model' \
   --feishu-app-name 'OmniService 物流客服' \
-  --tdlib-app-credentials "$team_config/telegram-application.json" \
   --telegram-owner @example_logistics \
   --chat-scope allowlist --test-chat-id 12345678 --port 8081
 ```

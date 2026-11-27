@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import stat
 import subprocess
 import sys
@@ -138,6 +139,42 @@ def ensure_sdk(tools):
     return py
 
 
+def verify_app_directory(root):
+    info = root.lstat()
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077
+            or root.resolve(strict=True) != root):
+        raise SetupError("团队目录必须为当前用户专用且不可为符号链接。")
+
+
+def check_telegram_app(target, validate):
+    if not target.exists() and not target.is_symlink():
+        return "missing"
+    validate(target)
+    return "ready"
+
+
+def store_telegram_app(target, validate):
+    from omni_service.telegram_tdlib import _validate_application, private_input
+
+    if check_telegram_app(target, validate) == "ready":
+        return
+    app_id = private_input("Telegram App api_id（隐藏输入）: ")
+    if not isinstance(app_id, str) or not app_id.isascii() or not app_id.isdecimal() or len(app_id) > 10:
+        raise SetupError("Telegram App api_id 无效。")
+    app_hash = private_input("Telegram App api_hash（隐藏输入）: ")
+    api_id, api_hash = _validate_application(int(app_id), app_hash)
+    with tempfile.NamedTemporaryFile(mode="w", dir=target.parent, delete=False) as stream:
+        staged = Path(stream.name)
+        try:
+            json.dump({"api_id": api_id, "api_hash": api_hash}, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+            # Publish the complete validated file only if no file already exists.
+            os.link(staged, target, follow_symlinks=False)
+        finally:
+            staged.unlink(missing_ok=True)
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if len(argv) == 2 and argv[0] == "--probe-tdlib":
@@ -153,25 +190,41 @@ def main(argv=None):
         setup, options = setup[:i], setup[i + 1:]
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("team")
-    parser.add_argument("action", choices=("prepare", "register-feishu", "configure", "check-feishu-scopes"))
+    parser.add_argument("action", choices=("prepare", "register-feishu", "configure", "check-feishu-scopes",
+                                           "telegram-app-store", "telegram-app-status"))
     parser.add_argument("--tdlib-source", type=Path, help="可选：用固定校验的官方源码包离线构建 TDLib")
     args = parser.parse_args(setup)
     if any(x.split("=", 1)[0] in ("--config", "--secrets-file", "--tdlib-library") for x in options):
         parser.error("接入入口使用本实例固定配置、凭据文件和已验证的 TDLib")
-    if args.action == "prepare" and options:
-        parser.error("prepare 不接受接入参数")
+    if args.action in ("prepare", "telegram-app-store", "telegram-app-status") and options:
+        parser.error("此操作不接受接入参数")
     os.umask(0o077)
     sys.path.insert(0, str(ROOT / "src"))
     from omni_service.models import ChannelError
     from omni_service.onboarding import _setup_lock
     from omni_service.onboarding_tools import ensure_lark_cli
+    from omni_service.telegram_tdlib import application_credentials
     try:
         xdg = Path(os.getenv("XDG_CONFIG_HOME") or Path.home() / ".config")
         if not xdg.is_absolute():
             raise SetupError("XDG 配置目录必须是绝对路径。")
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,47}", args.team):
+            raise SetupError("团队名请使用小写英文、数字和连字符。")
+        root = xdg / "omni-service" / args.team
+        if args.action in ("telegram-app-store", "telegram-app-status"):
+            verify_app_directory(root)
+            target = root / "telegram-application.json"
+            if args.action == "telegram-app-status":
+                status = check_telegram_app(target, application_credentials)
+                print(json.dumps({"telegram_application": status,
+                                  "scope": "local_format_only", "login_started": False}))
+                return 0 if status == "ready" else 1
+            with _setup_lock(root / ".dependencies.lock"):
+                store_telegram_app(target, application_credentials)
+            print("Telegram 开发者应用凭据可用。未发起登录或绑定。")
+            return 0
         installer = ROOT / "deploy" / "install_personal.py"
         _run((sys.executable, "-I", installer, args.team, "--no-start"), limit=60)
-        root = xdg / "omni-service" / args.team
         with _setup_lock(root / ".dependencies.lock"):
             tools = ensure_lark_cli(root)
             py = ensure_sdk(tools)
@@ -180,6 +233,12 @@ def main(argv=None):
         if args.action == "prepare":
             print("飞书和 Telegram 组件准备并通过本机检查；未启动服务或登录平台。")
             return 0
+        target = root / "telegram-application.json"
+        keys = {item.split("=", 1)[0] for item in options}
+        if (args.action == "configure" and "--telegram-owner" in keys
+                and "--tdlib-app-credentials" not in keys and (target.exists() or target.is_symlink())):
+            application_credentials(target)
+            options.extend(("--tdlib-app-credentials", target))
         entry = ("import runpy,sys; sys.path.insert(0,sys.argv.pop(1)); "
                  "runpy.run_module('omni_service.onboarding', run_name='__main__')")
         return subprocess.run((py, "-I", "-B", "-c", entry, ROOT / "src", args.action,

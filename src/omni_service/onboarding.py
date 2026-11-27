@@ -392,8 +392,8 @@ def configure(args, credentials, config):
         raise ChannelError("invalid_setup_config")
     if args.chat_scope is None or not args.model_url or not args.model or not 1 <= args.port <= 65535:
         raise ChannelError("invalid_setup_config")
-    company_name = args.company_name or args.config.parent.name
-    if (len(company_name) > 40 or not company_name.strip()
+    company_name = config.get('company_name', '') if args.company_name is None else args.company_name
+    if (not isinstance(company_name, str) or len(company_name) > 40
             or any(ord(char) < 32 or ord(char) == 127 for char in company_name)):
         raise ChannelError('invalid_company_name')
     scopes = args.chat_scope
@@ -494,7 +494,7 @@ def main(argv=None):
     parser.add_argument("--model-url")
     parser.add_argument("--model")
     parser.add_argument("--port", type=int, default=8081, help="管理页环回端口")
-    parser.add_argument("--company-name", help="飞书服务群使用的公司名称")
+    parser.add_argument("--company-name", help="已知的部署公司名称，作为新群业务简称默认值")
     parser.add_argument("--chat-scope", choices=("connection", "allowlist"))
     parser.add_argument("--test-chat-id", action="append", type=int, default=[])
     parser.add_argument("--tdlib-library", type=Path, help="启用 Telegram 命令行绑定，使用官方 libtdjson 的绝对路径")

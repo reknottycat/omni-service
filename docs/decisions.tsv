@@ -23,3 +23,4 @@ ts	phase	decision	why	evidence	result
 2026-11-26T18:08:56+08:00	verification	Telegram 与飞书双向原生附件及客户指令防护	按来源与会话校验资源和权限，疑似指令交人工且保持既有回复语言	docs/personal-account.md#2026-11-26-双向附件与-telegram-客户指令防护	Mac four native image and PDF receipts; DGX 201 Linux mock tests passed
 2026-11-26T18:35:26+08:00	verification	Linux 团队部署、扫码引导和飞书组织内客服邀请	按人员验证身份和按会话授权，无全局协作模式；升级保留原数据和权限	docs/personal-deployment.md	DGX 227 Linux mock tests passed; new-tenant and mixed external roster live acceptance pending
 2026-11-26T19:02:00+08:00	verification	不同公司使用独立 Telegram 与飞书应用实例	以公司区分配置、账户和数据库，提供本机管理入口并检查重复绑定	docs/personal-deployment.md#多公司和多个-telegram-原账号	DGX 231 Linux mock tests passed; multi-company live authorization pending
+2026-11-27T10:47:13+08:00	verification	管理员配置新群业务简称，采用服务器本地建群日期	沿用实例的管理员设置接口；显式空值省略简称	docs/evidence/linux-mock-acceptance.md#2026-11-27-客服群命名复验	DGX 254 Linux mock tests passed

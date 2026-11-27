@@ -103,3 +103,9 @@ DGX Linux aarch64 / Python 3.12.3 对 `8d596ab` 执行 `bash scripts/acceptance.
 ## 2026-11-26 多公司实例复验
 
 DGX Linux aarch64 / Python 3.12.3 对 `0910eb6` 执行 `bash scripts/acceptance.sh`，231 项通过，0 失败、0 错误、0 跳过。`test_company_accounts.py` 覆盖三家公司的独立业务连接、客户群与回复，以及重复配置、私有配置权限和本机管理页访问。源码 SHA256 为 `1051b804e67bdd0c8700c64d9733cd0853a938cd5da10f6ada65b4eccb7bd6b6`。报告及日志位于 `artifacts/dgx-companies-20261126/`。 [部署说明](../personal-deployment.md#多公司和多个-telegram-原账号)
+
+## 2026-11-27 客服群命名复验
+
+[Issue #13](https://github.com/reknottycat/omni-service/issues/13) 的源码 `8d5d489` 在 DGX Linux aarch64 / Python 3.12.3 上执行 `bash scripts/acceptance.sh`，254 项通过，0 失败、0 错误、0 跳过。验证了管理员保存、清空和重启读回，以及假 Feishu HTTP 接口收到的客户名、实际渠道和服务器本地日期。个人账号模拟测试复验了同账号多客户各自建群和重放不重复建群（AC-03、AC-08）。
+
+`artifacts/acceptance.json` 的源码指纹 `d826a429e242fe16c66c8302de5e9e1f93edddd4c0e68f660d4f862563f1efcf` 已与提交对应的文件核对。此次使用模拟平台。

@@ -1,5 +1,6 @@
 """Managed Telegram acceptance through the business poller and Feishu adapter."""
 
+from datetime import datetime
 from pathlib import Path
 import tempfile
 import unittest
@@ -93,6 +94,9 @@ class ManagedBridgeAcceptance(unittest.TestCase):
         room_a, room_b = first["room_id"], second["room_id"]
         self.assertNotEqual(room_a, room_b)
         self.assertEqual(len(self.feishu.create_requests), 2)
+        day = datetime.fromtimestamp(self.now).date().isoformat()
+        self.assertEqual([name for name, _ in self.feishu.create_requests],
+                         [f"Alpha｜TG·{day}", f"Beta｜TG·{day}"])
         self.assertEqual([out["chat_id"] for out in self.telegram.sent], [20, 30])
         self.assertTrue(all("[AI 模拟]" in out["text"] for out in self.telegram.sent))
         for room, name, other, state in ((room_a, "Alpha", "Beta", first), (room_b, "Beta", "Alpha", second)):

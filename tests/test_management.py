@@ -37,10 +37,11 @@ class ManagementAcceptance(unittest.TestCase):
         self.service = self.open_service()
         self.addCleanup(lambda: self.service.close())
 
-    def open_service(self):
+    def open_service(self, *, company_name=""):
         service = Service(self.path, self.transport, clock=lambda: self.now,
                           members=(ADMIN, STAFF), intake=Intake(lambda _text, _fields: {}, simulated=True),
-                          approval_intake=True, approval_cards=True, agent_advisor=lambda _transcript: "明白。")
+                          approval_intake=True, approval_cards=True, agent_advisor=lambda _transcript: "明白。",
+                          company_name=company_name)
         service.configure_management([ADMIN], welcome_document=DOCUMENT, preview_peers=["101"])
         return service
 
@@ -83,7 +84,7 @@ class ManagementAcceptance(unittest.TestCase):
         self.service.close()
         self.service = self.open_service()
 
-        self.assertEqual(self.service.admin_state(ADMIN)["defaults"], defaults)
+        self.assertEqual(self.service.admin_state(ADMIN)["defaults"], {**defaults, "business_label": ""})
         self.assertEqual(self.customer("101"), old)
         new = self.customer("102")
         self.service.drain()
@@ -93,6 +94,30 @@ class ManagementAcceptance(unittest.TestCase):
         self.assertEqual(self.platforms.rooms[new_row["room_id"]]["members"], [STAFF, NEW_STAFF])
         self.assertEqual(self.conversation_row(old), old_row)
         self.assertEqual(self.platforms.rooms[old_row["room_id"]]["members"], [ADMIN, STAFF])
+
+    def test_business_label_falls_back_until_explicitly_saved_and_survives_restart(self):
+        self.assertEqual(self.service.admin_state(ADMIN)["defaults"]["business_label"], "")
+        self.service.close()
+        self.service = self.open_service(company_name="部署业务")
+        self.assertEqual(self.service.admin_state(ADMIN)["defaults"]["business_label"], "部署业务")
+        self.assertEqual(self.service.admin_state(STAFF)["defaults"], {})
+        self.assert_channel_error("forbidden", self.service.admin_update_defaults, STAFF,
+                                  {"business_label": "无权修改"})
+
+        label = "运" * 40
+        self.service.admin_update_defaults(ADMIN, {"business_label": f"  {label}  "})
+        for invalid in (None, 42, f"{label}a", "不允许\n换行"):
+            with self.subTest(invalid=invalid):
+                self.assert_channel_error("invalid_admin_settings", self.service.admin_update_defaults,
+                                          ADMIN, {"business_label": invalid})
+        self.service.close()
+        self.service = self.open_service(company_name="另一个部署业务")
+        self.assertEqual(self.service.admin_state(ADMIN)["defaults"]["business_label"], label)
+
+        self.service.admin_update_defaults(ADMIN, {"business_label": "    "})
+        self.service.close()
+        self.service = self.open_service(company_name="另一个部署业务")
+        self.assertEqual(self.service.admin_state(ADMIN)["defaults"]["business_label"], "")
 
     def test_web_and_slash_use_the_same_permission_and_room_membership(self):
         cid_a, cid_b = self.customer("101"), self.customer("102")

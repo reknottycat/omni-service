@@ -68,3 +68,7 @@
 ## 后续范围
 
 完整需求待办以 [验收合同 B-01 至 B-10](acceptance.md#模拟边界与完整产品待办) 为准。P0 完成后保留这些条目为后续范围；没有新授权目标时，不为它们循环重跑已完成的 P0。
+
+## 客服群命名
+
+[Issue #13](https://github.com/reknottycat/omni-service/issues/13) / verify / 协调负责人。管理页保存可选业务简称，新群标题采用客户名、业务简称、渠道和服务器本地日期。DGX 复验完毕，见[客服群命名复验](evidence/linux-mock-acceptance.md#2026-11-27-客服群命名复验)。

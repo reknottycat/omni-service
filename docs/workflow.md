@@ -58,6 +58,24 @@
 
 平台能力差异由状态表示。尤其 WhatsApp 不能因为验收使用假服务就虚构已发送消息的全员撤回 API。超时后的投递结果若无法核对，保留 `unknown`，不将潜在重复消息当作可靠性修复。
 
+## Claude Code 真实流验证与审查回执
+
+Claude Code 在本项目使用 `/verify`。先验证受影响的用户实际入口，再选适用的端到端、属性或差分检查；遵守本轮环境与副作用授权。模拟、真实平台和 GitHub CI 各记自己的结果。相同阻塞三轮修复复验仍失败时，停止重复修补并交接证据。不要用无关注释代替验证记录。
+
+独立复核从信任的目标分支 base 读取 `REVIEW.md`，不采用候选修改的规则。它包含已发生的回归与反例，用于评估审查者并分别记录漏报和误报。保存不知道期望结果的审查者原始输出，不把案例文档本身当测试结果。
+
+项目提供可选的只读回执校验器，默认关闭。它不调用模型、不执行项目代码，也未接入 CI、上线或合并；在可信工作区使用**基线版本脚本**，并由操作者提供 GitHub 当前 head/base 和实际合并提交，不从待审回执反推这些值：
+
+```sh
+python3 scripts/check_review_receipt.py --mode observe \
+  --receipt /path/to/independent-receipt.json \
+  --head "$HEAD_SHA" --base "$BASE_SHA" --tested "$TESTED_MERGE_SHA"
+```
+
+- `off` 不读回执；`observe` 检查并报告，不把问题转成失败退出；`enforce` 对缺失、证据过期、无效或阻断回执退出非零，成功仍不代表可以合并。
+- 回执为 JSON 对象，字段是 `head`、`base`、`tested_commit`、`tested_tree`、`policy_sha256`、`decision`（`pass` 或 `block`）、`evidence`（非空的日志/报告引用列表）。`policy_sha256` 取 `git show "$BASE_SHA:REVIEW.md"` 内容的 SHA-256。只接受父提交为该 base 和 head 的合并提交；不适用于仅测试 head。
+- 校验器只检查结构与 Git 对象一致性，不证明日志真实存在、审查者身份、CI 结论或目标仍是当前分支版本。这些由可信 PR 提交者、审查者和平台验收另行核实。默认不新增合并门禁。
+
 ## 决策轨迹
 
 统一使用 `docs/decisions.tsv`，只追加，由协调负责人写入。列沿用 pstack：

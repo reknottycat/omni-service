@@ -381,7 +381,7 @@ def _account_binder(args, env):
         return connect_account(args.tdlib_library, args.config.parent, bot=bot,
                                expected_owner=args.telegram_owner, nonce=nonce,
                                included=args.test_chat_id, excluded=excluded, selectors=selectors,
-                               login=args.telegram_login or "qr", show_qr=show_qr, proxy=proxy,
+                               login=args.telegram_login or "phone", show_qr=show_qr, proxy=proxy,
                                application=application)
 
     return bind
@@ -500,7 +500,7 @@ def main(argv=None):
     parser.add_argument("--tdlib-library", type=Path, help="启用 Telegram 命令行绑定，使用官方 libtdjson 的绝对路径")
     parser.add_argument("--tdlib-app-credentials", type=Path, help="管理员预置的私有 Telegram API ID/hash JSON 文件")
     parser.add_argument("--telegram-owner", help="预期原账号的 @用户名或用户 ID")
-    parser.add_argument("--telegram-login", choices=("qr", "phone"), help="Telegram 登录方式，默认扫码")
+    parser.add_argument("--telegram-login", choices=("qr", "phone"), help="Telegram CLI 登录方式，默认手机号（验证码仅隐藏输入）")
     parser.add_argument("--telegram-recipients", action="append", choices=tuple(RECIPIENT_FLAGS), default=[],
                         help="TDLib connection 范围中的 Telegram 聊天类别，可重复")
     parser.add_argument("--telegram-exclude-chat-id", action="append", type=int, default=[],

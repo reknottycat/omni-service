@@ -255,10 +255,19 @@ def _telegram_pair(api, env, *, bind_account=None, pending=None, save_pending=No
     nonce = secrets.token_urlsafe(24)
     owner = None
     if bind_account is None:
+        if (isinstance(pending, dict) and pending.get("web_manual") is True
+                and pending.get("bot_id") == bot["id"] and type(pending.get("issued_at")) is int
+                and 0 <= issued_at - pending["issued_at"] < 23 * 3600
+                and isinstance(pending.get("nonce"), str)
+                and re.fullmatch(r"[A-Za-z0-9_-]{32}", pending["nonce"])):
+            nonce, issued_at = pending["nonce"], pending["issued_at"]
+        elif save_pending is not None:
+            save_pending({"bot_id": bot["id"], "issued_at": issued_at, "nonce": nonce, "web_manual": True})
         link = telegram_setup_link(bot["username"], nonce)
-        print(f"用 Telegram 原账号打开以下链接并点「开始」：\n{link}", flush=True)
-        _render_qr(link, env)
-        print("在原账号「设置 → 聊天自动化」连接该机器人，选择授权聊天，并允许回复。", flush=True)
+        print("可打开官方 Telegram Web K 扫码登录：https://web.telegram.org/k/ 。"
+              "已登录可直接使用；不需要 Computer Use。", flush=True)
+        print(f"用 Telegram 原账号打开以下配对链接并点「开始」：\n{link}", flush=True)
+        print(f"在「设置 → 聊天自动化」选择 @{bot['username']}，核对聊天范围，只允许回复，然后保存。", flush=True)
     else:
         if (isinstance(pending, dict) and pending.get("tdlib_send_confirmed") is True
                 and pending.get("bot_id") == bot["id"]
@@ -447,19 +456,20 @@ def configure(args, credentials, config):
     api = TelegramAPI(telegram_token, proxy_url=credentials.get("TELEGRAM_HTTPS_PROXY") or None,
                       tunnel_port=int(credentials["TELEGRAM_TLS_TUNNEL_PORT"])
                       if credentials.get("TELEGRAM_TLS_TUNNEL_PORT") else None)
-    pairing = {}
-    if bind_account is not None:
+    if bind_account is None:
+        signature = ["web-manual", scopes, sorted(args.test_chat_id)]
+    else:
         signature = [args.telegram_owner.lstrip("@").casefold(), scopes, sorted(args.test_chat_id),
                      sorted(args.telegram_recipients), sorted(args.telegram_exclude_chat_id)]
-        checkpoint = config["telegram"].get("setup_pairing")
+    checkpoint = config["telegram"].get("setup_pairing")
 
-        def save_pending(proof):
-            config["telegram"]["setup_pairing"] = {"scope": signature, "proof": proof}
-            _save_profile(args, credentials, config)
+    def save_pending(proof):
+        config["telegram"]["setup_pairing"] = {"scope": signature, "proof": proof}
+        _save_profile(args, credentials, config)
 
-        pairing = {"bind_account": bind_account, "save_pending": save_pending}
-        if isinstance(checkpoint, dict) and checkpoint.get("scope") == signature:
-            pairing["pending"] = checkpoint.get("proof")
+    pairing = {"bind_account": bind_account, "save_pending": save_pending}
+    if isinstance(checkpoint, dict) and checkpoint.get("scope") == signature:
+        pairing["pending"] = checkpoint.get("proof")
     bot, connection = _telegram_pair(api, env, **pairing)
     if connection.owner_id in args.test_chat_id:
         raise ChannelError("invalid_telegram_scope")

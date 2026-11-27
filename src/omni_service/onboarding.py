@@ -285,15 +285,21 @@ def _telegram_pair(api, env, *, bind_account=None, pending=None, save_pending=No
                               "tdlib_send_confirmed": True})
     deadline = time.monotonic() + 420
     while time.monotonic() < deadline:
-        updates = api.call("getUpdates", {"timeout": 5, "limit": 100,
-                                          "allowed_updates": ["message", *TelegramPersonal.allowed_updates]})
-        connection = paired_connection(api, updates, nonce, issued_at)
-        if connection is not None:
-            if owner is not None and connection.owner_id != owner:
-                raise ChannelError("telegram_setup_wrong_owner")
-            return bot, connection
-        if len(updates) == 100:
-            raise ChannelError('telegram_pairing_backlog')
+        try:
+            updates = api.call("getUpdates", {"timeout": 5, "limit": 100,
+                                              "allowed_updates": ["message", *TelegramPersonal.allowed_updates]})
+            connection = paired_connection(api, updates, nonce, issued_at)
+        except ChannelError as exc:
+            if exc.code != "delivery_unknown":
+                raise
+            # No offset is acknowledged and the same challenge stays in effect.
+        else:
+            if connection is not None:
+                if owner is not None and connection.owner_id != owner:
+                    raise ChannelError("telegram_setup_wrong_owner")
+                return bot, connection
+            if len(updates) == 100:
+                raise ChannelError('telegram_pairing_backlog')
         time.sleep(1)
     raise ChannelError("telegram_pairing_timed_out")
 

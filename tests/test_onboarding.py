@@ -71,6 +71,29 @@ class OnboardingContracts(unittest.TestCase):
             self.assertEqual(saved.call_args.args[0]["nonce"], "b" * 32)
             self.assertEqual(saved.call_args.args[0]["bot_id"], 41)
 
+    def test_pairing_retries_unknown_reads_without_reissuing_the_challenge(self):
+        api, saved = Mock(), Mock()
+        bot = {"username": "fixture_onboarding_bot", "id": 41}
+        batch = [_start(), {"business_connection": _connection()}]
+        api.call.side_effect = (
+            ChannelError("delivery_unknown"), batch, ChannelError("delivery_unknown"), batch, _connection(),
+        )
+        with patch("omni_service.onboarding.telegram_ready", return_value=bot), \
+                patch("omni_service.onboarding.enable_secretary", return_value=bot) as enable, \
+                patch("omni_service.onboarding.time.time", return_value=1000), \
+                patch("omni_service.onboarding.time.sleep"), \
+                patch("omni_service.onboarding.secrets.token_urlsafe", return_value=NONCE), \
+                contextlib.redirect_stdout(io.StringIO()):
+            _, connection = _telegram_pair(api, {}, save_pending=saved)
+        self.assertEqual(connection.owner_id, 10)
+        self.assertEqual([item.args[0] for item in api.call.call_args_list],
+                         ["getUpdates", "getUpdates", "getBusinessConnection", "getUpdates",
+                          "getBusinessConnection"])
+        for item in api.call.call_args_list:
+            self.assertNotIn("offset", item.args[1])
+        saved.assert_called_once_with({"bot_id": 41, "issued_at": 1000, "nonce": NONCE, "web_manual": True})
+        enable.assert_called_once_with(api, bot)
+
     def test_credentials_are_literal_and_owner_only(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "credentials.env"

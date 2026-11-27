@@ -163,6 +163,10 @@ def store_telegram_app(target, validate):
         raise SetupError("Telegram App api_id 无效。")
     app_hash = private_input("Telegram App api_hash（隐藏输入）: ")
     api_id, api_hash = _validate_application(int(app_id), app_hash)
+    persist_telegram_app(target, api_id, api_hash)
+
+
+def persist_telegram_app(target, api_id, api_hash):
     with tempfile.NamedTemporaryFile(mode="w", dir=target.parent, delete=False) as stream:
         staged = Path(stream.name)
         try:
@@ -191,12 +195,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("team")
     parser.add_argument("action", choices=("prepare", "register-feishu", "configure", "check-feishu-scopes",
-                                           "telegram-app-store", "telegram-app-status"))
+                                           "telegram-app-store", "telegram-app-status", "telegram-app-enroll"))
+    parser.add_argument("--create-telegram-app", action="store_true",
+                        help="明确允许在官方开发者后台登记一个 OmniService 应用（已存在则不改）")
     parser.add_argument("--tdlib-source", type=Path, help="可选：用固定校验的官方源码包离线构建 TDLib")
     args = parser.parse_args(setup)
     if any(x.split("=", 1)[0] in ("--config", "--secrets-file", "--tdlib-library") for x in options):
         parser.error("接入入口使用本实例固定配置、凭据文件和已验证的 TDLib")
-    if args.action in ("prepare", "telegram-app-store", "telegram-app-status") and options:
+    if args.create_telegram_app and args.action != "telegram-app-enroll":
+        parser.error("--create-telegram-app 仅用于 telegram-app-enroll")
+    if args.action in ("prepare", "telegram-app-store", "telegram-app-status", "telegram-app-enroll") and options:
         parser.error("此操作不接受接入参数")
     os.umask(0o077)
     sys.path.insert(0, str(ROOT / "src"))
@@ -211,7 +219,7 @@ def main(argv=None):
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,47}", args.team):
             raise SetupError("团队名请使用小写英文、数字和连字符。")
         root = xdg / "omni-service" / args.team
-        if args.action in ("telegram-app-store", "telegram-app-status"):
+        if args.action in ("telegram-app-store", "telegram-app-status", "telegram-app-enroll"):
             verify_app_directory(root)
             target = root / "telegram-application.json"
             if args.action == "telegram-app-status":
@@ -220,7 +228,17 @@ def main(argv=None):
                                   "scope": "local_format_only", "login_started": False}))
                 return 0 if status == "ready" else 1
             with _setup_lock(root / ".dependencies.lock"):
-                store_telegram_app(target, application_credentials)
+                if args.action == "telegram-app-enroll":
+                    if check_telegram_app(target, application_credentials) == "missing":
+                        from omni_service.telegram_developer import enroll
+                        from omni_service.telegram_tdlib import private_input
+                        phone = private_input("Telegram 开发者账号手机号（隐藏输入）: ").strip()
+                        api_id, api_hash = enroll(
+                            phone, lambda: private_input("开发者后台本次验证码（隐藏输入）: ").strip(),
+                            create=args.create_telegram_app)
+                        persist_telegram_app(target, api_id, api_hash)
+                else:
+                    store_telegram_app(target, application_credentials)
             print("Telegram 开发者应用凭据可用。未发起登录或绑定。")
             return 0
         installer = ROOT / "deploy" / "install_personal.py"

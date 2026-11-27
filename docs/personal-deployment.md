@@ -37,6 +37,9 @@ bash scripts/setup-personal.sh support prepare
 2. 在服务主机的受信任终端，从已准备好的实例运行 `bash scripts/setup-personal.sh support telegram-app-store`。提示输入 `api_id / api_hash` 时不会回显，原值不会被日志、命令行或 Git 接收，文件仅当前用户可读，已有文件不会覆盖。
 3. `bash scripts/setup-personal.sh support telegram-app-status` 只检查本机文件格式和权限，不发短信、不登录、不绑定。以后同实例的 `configure -- --telegram-owner …` 自动使用它，不必再填写或转发。账号所有者仍在 Telegram App 扫描官方登录码，若平台要求额外的安全确认不得自动跳过。
 
+**可选，同一会话开发者登记：** `bash scripts/setup-personal.sh support telegram-app-enroll` 通过同一个内存会话发码、隐藏输入验证码，并读回已有开发者应用。如已明确授权创建新应用，加 `--create-telegram-app`，只提交一次；失去会话、出现额外验证或无法读回时停止，不自动重新发码或登记。复用已有团队应用，不更改它。该命令依赖第一方网页当前表单协议，不是 Telegram 承诺稳定的公开登记 SDK；若不兼容，回到官方页面并用 `telegram-app-store` 私密写入。它只准备应用凭据，不会启用聊天自动化或开始消息收发。Telegram 开发者验证码不能用作后续 CLI 账号授权验证码。
+
+
 用同一个仓库入口续接；它自动使用该实例的私有组件。Telegram Bot Token 和开发者 [API ID/hash](https://core.telegram.org/api/obtaining_api_id) 分别用于 Bot API 和一次性用户绑定，不随仓库分发。可信部署者可将 API ID/hash 预置为仅本人能读的 JSON（字段 `api_id` 整数、`api_hash` 字符串），或在终端按隐藏输入提示填写。切勿提交到 Git。
 
 ```bash

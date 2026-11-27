@@ -2,6 +2,8 @@
 
 [观看人工授权演示与章节索引](authorization-walkthrough.md)。
 
+如果账号所有者只愿意扫一次，不想操作设置或办理 Telegram 开发者账号，先看 [Telegram Web K 单次扫码运行手册](telegram-web-k-onboarding.md)。浏览器仅用于首次授权，日常服务不依赖浏览器。
+
 每个实例绑定一个飞书自建应用、一个 Telegram 原账号和一份 SQLite 数据库。可以装在办公室 Linux 或云主机，管理网页使用你自己的域名。互不信任的团队用各自的 Linux 用户或容器隔离。团队代号只用于区分配置目录和服务名。
 
 ## 1. 准备 Linux

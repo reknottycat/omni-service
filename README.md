@@ -8,6 +8,8 @@
 
 Telegram–飞书团队接入见[团队部署](docs/personal-deployment.md)，包括 Linux 服务、平台授权与客服邀请。
 
+在 Codex 中可用 `$omni-service-onboarding` 复用接入和验收流程。[OmniService 接入 Skill](.agents/skills/omni-service-onboarding/SKILL.md)
+
 本仓库当前交付可运行的协议与会话验收台。HTTP webhook、渠道适配、SQLite 队列、会话状态及出站 HTTP 都执行实际代码；平台接收端和 AI/翻译使用确定性模拟服务。**这不是已接通真实账号的生产部署。**
 
 - 模拟 Telegram / MAX / WhatsApp：一账号多客户、账号和客户隔离、批量回调与去重。

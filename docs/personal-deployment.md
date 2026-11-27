@@ -2,6 +2,8 @@
 
 [观看人工授权演示与章节索引](authorization-walkthrough.md)。
 
+如果不能提供手机号，或 CLI 正常登录无法继续，使用备选 [Telegram Web K 单次扫码运行手册](telegram-web-k-onboarding.md)。浏览器仅用于首次授权，日常服务不依赖浏览器。
+
 每个实例绑定一个飞书自建应用、一个 Telegram 原账号和一份 SQLite 数据库。可以装在办公室 Linux 或云主机，管理网页使用你自己的域名。互不信任的团队用各自的 Linux 用户或容器隔离。团队代号只用于区分配置目录和服务名。
 
 ## 1. 准备 Linux
@@ -22,6 +24,22 @@ bash scripts/setup-personal.sh support prepare
 
 安装者先准备实例参数、专用 Telegram Bot Token 和 Telegram 应用的 API ID/hash。使用者按提示在飞书和 Telegram 登录或确认授权，由程序写入配置并验证平台回执。已接入实例的启动和升级沿用保存的配置，无需再次登录 Telegram。
 
+先向用户明确给两种选择，整个接入只运行一路：
+
+| 优先级 | 登录与授权 | 用户做什么 | 部署者做什么 |
+| --- | --- | --- | --- |
+| 默认：CLI | 预配置开发者凭据，手机号 + Telegram 指定的验证码 | 通过受信终端的隐藏输入提供手机号和验证码。Telegram 若选择 App 消息，验证码会到已登录设备，不保证所有账号永远用同一渠道。 | 运行仓库命令；验证账号、按既定范围保存绑定并验回执。不收集普通聊天里的验证码。 |
+| 备选：官方 Web K | 手机号不可用或 CLI 无法继续时，使用 Telegram 官方扫码 | 扫码确认；只有部署者不能接手浏览器时，才在自己的客户端手动添加指定机器人并保存。 | 有受信任 Computer Use 会话时，仅首次用它操作官方网页、选 Bot 和权限、读取结果。日常运行不依赖界面。 |
+
+#### 部署方只做一次的 Telegram 开发者配置
+
+1. 官方开发者后台 [API development tools](https://my.telegram.org/apps) 负责应用登记。由账号所有者在官方页面输入手机号和收到的 Telegram App 验证码（不是短信）；没有公开的开发者登记 CLI，不自动读取 App 消息，不把验证码交给 OmniService。
+2. 在服务主机的受信任终端，从已准备好的实例运行 `bash scripts/setup-personal.sh support telegram-app-store`。提示输入 `api_id / api_hash` 时不会回显，原值不会被日志、命令行或 Git 接收，文件仅当前用户可读，已有文件不会覆盖。
+3. `bash scripts/setup-personal.sh support telegram-app-status` 只检查本机文件格式和权限，不发短信、不登录、不绑定。以后同实例的 `configure -- --telegram-owner …` 自动使用它，不必再填写或转发。账号所有者仍在 Telegram App 扫描官方登录码，若平台要求额外的安全确认不得自动跳过。
+
+**可选，同一会话开发者登记：** `bash scripts/setup-personal.sh support telegram-app-enroll` 通过同一个内存会话发码、隐藏输入验证码，并读回已有开发者应用。如已明确授权创建新应用，加 `--create-telegram-app`，只提交一次；失去会话、出现额外验证或无法读回时停止，不自动重新发码或登记。复用已有团队应用，不更改它。该命令依赖第一方网页当前表单协议，不是 Telegram 承诺稳定的公开登记 SDK；若不兼容，回到官方页面并用 `telegram-app-store` 私密写入。它只准备应用凭据，不会启用聊天自动化或开始消息收发。Telegram 开发者验证码不能用作后续 CLI 账号授权验证码。
+
+
 用同一个仓库入口续接；它自动使用该实例的私有组件。Telegram Bot Token 和开发者 [API ID/hash](https://core.telegram.org/api/obtaining_api_id) 分别用于 Bot API 和一次性用户绑定，不随仓库分发。可信部署者可将 API ID/hash 预置为仅本人能读的 JSON（字段 `api_id` 整数、`api_hash` 字符串），或在终端按隐藏输入提示填写。切勿提交到 Git。
 
 ```bash
@@ -30,14 +48,13 @@ bash scripts/setup-personal.sh support configure -- \
   --callback-url 'https://support.example.com/admin/auth/callback' \
   --model-url 'http://127.0.0.1:8000/v1' --model 'translation-model' \
   --feishu-app-name 'OmniService 物流客服' \
-  --tdlib-app-credentials "$team_config/telegram-application.json" \
-  --telegram-owner @example_logistics \
+  --telegram-owner @example_logistics --telegram-login phone \
   --chat-scope allowlist --test-chat-id 12345678 --port 8081
 ```
 
 - **模型**。输入一个 OpenAI 兼容的本机或私网地址和模型名。如网关有 API Key，按隐藏输入提示填写。携带 Key 的非本机地址使用 HTTPS。安装前会用一条合成消息测试中俄翻译。业务来信可能发送到你指定的模型，期限由实例的数据保留安排决定。 [Telegram 业务机器人数据条款](https://telegram.org/tos/bot-developers#5-4-telegram-business)
 - **飞书**。新应用由官方 Python SDK 发起创建并预填群消息、附件、建群与成员权限，以及群消息事件和卡片回调。用户扫码或打开官方链接确认后，程序保存 App ID 和 Secret。应用管理员登记相同的 OAuth 回调地址，确认机器人事件及卡片回调走长连接，设置团队可见范围并按组织规则发布和审批。随后用管理员账号完成官方身份授权，程序核对 Open ID 和组织标识。同一实例完成身份验证后，重跑接入命令会沿用已验证的管理员。托管模式自动核对当前应用的客服权限，只将确实缺少的权限放进官方申请链接和二维码，然后暂停接入，等待获授权的人确认；可用 `check-feishu-scopes` 单独复核。用户扫码授予的权限、应用权限、企业发版及事件订阅是不同检查。复用明确指定的应用可加 `--feishu-app cli_...`。 [批量申请和发版审批](https://open.feishu.cn/document/ukTMukTMukTM/uQjN3QjL0YzN04CN2cDN?lang=zh-CN) · [飞书长连接](https://open.feishu.cn/document/server-side-sdk/java-sdk-guide/handle-events)
-- **Telegram**。程序用 Bot Token 开启并读回秘书模式，随后显示 Telegram 账号登录二维码。使用新号在「设置 → 设备 → 连接桌面设备」扫码。程序核对预期账号，按参数设置聊天范围和回复权，只向指定机器人发送配对挑战，并验证 Bot API 返回的账号与连接。已有其他机器人时会停止。临时用户会话退出后，后台继续用 Bot Token。平台要求验证码或两步验证时在终端隐藏输入。如果 TDLib 已确认对专用机器人发送成功、仅差 Bot API 回执，同参数重跑可复用已确认的记录。加入发送队列不算成功。明确发送失败不会留待确认记录；结果不明也不会自动重发，核对专用机器人状态后再重跑。旧版未确认的记录不再复用。 [Telegram 聊天自动化](https://core.telegram.org/api/bots/connected-business-bots) · [TDLib 用户侧绑定](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_business_connected_bot.html)
+- **Telegram**。程序用 Bot Token 开启并读回秘书模式，默认提示手机号及 Telegram 指定渠道的验证码；`--telegram-login qr` 也可对已配置开发者凭据的实例生成 TDLib 登录二维码。程序核对预期账号，按参数设置聊天范围和回复权，只向指定机器人发送配对挑战，并验证 Bot API 返回的账号与连接。已有其他机器人时会停止。临时用户会话退出后，后台继续用 Bot Token。平台要求验证码或两步验证时在终端隐藏输入。如果 TDLib 已确认对专用机器人发送成功、仅差 Bot API 回执，同参数重跑可复用已确认的记录。加入发送队列不算成功。明确发送失败不会留待确认记录；结果不明也不会自动重发，核对专用机器人状态后再重跑。旧版未确认的记录不再复用。 [Telegram 聊天自动化](https://core.telegram.org/api/bots/connected-business-bots) · [TDLib 用户侧绑定](https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1set_business_connected_bot.html)
 
 `allowlist` 把 Telegram 授权和 OmniService 接收同时限定在给出的测试私聊。实际接管指定类别时用 `--chat-scope connection --telegram-recipients new`，可重复显式选择 `existing`、`contacts`、`non-contacts`，并用 `--telegram-exclude-chat-id ID` 排除特定私聊。获取更多类别前先核实范围。TDLib 登录需要访问 Telegram 用户侧网络，可用 `--tdlib-http-proxy http://127.0.0.1:7890` 指定现有的 HTTP CONNECT 代理。Bot API 的专用 TLS 转发不能代替 TDLib 登录通道。
 

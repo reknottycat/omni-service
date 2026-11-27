@@ -239,7 +239,17 @@ def _sign_in(td, directory, *, login, show_qr, proxy, application=None):
                 raise ChannelError("tdlib_invalid_qr")
             show_qr(link)
         elif kind == "authorizationStateWaitCode":
-            td.call("checkAuthenticationCode", code=private_input("Telegram 登录验证码: ").strip())
+            info = state.get("code_info")
+            delivery = info.get("type") if isinstance(info, dict) else None
+            channel = {
+                "authenticationCodeTypeTelegramMessage": "已登录的 Telegram App",
+                "authenticationCodeTypeSms": "短信",
+                "authenticationCodeTypeCall": "来电",
+                "authenticationCodeTypeFragment": "Telegram 指示的 Fragment",
+            }.get(delivery.get("@type") if isinstance(delivery, dict) else None)
+            if channel:
+                print(f"Telegram 通知渠道：{channel}。", flush=True)
+            td.call("checkAuthenticationCode", code=private_input("Telegram 登录验证码（隐藏输入）: ").strip())
         elif kind == "authorizationStateWaitPassword":
             td.call("checkAuthenticationPassword", password=private_input("Telegram 两步验证密码: "))
         elif kind == "authorizationStateWaitEmailAddress":

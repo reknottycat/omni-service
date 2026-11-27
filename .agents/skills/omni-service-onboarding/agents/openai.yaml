@@ -1,0 +1,4 @@
+interface:
+  display_name: "OmniService 接入"
+  short_description: "配置并验收 OmniService 的 Telegram 与飞书接入"
+  default_prompt: "用 $omni-service-onboarding 为一个独立团队配置 Telegram 与飞书，并报告实际验收状态。"

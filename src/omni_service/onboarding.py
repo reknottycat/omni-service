@@ -255,10 +255,19 @@ def _telegram_pair(api, env, *, bind_account=None, pending=None, save_pending=No
     nonce = secrets.token_urlsafe(24)
     owner = None
     if bind_account is None:
+        if (isinstance(pending, dict) and pending.get("web_manual") is True
+                and pending.get("bot_id") == bot["id"] and type(pending.get("issued_at")) is int
+                and 0 <= issued_at - pending["issued_at"] < 23 * 3600
+                and isinstance(pending.get("nonce"), str)
+                and re.fullmatch(r"[A-Za-z0-9_-]{32}", pending["nonce"])):
+            nonce, issued_at = pending["nonce"], pending["issued_at"]
+        elif save_pending is not None:
+            save_pending({"bot_id": bot["id"], "issued_at": issued_at, "nonce": nonce, "web_manual": True})
         link = telegram_setup_link(bot["username"], nonce)
-        print(f"用 Telegram 原账号打开以下链接并点「开始」：\n{link}", flush=True)
-        _render_qr(link, env)
-        print("在原账号「设置 → 聊天自动化」连接该机器人，选择授权聊天，并允许回复。", flush=True)
+        print("可打开官方 Telegram Web K 扫码登录：https://web.telegram.org/k/ 。"
+              "已登录可直接使用；不需要 Computer Use。", flush=True)
+        print(f"用 Telegram 原账号打开以下配对链接并点「开始」：\n{link}", flush=True)
+        print(f"在「设置 → 聊天自动化」选择 @{bot['username']}，核对聊天范围，只允许回复，然后保存。", flush=True)
     else:
         if (isinstance(pending, dict) and pending.get("tdlib_send_confirmed") is True
                 and pending.get("bot_id") == bot["id"]
@@ -276,15 +285,21 @@ def _telegram_pair(api, env, *, bind_account=None, pending=None, save_pending=No
                               "tdlib_send_confirmed": True})
     deadline = time.monotonic() + 420
     while time.monotonic() < deadline:
-        updates = api.call("getUpdates", {"timeout": 5, "limit": 100,
-                                          "allowed_updates": ["message", *TelegramPersonal.allowed_updates]})
-        connection = paired_connection(api, updates, nonce, issued_at)
-        if connection is not None:
-            if owner is not None and connection.owner_id != owner:
-                raise ChannelError("telegram_setup_wrong_owner")
-            return bot, connection
-        if len(updates) == 100:
-            raise ChannelError('telegram_pairing_backlog')
+        try:
+            updates = api.call("getUpdates", {"timeout": 5, "limit": 100,
+                                              "allowed_updates": ["message", *TelegramPersonal.allowed_updates]})
+            connection = paired_connection(api, updates, nonce, issued_at)
+        except ChannelError as exc:
+            if exc.code != "delivery_unknown":
+                raise
+            # No offset is acknowledged and the same challenge stays in effect.
+        else:
+            if connection is not None:
+                if owner is not None and connection.owner_id != owner:
+                    raise ChannelError("telegram_setup_wrong_owner")
+                return bot, connection
+            if len(updates) == 100:
+                raise ChannelError('telegram_pairing_backlog')
         time.sleep(1)
     raise ChannelError("telegram_pairing_timed_out")
 
@@ -381,7 +396,7 @@ def _account_binder(args, env):
         return connect_account(args.tdlib_library, args.config.parent, bot=bot,
                                expected_owner=args.telegram_owner, nonce=nonce,
                                included=args.test_chat_id, excluded=excluded, selectors=selectors,
-                               login=args.telegram_login or "qr", show_qr=show_qr, proxy=proxy,
+                               login=args.telegram_login or "phone", show_qr=show_qr, proxy=proxy,
                                application=application)
 
     return bind
@@ -447,19 +462,20 @@ def configure(args, credentials, config):
     api = TelegramAPI(telegram_token, proxy_url=credentials.get("TELEGRAM_HTTPS_PROXY") or None,
                       tunnel_port=int(credentials["TELEGRAM_TLS_TUNNEL_PORT"])
                       if credentials.get("TELEGRAM_TLS_TUNNEL_PORT") else None)
-    pairing = {}
-    if bind_account is not None:
+    if bind_account is None:
+        signature = ["web-manual", scopes, sorted(args.test_chat_id)]
+    else:
         signature = [args.telegram_owner.lstrip("@").casefold(), scopes, sorted(args.test_chat_id),
                      sorted(args.telegram_recipients), sorted(args.telegram_exclude_chat_id)]
-        checkpoint = config["telegram"].get("setup_pairing")
+    checkpoint = config["telegram"].get("setup_pairing")
 
-        def save_pending(proof):
-            config["telegram"]["setup_pairing"] = {"scope": signature, "proof": proof}
-            _save_profile(args, credentials, config)
+    def save_pending(proof):
+        config["telegram"]["setup_pairing"] = {"scope": signature, "proof": proof}
+        _save_profile(args, credentials, config)
 
-        pairing = {"bind_account": bind_account, "save_pending": save_pending}
-        if isinstance(checkpoint, dict) and checkpoint.get("scope") == signature:
-            pairing["pending"] = checkpoint.get("proof")
+    pairing = {"bind_account": bind_account, "save_pending": save_pending}
+    if isinstance(checkpoint, dict) and checkpoint.get("scope") == signature:
+        pairing["pending"] = checkpoint.get("proof")
     bot, connection = _telegram_pair(api, env, **pairing)
     if connection.owner_id in args.test_chat_id:
         raise ChannelError("invalid_telegram_scope")
@@ -500,7 +516,7 @@ def main(argv=None):
     parser.add_argument("--tdlib-library", type=Path, help="启用 Telegram 命令行绑定，使用官方 libtdjson 的绝对路径")
     parser.add_argument("--tdlib-app-credentials", type=Path, help="管理员预置的私有 Telegram API ID/hash JSON 文件")
     parser.add_argument("--telegram-owner", help="预期原账号的 @用户名或用户 ID")
-    parser.add_argument("--telegram-login", choices=("qr", "phone"), help="Telegram 登录方式，默认扫码")
+    parser.add_argument("--telegram-login", choices=("qr", "phone"), help="Telegram CLI 登录方式，默认手机号（验证码仅隐藏输入）")
     parser.add_argument("--telegram-recipients", action="append", choices=tuple(RECIPIENT_FLAGS), default=[],
                         help="TDLib connection 范围中的 Telegram 聊天类别，可重复")
     parser.add_argument("--telegram-exclude-chat-id", action="append", type=int, default=[],

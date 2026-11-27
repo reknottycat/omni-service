@@ -1,4 +1,6 @@
 import getpass
+import contextlib
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -6,7 +8,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from omni_service.models import ChannelError
-from omni_service.onboarding import _ask, _feishu_owner, main, paired_connection, read_credentials
+from omni_service.onboarding import _ask, _telegram_pair, _feishu_owner, main, paired_connection, read_credentials
 from omni_service.personal import Connection
 from omni_service.personal_runner import PersonalBridge
 from omni_service.intake import Intake
@@ -42,6 +44,55 @@ class OnboardingContracts(unittest.TestCase):
             paired_connection(api, [_start(), connection], NONCE, 1000)
         with self.assertRaisesRegex(ChannelError, "telegram_pairing_ambiguous"):
             paired_connection(api, [_start(), _start(20), connection, wrong], NONCE, 1000)
+
+    def test_web_k_pending_only_reuses_the_same_bot_and_nonce(self):
+        api = Mock()
+        bot = {"username": "fixture_onboarding_bot", "id": 41}
+        old = {"web_manual": True, "bot_id": 41, "issued_at": 1000, "nonce": NONCE}
+        saved = Mock()
+        with patch("omni_service.onboarding.telegram_ready", return_value=bot), \
+                patch("omni_service.onboarding.enable_secretary", return_value=bot), \
+                patch("omni_service.onboarding.time.time", return_value=1002), \
+                patch("omni_service.onboarding.secrets.token_urlsafe", return_value="b" * 32):
+            api.call.side_effect = ([_start(), {"business_connection": _connection()}], _connection())
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                _, connection = _telegram_pair(api, {}, pending=old, save_pending=saved)
+            saved.assert_not_called()
+            self.assertEqual(connection.owner_id, 10)
+            self.assertIn("https://web.telegram.org/k/", output.getvalue())
+            self.assertIn(NONCE, output.getvalue())
+            start = _start()
+            start["message"]["text"] = "/start " + "b" * 32
+            start["message"]["date"] = 1003
+            api.call.side_effect = ([start, {"business_connection": _connection()}], _connection())
+            with contextlib.redirect_stdout(io.StringIO()):
+                _telegram_pair(api, {}, pending=dict(old, bot_id=100), save_pending=saved)
+            self.assertEqual(saved.call_args.args[0]["nonce"], "b" * 32)
+            self.assertEqual(saved.call_args.args[0]["bot_id"], 41)
+
+    def test_pairing_retries_unknown_reads_without_reissuing_the_challenge(self):
+        api, saved = Mock(), Mock()
+        bot = {"username": "fixture_onboarding_bot", "id": 41}
+        batch = [_start(), {"business_connection": _connection()}]
+        api.call.side_effect = (
+            ChannelError("delivery_unknown"), batch, ChannelError("delivery_unknown"), batch, _connection(),
+        )
+        with patch("omni_service.onboarding.telegram_ready", return_value=bot), \
+                patch("omni_service.onboarding.enable_secretary", return_value=bot) as enable, \
+                patch("omni_service.onboarding.time.time", return_value=1000), \
+                patch("omni_service.onboarding.time.sleep"), \
+                patch("omni_service.onboarding.secrets.token_urlsafe", return_value=NONCE), \
+                contextlib.redirect_stdout(io.StringIO()):
+            _, connection = _telegram_pair(api, {}, save_pending=saved)
+        self.assertEqual(connection.owner_id, 10)
+        self.assertEqual([item.args[0] for item in api.call.call_args_list],
+                         ["getUpdates", "getUpdates", "getBusinessConnection", "getUpdates",
+                          "getBusinessConnection"])
+        for item in api.call.call_args_list:
+            self.assertNotIn("offset", item.args[1])
+        saved.assert_called_once_with({"bot_id": 41, "issued_at": 1000, "nonce": NONCE, "web_manual": True})
+        enable.assert_called_once_with(api, bot)
 
     def test_credentials_are_literal_and_owner_only(self):
         with tempfile.TemporaryDirectory() as tmp:

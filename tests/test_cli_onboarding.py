@@ -95,7 +95,7 @@ class TelegramCommandContracts(unittest.TestCase):
 
             def connect(library, directory, *, bot, expected_owner, nonce, included,
                         excluded, selectors, login, show_qr, proxy, application):
-                self.assertEqual(login, "qr")
+                self.assertEqual(login, "phone")
                 self.assertEqual(application, (123, "a" * 32))
                 return telegram_tdlib._bind(account, bot, expected_owner, nonce, included, excluded, selectors)
 
@@ -171,6 +171,38 @@ class TelegramCommandContracts(unittest.TestCase):
         self.assertFalse(setting["use_message_database"])
         self.assertTrue(setting["database_encryption_key"])
         self.assertEqual(links, ["tg://login?token=fixture"])
+
+    def test_phone_login_accepts_in_app_code_without_qr_or_echo(self):
+        class LoginClient:
+            def __init__(self):
+                self.commands = []
+                self.states = iter([
+                    {"@type": "authorizationStateWaitPhoneNumber"},
+                    {"@type": "authorizationStateWaitCode", "code_info":
+                        {"type": {"@type": "authenticationCodeTypeTelegramMessage"}}},
+                    {"@type": "authorizationStateReady"},
+                ])
+
+            def call(self, method, **args):
+                self.commands.append((method, args))
+                return {"@type": "authorizationStateWaitTdlibParameters"}
+
+            def next_state(self, previous, **args):
+                return next(self.states)
+
+        td = LoginClient()
+        output = io.StringIO()
+        number, code = "+12025550123", "12345"
+        with contextlib.redirect_stdout(output), patch("omni_service.telegram_tdlib.private_input",
+                                                       side_effect=[number, code]):
+            telegram_tdlib._sign_in(td, "/private/fixture", login="phone", proxy=None,
+                                    application=(123, "a" * 32),
+                                    show_qr=lambda _: self.fail("phone mode must not show a QR"))
+        self.assertEqual(td.commands[-2:], [("setAuthenticationPhoneNumber", {"phone_number": number}),
+                                           ("checkAuthenticationCode", {"code": code})])
+        self.assertIn("已登录的 Telegram App", output.getvalue())
+        self.assertNotIn(number, output.getvalue())
+        self.assertNotIn(code, output.getvalue())
 
 
 class FeishuRegistrationCommand(unittest.TestCase):

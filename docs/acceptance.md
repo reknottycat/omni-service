@@ -35,6 +35,8 @@ python scripts/demo.py
 
 脚本应以非零退出码报告失败，生成机器可读结果 `artifacts/acceptance.json`。人工可读归档为 [`docs/evidence/linux-mock-acceptance.md`](evidence/linux-mock-acceptance.md)。证据至少包含被测提交/工作树状态、Linux 与 Python 版本、实际命令、输入数据范围、观察到的结果、失败与修复、剩余边界。尚未生成证据时，相应条目必须保持未验收。
 
+在 GitHub CI 尚未运行时，可在 DGX/Linux 上对实际候选合并树运行本地验收入口 `bash scripts/acceptance.sh`：先构造候选合并结果（PR head 合入目标分支 base），再执行脚本，保存生成的 `artifacts/acceptance.json`，并在配套验收回执中至少记录 PR head 提交、目标分支 base 提交以及实际被测试的合并提交或 Git 树，使证据可追溯到确切的代码状态。必须明确：该运行仅为本地模拟，不等同于 GitHub CI 通过或真实平台验收；若远程检查已失败，本地结果不能覆盖或抵消失败状态，也不能替代分支保护要求运行的任何检查；证据只记录实际观察到的结果，未执行或未观察到的条目保持未验收，不得编造任何测试结果。
+
 以下全部是 P0 必选条件。`tests/` 中的行为检查与 `scripts/demo.py` 经统一脚本执行（包含演示命令的子进程测试）；具体测试名称在实现后补入证据，不能把不存在的测试当作证明。
 
 | ID | 场景与输入 | 可观察的通过条件 | 复验与证据 | 本轮状态 |

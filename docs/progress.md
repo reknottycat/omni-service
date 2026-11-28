@@ -1,5 +1,18 @@
 # OmniService 工作追踪
 
+## 2026-11-28 全新 DGX 安装增量
+
+基线 `feca72191d3bfb0ef5eeca8376e594e18a0a26bb`，关联既有 PR #8 与 Issue #1。
+本轮不改账号扫码协议、不覆盖既有部署；新增工作独立于历史 P0 统计。
+
+| ID / 状态 / 负责人 | 价值与交付 | 允许修改的文件 | 依赖 / 复验 / 通过条件 |
+|---|---|---|---|
+| DGX-01 / done / 依赖审查 | 核实三类上游固定版本和摘要，避免下载漂移 | `onboarding_tools.py`、对应专项测试 | 官方 Release/PyPI/source；固定值可逐项核对 |
+| DGX-02 / verify / SDK 与总控 | 完整依赖包、私有 SDK 校验、原生库原子发布、新安装脚本与正确解释器 | `deploy/`、安装/打包 scripts、依赖专项测试 | `bash scripts/acceptance.sh`；摘要错误不执行、不修改旧实例 |
+| DGX-03 / in_progress / 干净环境验证 | 全新 Ubuntu 原生组件与断网包安装证据；amd64/arm64 CI | `scripts/test-clean-onboarding.sh`、容器及工作流、证据 | 真实加载固定 TDLib/CLI/SDK；重跑幂等、无授权/DB/systemctl |
+
+具体安装命令和验收边界见[全新 DGX 安装](dgx-clean-install.md)。任务完成状态仅在取得实际结果后更新。
+
 ## 当前目标
 
 **P0 · Linux 三渠道模拟闭环。** 以 Telegram、俄罗斯 MAX、WhatsApp 为客户入口，飞书为 7 人团队工作端，完成自动翻译、AI/人工协作、撤回及可靠消息路由。完成标准见 [验收合同](acceptance.md)。真实账号、完整媒体、Chatwoot/NextBridge 生产联调与真实模型质量作为后续增量。

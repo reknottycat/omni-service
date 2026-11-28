@@ -1,0 +1,1924 @@
+{
+  "schema": 1,
+  "scope": "P0-linux-mock",
+  "mode": "simulation",
+  "passed": true,
+  "tests": 304,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "generated_at": "2026-11-28T02:23:09.278259+00:00",
+  "environment": {
+    "system": "Linux",
+    "release": "6.18.57",
+    "machine": "x86_64",
+    "python": "3.12.14",
+    "sqlite": "3.53.1"
+  },
+  "source_commit": "feca72191d3bfb0ef5eeca8376e594e18a0a26bb",
+  "source_sha256": "e1e4e190064ef890b4dca01da340391252e48bfacf19f4e195cd8c0c90cb6250",
+  "source_files": [
+    {
+      "path": "src/omni_service/__init__.py",
+      "sha256": "db76a3d7f3c9e3c0a8e8b408bb6753b1eb47772cafc2fe23a402145e825c0ca4"
+    },
+    {
+      "path": "src/omni_service/admin_auth.py",
+      "sha256": "f021df163af372e5ed03949fc1bde375b3e7e4f4bfda581af3f5748502115353"
+    },
+    {
+      "path": "src/omni_service/admin_page.html",
+      "sha256": "ef5590718459347b976a12149590b5717f5ee0f0074562974b1253fbea31a2e5"
+    },
+    {
+      "path": "src/omni_service/admin_web.py",
+      "sha256": "42f679190113e93b88d8cb7b46fbbbd2f9e2567c9ede56367ef6d31adba1c200"
+    },
+    {
+      "path": "src/omni_service/approval_card.py",
+      "sha256": "740fd9b69da8615bc0dacc1f5756e0827428f908770e3a98261c86861ab04006"
+    },
+    {
+      "path": "src/omni_service/channels.py",
+      "sha256": "79d808748b38a156f374ab118313f386e77289c0560e172fca3738918c3692b2"
+    },
+    {
+      "path": "src/omni_service/company_accounts.py",
+      "sha256": "7746039755f3549b817f29e94b981a263f21656c2b83f45c533a24271fc2ceb2"
+    },
+    {
+      "path": "src/omni_service/customer_security.py",
+      "sha256": "fa7b0f1aa4926e270d51954819d9586dbce22fc021f4617856b894d5decbf3b2"
+    },
+    {
+      "path": "src/omni_service/feishu_live.py",
+      "sha256": "ce257d49a0cf22492936b819d317774a56c0f2190663581e21f8a22443bd9ce6"
+    },
+    {
+      "path": "src/omni_service/feishu_provision.py",
+      "sha256": "574994ea2b04786651dea42e9ad610d3dd0045cdcd70c8cc2abcae37f9fe2bc3"
+    },
+    {
+      "path": "src/omni_service/intake.py",
+      "sha256": "477feef0765b6b7d0bb2230ce2bc67c2efa2cda1d1512b33e3e7d5fb5f37d1cf"
+    },
+    {
+      "path": "src/omni_service/language.py",
+      "sha256": "0ff410959bebfebfb69b8c520ad96a40ed8d812f56f34784059d5e0de1f69b4a"
+    },
+    {
+      "path": "src/omni_service/local_translation.py",
+      "sha256": "7c1d3181b0bc39c26ff4688a0de209c2570e05988105aee307bab849638b18e9"
+    },
+    {
+      "path": "src/omni_service/management.py",
+      "sha256": "59b1c44a63fdbf59118b337ad13116488c1d4094fd69f78cd922171c5e5493b8"
+    },
+    {
+      "path": "src/omni_service/media.py",
+      "sha256": "d0b19bd1abe59c034c3cd8098a93a18721cb23e53bd217fb31ba14bbca5ebc08"
+    },
+    {
+      "path": "src/omni_service/models.py",
+      "sha256": "526ba36d1f795e911479775425487efc13ab0a976ed27568eb869e7e0bbafbca"
+    },
+    {
+      "path": "src/omni_service/onboarding.py",
+      "sha256": "3e07400a4493b7ffe4905560778ad11e98fd7da06394bbb7c1931f11ffee2ce4"
+    },
+    {
+      "path": "src/omni_service/onboarding_tools.py",
+      "sha256": "e128e01be67986265e575482ebfe8f3d527be38ff1688bad466fa1d65c9018e0"
+    },
+    {
+      "path": "src/omni_service/personal.py",
+      "sha256": "32d48df2db4030bb4dfe4121d9534595b8e5b10912f9f089c0454a05c572b51d"
+    },
+    {
+      "path": "src/omni_service/personal_runner.py",
+      "sha256": "bd926b83d63d1ac84757c93abb014d15e1a9ca81bbf44c859f499798f5f37806"
+    },
+    {
+      "path": "src/omni_service/server.py",
+      "sha256": "8286638dfaf041fe3e94235954e055e0e80a59c183dc3f853379251d25f82767"
+    },
+    {
+      "path": "src/omni_service/service.py",
+      "sha256": "98169b208eb5b5a23ca55bfb3872d0ed55ee86afce2ff77287041a99a930b75a"
+    },
+    {
+      "path": "src/omni_service/simulation.py",
+      "sha256": "bb46b8820feefc0ede9e153d4130194fb5b2adbd751be47a9ab23660f83787e0"
+    },
+    {
+      "path": "src/omni_service/store.py",
+      "sha256": "f073e00fe86a03ae21950a6ea07171cbb011154aabb9782e4c3618c63bcedf90"
+    },
+    {
+      "path": "src/omni_service/telegram_live.py",
+      "sha256": "f1e5bf06c3e34a74de6a3f3d73e351dda67cf5f37b2f253b60b4b4aa45ab190c"
+    },
+    {
+      "path": "src/omni_service/telegram_tdlib.py",
+      "sha256": "962cb0cded69897cfb68c7b34b80d4be5d68b0c1cff1594c86cd2e25a6b9a19b"
+    },
+    {
+      "path": "src/omni_service/transport.py",
+      "sha256": "52bb68c5ad1b32e525f240291e52d2cdeafc5c5802c942913bd93438e74f021d"
+    },
+    {
+      "path": "src/omni_service/welcome_templates.py",
+      "sha256": "9e332bea2c4a9a8cef1fcb17b957656aa0d9a95050289221fd453dab59ae6a80"
+    },
+    {
+      "path": "tests/test_admin_auth.py",
+      "sha256": "e1ee19a8218367c206d772941dbdce4e2c2c7620f2f4c35509a2cb9e3ef61962"
+    },
+    {
+      "path": "tests/test_admin_web.py",
+      "sha256": "70a0a5d413706cb80772c90254af70401c9f8193ea3ad22835c482aff930a330"
+    },
+    {
+      "path": "tests/test_approval_flow.py",
+      "sha256": "42f08b2820b0b01f393602d9f88061ac6eba047476f8687844f9897cb0a41e7a"
+    },
+    {
+      "path": "tests/test_card_approval.py",
+      "sha256": "9c745b68e4d9eec56e5ec2c431974c5f8c8a0dab868047d261617e4e20356ebd"
+    },
+    {
+      "path": "tests/test_channels.py",
+      "sha256": "bb7101dcd6723795329b57228efea7ae0a8e339b3bb1158b0bede509241f250c"
+    },
+    {
+      "path": "tests/test_cli_onboarding.py",
+      "sha256": "6c9cd729ac7130d7e50e13072331967e3b0ec10be750032376553e58a8ded3e8"
+    },
+    {
+      "path": "tests/test_company_accounts.py",
+      "sha256": "c3d2709aa984923036811900a01556566ed15142b5bdf9f6a353e680d8bfc09b"
+    },
+    {
+      "path": "tests/test_demo.py",
+      "sha256": "c5c98930a24de09267c3942b0060901d5ca040c4b5e3962e3d817cad090534aa"
+    },
+    {
+      "path": "tests/test_dependency_bundle.py",
+      "sha256": "8142e600dc73ec7fb6f3a2fb6bf71c9b6c671d27a95fa9b665aaa39c73f00c63"
+    },
+    {
+      "path": "tests/test_feishu_live.py",
+      "sha256": "4815b6c376f3cdeb7997ee624b351f9df52bf888d7e4514a512eb94aad339e5b"
+    },
+    {
+      "path": "tests/test_feishu_provision.py",
+      "sha256": "001e45bae330147977bf2151099abc8153fb01f85de902512d66e3383b935540"
+    },
+    {
+      "path": "tests/test_http.py",
+      "sha256": "ff3abc77793eae1b80f14eeb61688ebb1d40311857bdb7f359c703bfe3a200fb"
+    },
+    {
+      "path": "tests/test_intake.py",
+      "sha256": "e4c2c24110bdbb37132d95d8d388ba16efd8934630de02f2499b69664d911bed"
+    },
+    {
+      "path": "tests/test_intake_service.py",
+      "sha256": "13788be78d341122cc2aa07be16a0db209a8d65d7dfea4d5b07e471e74a90d64"
+    },
+    {
+      "path": "tests/test_language.py",
+      "sha256": "0eb96ee2d3fca6f9cf0e97bbd95000c8d0709d215a11596a8821555f860c5437"
+    },
+    {
+      "path": "tests/test_live_media.py",
+      "sha256": "da9d000e4b838752fb21ad2bd3ae11a69246aefb06117c8bd36611369cb442fb"
+    },
+    {
+      "path": "tests/test_local_translation.py",
+      "sha256": "8c2a99bca58748334322b5ac5b454846005b0d96e11e316797ea9b2a048065e2"
+    },
+    {
+      "path": "tests/test_management.py",
+      "sha256": "e1315aac2cea42b0fd1a0e79caac67f26f104d0518df74eb8172c1e5a54f7bb0"
+    },
+    {
+      "path": "tests/test_onboarding.py",
+      "sha256": "c121dd2aeb157e45dd133bf2ae007df1314fca73c8edcb62f06b9a984e525e86"
+    },
+    {
+      "path": "tests/test_onboarding_delivery.py",
+      "sha256": "56137677d0562b9268fc033309e8913873bbe529990565e28b6c4be97fa4357a"
+    },
+    {
+      "path": "tests/test_onboarding_tools.py",
+      "sha256": "5f940f51590abf3ff500b82bd7fa6ee9dd9026d9d7f285dba655144f0b0b420d"
+    },
+    {
+      "path": "tests/test_personal.py",
+      "sha256": "0d1d11f3e3b733d2740131dfdfa8ac51d5389ffc1455eb08c8f8c8cf7ad41970"
+    },
+    {
+      "path": "tests/test_personal_install.py",
+      "sha256": "6435f1490d0eab99ba133df151908a9e54257a0316b29847ecbc5ad9aeae602c"
+    },
+    {
+      "path": "tests/test_personal_intake.py",
+      "sha256": "45bf3393ad016f06f928f3acca25aa30a161fad2c07ae1db61fb43d08f75882e"
+    },
+    {
+      "path": "tests/test_personal_managed.py",
+      "sha256": "3b6c272ead2f0e6e9ce4e9267ec56375379b3df01b5082729a4ee9138069e2d5"
+    },
+    {
+      "path": "tests/test_personal_runner.py",
+      "sha256": "5436185ef043d65c1b6f0e30d13cc99d7559c3b6c420b5bb9d462764cc4c909e"
+    },
+    {
+      "path": "tests/test_receipts.py",
+      "sha256": "029071686efbdc18efb272b23e603022192112c7c30d2af3c5b2e03a55774202"
+    },
+    {
+      "path": "tests/test_sdk_dependencies.py",
+      "sha256": "a089f0b2d94945165692ef159bdb867d719dbc86a38246057b97a358bed79ac6"
+    },
+    {
+      "path": "tests/test_service.py",
+      "sha256": "c3c8ddd86e8370881a4fbe43e1b305af514056c6be55b7566c2212cdb30c84a6"
+    },
+    {
+      "path": "tests/test_setup_personal.py",
+      "sha256": "9acfff566f9788deae0978441bb3796931ca8031e51258967f01e014c15e42d2"
+    },
+    {
+      "path": "tests/test_staff_invites.py",
+      "sha256": "987f70e6dcca38f23ff84f929df40526ed8373f3083206419e6f85ae127dea2c"
+    },
+    {
+      "path": "tests/test_telegram_live.py",
+      "sha256": "deb8dca8e01d05e179048791a5a7a18c4503130df2e9f0fb2bc1f456efb7db99"
+    },
+    {
+      "path": "tests/test_transport.py",
+      "sha256": "df074191c1716951b2564f56880ea72e07b0416dd77a47ff47ca67f30b44eedd"
+    },
+    {
+      "path": "tests/test_welcome_templates.py",
+      "sha256": "cd0b6aa1c9b88164543f0c9bcc253b24355d12e17966253e906aec50b200de57"
+    },
+    {
+      "path": "scripts/acceptance.sh",
+      "sha256": "672f8123bcb8c37f15fce85d2a6b8453f68be15528d75421ac05671eb4a8b9ad"
+    },
+    {
+      "path": "scripts/demo.py",
+      "sha256": "ba97b29117550ee4d6f8b3505689c3fa2ca8dc171c603fdb4f4db3b790c13129"
+    },
+    {
+      "path": "scripts/install-dgx.sh",
+      "sha256": "382fad4463a00d7b4cd283cf4a0232ccd0c6123626fe97d7ebc6452620a94685"
+    },
+    {
+      "path": "scripts/install-personal.sh",
+      "sha256": "93c7d8484c456956e0621a159a4403bd37c2ced0502b1e4b877f055445dba55d"
+    },
+    {
+      "path": "scripts/log_decision.py",
+      "sha256": "c66e2a56d531b1d7d30a2bca332b73a095ff4db83c11fa43cf616f5fcc371480"
+    },
+    {
+      "path": "scripts/package-onboarding.py",
+      "sha256": "7fdbae2956081f218b3809d15b18d45fdc66624bff08b6d9d85904e3f128d78f"
+    },
+    {
+      "path": "scripts/run_acceptance.py",
+      "sha256": "f9270ff214399b959ac0241f64604e9f6679af5d2736c9f268f09cd05504b42c"
+    },
+    {
+      "path": "scripts/setup-personal.sh",
+      "sha256": "8d15e2c26eeaa333436925aa2eb4abafe28a537f4d71a92605e51cda3a751d36"
+    },
+    {
+      "path": "scripts/test-clean-onboarding.sh",
+      "sha256": "772e66894fe4fb45d18f2061ad69015d9c887c37f14ceba4fd6e545c1c128b86"
+    },
+    {
+      "path": "deploy/clean-install.Dockerfile",
+      "sha256": "c4d23acb3b8f4537e37b07b4d6df4c6745a1e25292484d01ba7c9e198b4448b9"
+    },
+    {
+      "path": "deploy/dependency_bundle.py",
+      "sha256": "6b6fc62af6628d7241d4e1cee765b5cebb25b925ee6b4ac6764672dbc2fdcbd3"
+    },
+    {
+      "path": "deploy/dependency_pins.py",
+      "sha256": "4b2186d9e4b5f3404fd8d5382079b16a6a57b6832ce012f98bb2471f8bfdbf4f"
+    },
+    {
+      "path": "deploy/install_personal.py",
+      "sha256": "1bb72eaba396c8b3d29bc278537db9bdd0fabe5180067f5e9b8685f282a06296"
+    },
+    {
+      "path": "deploy/sdk_dependencies.py",
+      "sha256": "77fe3e5b17dda017a96969dbae345c8d6249640c1e8d8f9c5fa7358b3b78e702"
+    },
+    {
+      "path": "deploy/setup_personal.py",
+      "sha256": "ed98b81a4b65727ae9a76b50ca708a4551f465dfa972111827171d9902769d0d"
+    },
+    {
+      "path": "config/personal.example.json",
+      "sha256": "e0c32d0e38d0de68c4f83d50273714b33f54cd907585aa7fa1e9d4c9bdd6ff09"
+    },
+    {
+      "path": "fixtures/channels/feishu_recalled.json",
+      "sha256": "da7d6fc0ced0fdb51ca5389b1ba864b78d4a60470fd04486f9f1ab1ab8d97a41"
+    },
+    {
+      "path": "fixtures/channels/feishu_text.json",
+      "sha256": "79e1704ca3d2bb30a82071978f8929af56128ac670631cd23cc4043c573f43e7"
+    },
+    {
+      "path": "fixtures/channels/max_media.json",
+      "sha256": "b953bc2876b2d66415972707911a7c3e253053c911b4f526d67c3b3f12ac86f6"
+    },
+    {
+      "path": "fixtures/channels/max_removed.json",
+      "sha256": "81f12c612fd9a37e52d4d478f9d5c60cac25a2ab6d340f8581b5c89e2755e984"
+    },
+    {
+      "path": "fixtures/channels/max_text.json",
+      "sha256": "c73702433c61e7f3b7158b4dc82c834c1746992cefcf9600e5e8d5de952f4e4d"
+    },
+    {
+      "path": "fixtures/channels/telegram_media.json",
+      "sha256": "f09df3c98f98959a241b8685981b367b340d4cc176e083f846442541e45d7f6d"
+    },
+    {
+      "path": "fixtures/channels/telegram_text.json",
+      "sha256": "c9c5aa84ba29416a189a09f70f5f57a1d0b378ee9712ebd028344d21bb766082"
+    },
+    {
+      "path": "fixtures/channels/whatsapp_bsuid.json",
+      "sha256": "d5c072c8ec738d67e803d1a26a305dc1e72c428ee301adcf18103f405180cb1c"
+    },
+    {
+      "path": "fixtures/channels/whatsapp_status.json",
+      "sha256": "351b411168ae4a871fc5885e3100406079e0a171ffb4ad4d69350c0c2bd481a2"
+    },
+    {
+      "path": "fixtures/channels/whatsapp_text.json",
+      "sha256": "a3f5e3e95edd898c63ce85ced348639fd907742bd98b30f36c1377d8ac209360"
+    },
+    {
+      "path": "fixtures/knowledge/logistics-zh-ru.md",
+      "sha256": "a0ef4bc241f24f4dbf2dc16e4b4c23cb6566c3891849ff312c4cc087ab6266ac"
+    },
+    {
+      "path": ".github/workflows/linux-mock.yml",
+      "sha256": "478ae5a172f73cdf952706aadfedb0802fd9ee65b38de8c66ba669f0beeaf505"
+    },
+    {
+      "path": ".github/workflows/onboarding-components.yml",
+      "sha256": "87e15cdb44a7f42a0e10cc80772a07eb6aab57860ced9463968414b546547071"
+    },
+    {
+      "path": "requirements-onboarding.txt",
+      "sha256": "ce5ad9b01b4db566d8d6e7cb92f0f43faa880b00ad46c9c57ad430f64383d0ae"
+    },
+    {
+      "path": "requirements-onboarding.lock",
+      "sha256": "14033db46be611048f7f0169c9e9d4fa98eafa168c2f35408ed0970c498fe9d0"
+    }
+  ],
+  "source_consistent": true,
+  "seconds": 42.879,
+  "cases": [
+    {
+      "test": "test_admin_auth.AdminAuthTest.test_callback_must_be_fixed_https_or_explicit_loopback",
+      "status": "passed",
+      "seconds": 0.001325
+    },
+    {
+      "test": "test_admin_auth.AdminAuthTest.test_default_transport_does_not_follow_redirects",
+      "status": "passed",
+      "seconds": 0.001827
+    },
+    {
+      "test": "test_admin_auth.AdminAuthTest.test_mismatched_tampered_expired_state_fails_before_network",
+      "status": "passed",
+      "seconds": 0.000617
+    },
+    {
+      "test": "test_admin_auth.AdminAuthTest.test_oidc_code_exchange_checks_exact_redirect_and_retains_only_identity",
+      "status": "passed",
+      "seconds": 0.000506
+    },
+    {
+      "test": "test_admin_auth.AdminAuthTest.test_sessions_expire_and_cannot_cross_auth_realms",
+      "status": "passed",
+      "seconds": 0.000627
+    },
+    {
+      "test": "test_admin_auth.AdminAuthTest.test_wrong_organization_missing_identity_and_failed_provider_do_not_sign_in",
+      "status": "passed",
+      "seconds": 0.000819
+    },
+    {
+      "test": "test_admin_web.AdminHTTPTests.test_login_redirect_cookies_and_state_are_separated",
+      "status": "passed",
+      "seconds": 0.017931
+    },
+    {
+      "test": "test_admin_web.AdminHTTPTests.test_mutations_require_both_csrf_checks_and_call_service_with_session_user",
+      "status": "passed",
+      "seconds": 0.015756
+    },
+    {
+      "test": "test_admin_web.AdminHTTPTests.test_welcome_preview_uses_only_permission_checked_document_and_separate_publish",
+      "status": "passed",
+      "seconds": 0.01352
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_agent_switch_leaves_intake_alone_and_followup_still_requires_approval",
+      "status": "passed",
+      "seconds": 0.55174
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_first_message_that_already_needs_handoff_still_gets_one_welcome",
+      "status": "passed",
+      "seconds": 0.521279
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_group_preferences_and_control_commands_stay_in_the_correct_room",
+      "status": "passed",
+      "seconds": 0.540328
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_new_customer_context_supersedes_drafts_and_complete_handoff_is_feishu_only",
+      "status": "passed",
+      "seconds": 0.533811
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_new_customer_event_schedules_agent_only_after_handoff_in_enabled_room",
+      "status": "passed",
+      "seconds": 0.593819
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_only_authorized_staff_in_the_same_room_can_send_the_previewed_translation",
+      "status": "passed",
+      "seconds": 0.541067
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_preview_confirmation_and_five_delivered_questions_gate_handoff",
+      "status": "passed",
+      "seconds": 0.595085
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_source_labels_only_change_feishu_display",
+      "status": "passed",
+      "seconds": 0.549941
+    },
+    {
+      "test": "test_approval_flow.ApprovalFlowAcceptance.test_staff_message_supersedes_an_inflight_agent_job",
+      "status": "passed",
+      "seconds": 0.523883
+    },
+    {
+      "test": "test_card_approval.CardApprovalAcceptance.test_basic_intake_keeps_approval_and_auto_authorization_can_be_revoked",
+      "status": "passed",
+      "seconds": 0.542238
+    },
+    {
+      "test": "test_card_approval.CardApprovalAcceptance.test_followup_auto_send_requires_both_switches_in_that_room",
+      "status": "passed",
+      "seconds": 0.57087
+    },
+    {
+      "test": "test_card_approval.CardApprovalAcceptance.test_old_events_and_manual_draft_requests_cannot_gain_auto_authorization",
+      "status": "passed",
+      "seconds": 0.554675
+    },
+    {
+      "test": "test_card_approval.CardApprovalAcceptance.test_only_signed_same_room_card_and_version_can_send_exactly_once",
+      "status": "passed",
+      "seconds": 0.548967
+    },
+    {
+      "test": "test_card_approval.CardApprovalAcceptance.test_reject_and_replaced_card_never_send",
+      "status": "passed",
+      "seconds": 0.530048
+    },
+    {
+      "test": "test_card_approval.FinalizedApprovalCardTest.test_cancelled_card_keeps_exact_preview_and_callback_version",
+      "status": "passed",
+      "seconds": 0.000362
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_bot_echoes_are_ignored",
+      "status": "passed",
+      "seconds": 0.000262
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_bsuid_without_phone_routes_with_recipient",
+      "status": "passed",
+      "seconds": 0.000233
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_delete_shapes_and_whatsapp_unsupported",
+      "status": "passed",
+      "seconds": 0.000126
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_empty_or_missing_receipts_preserve_unknown_outcome",
+      "status": "passed",
+      "seconds": 0.000575
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_feishu_employee_and_recall_without_invented_actor",
+      "status": "passed",
+      "seconds": 0.000135
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_feishu_encryption_is_not_falsely_supported",
+      "status": "passed",
+      "seconds": 3.1e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_feishu_preserves_mention_metadata_for_staff_routing",
+      "status": "passed",
+      "seconds": 0.00015
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_feishu_room_creation_members_and_partial_failure",
+      "status": "passed",
+      "seconds": 7.3e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_feishu_targeted_mentions_allow_safe_ids_and_escape_source_markup",
+      "status": "passed",
+      "seconds": 0.000262
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_feishu_text_only_adds_a_trusted_group_mention",
+      "status": "passed",
+      "seconds": 6.1e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_feishu_token_signature_and_no_downgrade",
+      "status": "passed",
+      "seconds": 0.000163
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_malformed_ids_in_success_receipts_are_unknown",
+      "status": "passed",
+      "seconds": 0.000303
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_malformed_payloads_have_typed_error",
+      "status": "passed",
+      "seconds": 0.000275
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_max_edit_removal_and_stable_create_id",
+      "status": "passed",
+      "seconds": 0.000153
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_max_missing_chat_uses_sender_not_recipient",
+      "status": "passed",
+      "seconds": 8.8e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_media_caption_is_not_silently_lost",
+      "status": "passed",
+      "seconds": 5.4e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_media_normalization_all_channels",
+      "status": "passed",
+      "seconds": 0.000196
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_missing_message_fields_and_broken_error_envelopes_are_unknown",
+      "status": "passed",
+      "seconds": 6.3e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_missing_or_wrong_success_flags_are_not_rejections",
+      "status": "passed",
+      "seconds": 0.000164
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_only_explicit_rejections_are_provider_failures",
+      "status": "passed",
+      "seconds": 5.2e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_outgoing_media_uses_destination_upload_id",
+      "status": "passed",
+      "seconds": 0.000246
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_outgoing_text_paths_auth_and_json_content",
+      "status": "passed",
+      "seconds": 8.5e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_provider_errors_and_rate_limit_delay",
+      "status": "passed",
+      "seconds": 0.000194
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_semantic_delete_success_and_failure",
+      "status": "passed",
+      "seconds": 3.2e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_success_response_message_ids",
+      "status": "passed",
+      "seconds": 3.2e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_telegram_and_max_secrets_case_insensitive_headers",
+      "status": "passed",
+      "seconds": 4.8e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_telegram_edit_and_nonmessage_event",
+      "status": "passed",
+      "seconds": 0.000302
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_telegram_photo_selects_largest_and_voice_normalizes",
+      "status": "passed",
+      "seconds": 0.000119
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_text_limits_and_empty_messages",
+      "status": "passed",
+      "seconds": 4.8e-05
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_three_external_identities_and_seconds",
+      "status": "passed",
+      "seconds": 0.000483
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_unsupported_media_never_becomes_normal_text",
+      "status": "passed",
+      "seconds": 0.000412
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_whatsapp_full_batch_across_entries_and_changes",
+      "status": "passed",
+      "seconds": 0.00032
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_whatsapp_hmac_on_original_bytes",
+      "status": "passed",
+      "seconds": 0.000102
+    },
+    {
+      "test": "test_channels.ChannelContracts.test_whatsapp_status_and_account_mismatch",
+      "status": "passed",
+      "seconds": 0.000127
+    },
+    {
+      "test": "test_cli_onboarding.FeishuRegistrationCommand.test_register_and_retry_without_creating_another_app",
+      "status": "passed",
+      "seconds": 0.003805
+    },
+    {
+      "test": "test_cli_onboarding.TelegramCommandContracts.test_cli_configuration_requires_same_verified_platform_owner",
+      "status": "passed",
+      "seconds": 0.006158
+    },
+    {
+      "test": "test_cli_onboarding.TelegramCommandContracts.test_qr_login_uses_ephemeral_database_and_waits_for_authorization",
+      "status": "passed",
+      "seconds": 0.000213
+    },
+    {
+      "test": "test_cli_onboarding.TelegramCommandContracts.test_scope_readback_rejects_extra_rights_and_honors_exclusions",
+      "status": "passed",
+      "seconds": 0.000225
+    },
+    {
+      "test": "test_cli_onboarding.TelegramCommandContracts.test_wrong_account_or_existing_other_bot_cannot_be_changed",
+      "status": "passed",
+      "seconds": 0.000126
+    },
+    {
+      "test": "test_company_accounts.CompanyRegistryTest.test_dashboard_requires_secret_url_and_loopback_host",
+      "status": "passed",
+      "seconds": 0.505116
+    },
+    {
+      "test": "test_company_accounts.CompanyRegistryTest.test_disabled_and_unsafe_files",
+      "status": "passed",
+      "seconds": 0.000775
+    },
+    {
+      "test": "test_company_accounts.CompanyRegistryTest.test_three_companies_list_without_credentials_and_detect_each_collision",
+      "status": "passed",
+      "seconds": 0.002463
+    },
+    {
+      "test": "test_company_accounts.SeparateCompaniesTest.test_same_customer_in_three_companies_stays_in_its_own_database_and_room",
+      "status": "passed",
+      "seconds": 0.013567
+    },
+    {
+      "test": "test_demo.DemoAcceptance.test_documented_demo_command_runs_three_complete_conversations",
+      "status": "passed",
+      "seconds": 1.128584
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_actual_cli_cannot_be_rehashed_into_manifest",
+      "status": "passed",
+      "seconds": 0.003822
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_actual_source_and_lock_cannot_be_rehashed_into_manifest",
+      "status": "passed",
+      "seconds": 0.003569
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_actual_wheel_cannot_be_rehashed_into_manifest",
+      "status": "passed",
+      "seconds": 0.002259
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_archive_symlink_is_rejected",
+      "status": "passed",
+      "seconds": 0.001103
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_duplicate_archive_entry_is_rejected",
+      "status": "passed",
+      "seconds": 0.001708
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_links_devices_and_explicit_directory_entries_are_rejected",
+      "status": "passed",
+      "seconds": 0.00553
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_missing_malformed_and_noncanonical_outer_digest_are_rejected",
+      "status": "passed",
+      "seconds": 0.000922
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_missing_manifest_file_is_rejected",
+      "status": "passed",
+      "seconds": 0.001499
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_native_kind_must_match_payload",
+      "status": "passed",
+      "seconds": 0.001815
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_non_object_or_missing_manifest_fields_are_handled_as_bundle_error",
+      "status": "passed",
+      "seconds": 0.005187
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_path_traversal_absolute_and_ambiguous_paths_are_rejected",
+      "status": "passed",
+      "seconds": 0.006402
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_replacing_input_after_verification_cannot_replace_native_payload",
+      "status": "passed",
+      "seconds": 0.002881
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_required_source_and_wheelhouse_cannot_be_omitted_from_both",
+      "status": "passed",
+      "seconds": 0.002651
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_total_expanded_size_limit_precedes_installation",
+      "status": "passed",
+      "seconds": 0.001024
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_unlisted_extra_file_is_rejected",
+      "status": "passed",
+      "seconds": 0.00269
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_valid_native_archive_retains_native_payload_identity",
+      "status": "passed",
+      "seconds": 0.00226
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_valid_source_archive_is_verified_then_cleaned_up",
+      "status": "passed",
+      "seconds": 0.001843
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_wrong_architecture_python_lock_or_source_pin_is_rejected",
+      "status": "passed",
+      "seconds": 0.006671
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_wrong_file_digest_or_size_is_rejected",
+      "status": "passed",
+      "seconds": 0.003429
+    },
+    {
+      "test": "test_dependency_bundle.DependencyBundleContracts.test_wrong_outer_digest_is_rejected_before_tar_open",
+      "status": "passed",
+      "seconds": 0.001183
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_additional_bot_roster_must_match_explicitly_allowed_app_ids",
+      "status": "passed",
+      "seconds": 0.001011
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_approval_card_preserves_preview_and_sends_interactive_message",
+      "status": "passed",
+      "seconds": 0.000531
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_card_stream_limits_clicks_to_mapped_rooms_and_authorized_staff",
+      "status": "passed",
+      "seconds": 0.036635
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_download_attachment_rejects_unscoped_and_unsafe_receipts",
+      "status": "passed",
+      "seconds": 0.002391
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_download_attachment_scopes_message_resource_and_uses_private_destination",
+      "status": "passed",
+      "seconds": 0.00276
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_managed_private_group_creation_is_scoped_and_repeatable",
+      "status": "passed",
+      "seconds": 0.000549
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_managed_room_requires_a_private_internal_creation_receipt",
+      "status": "passed",
+      "seconds": 0.000686
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_managed_send_requires_explicit_chat_and_checks_its_roster",
+      "status": "passed",
+      "seconds": 0.000595
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_managed_stream_only_returns_rooms_currently_mapped",
+      "status": "passed",
+      "seconds": 0.038404
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_patch_card_requires_exact_room_roster_and_uses_nested_content",
+      "status": "passed",
+      "seconds": 0.001228
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_per_room_membership_stream_keeps_identity_checks_and_requires_room_mapping",
+      "status": "passed",
+      "seconds": 0.082805
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_persistent_stream_stops_or_reports_unexpected_exit",
+      "status": "passed",
+      "seconds": 0.150508
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_raw_card_callback_requires_matching_app_and_button_payload",
+      "status": "passed",
+      "seconds": 0.000245
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_receipt_must_confirm_group_and_message",
+      "status": "passed",
+      "seconds": 0.000562
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_send_attachment_uploads_native_media_and_keeps_delivery_key",
+      "status": "passed",
+      "seconds": 0.001997
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_send_checks_bot_and_audience_and_passes_content_via_stdin",
+      "status": "passed",
+      "seconds": 0.000474
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_staff_invite_is_addressed_to_one_user_and_requires_a_p2p_receipt",
+      "status": "passed",
+      "seconds": 0.000478
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_staff_invite_rejects_bad_target_and_url_without_a_cli_call",
+      "status": "passed",
+      "seconds": 0.000642
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_staff_invite_with_unverifiable_chat_or_receipt_is_not_reported_sent",
+      "status": "passed",
+      "seconds": 0.001326
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_staff_override_validates_before_any_request_and_controls_create_or_send",
+      "status": "passed",
+      "seconds": 0.000567
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_stream_filters_chat_sender_bot_and_type_before_returning_message",
+      "status": "passed",
+      "seconds": 0.077661
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_stream_parses_installed_cli_native_media_shapes",
+      "status": "passed",
+      "seconds": 0.126059
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_stream_reports_cli_event_loss_without_exposing_stderr",
+      "status": "passed",
+      "seconds": 0.078883
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_targeted_send_limits_mention_to_the_allowed_staff",
+      "status": "passed",
+      "seconds": 0.000964
+    },
+    {
+      "test": "test_feishu_live.FeishuLiveTest.test_unapproved_members_block_the_send_before_issuing_the_command",
+      "status": "passed",
+      "seconds": 0.000871
+    },
+    {
+      "test": "test_feishu_provision.FeishuProvision.test_no_sdk_and_provider_failure_report_stable_codes",
+      "status": "passed",
+      "seconds": 0.0009
+    },
+    {
+      "test": "test_feishu_provision.FeishuProvision.test_non_vendor_and_malformed_links_never_reach_the_owner",
+      "status": "passed",
+      "seconds": 0.000756
+    },
+    {
+      "test": "test_feishu_provision.FeishuProvision.test_scan_uses_vendor_link_and_only_bridge_capabilities",
+      "status": "passed",
+      "seconds": 0.000203
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_1000_simulated_customers_are_isolated_under_one_account_per_channel",
+      "status": "passed",
+      "seconds": 4.916555
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_account_scope_and_unmapped_or_unapproved_staff_have_no_side_effect",
+      "status": "passed",
+      "seconds": 1.012916
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_authentication_challenges_and_account_mismatch",
+      "status": "passed",
+      "seconds": 1.003105
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_automatic_handoff_creates_one_room_and_manual_mode_suppresses_ai",
+      "status": "passed",
+      "seconds": 0.5364
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_cancel_before_dispatch_and_native_feishu_recall_after_dispatch",
+      "status": "passed",
+      "seconds": 1.035779
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_language_is_from_customer_text_and_short_numbers_do_not_change_it",
+      "status": "passed",
+      "seconds": 0.528322
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_max_semantic_delete_failure_and_whatsapp_unsupported_are_not_success",
+      "status": "passed",
+      "seconds": 1.032278
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_replay_batch_status_only_and_bsuid",
+      "status": "passed",
+      "seconds": 1.015449
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_three_channels_auto_reply_then_seven_staff_translate_without_send_modes",
+      "status": "passed",
+      "seconds": 1.106925
+    },
+    {
+      "test": "test_http.HTTPAcceptance.test_whatsapp_window_is_checked_again_at_dispatch",
+      "status": "passed",
+      "seconds": 1.008503
+    },
+    {
+      "test": "test_http.ProcessRestartAcceptance.test_queued_message_survives_actual_linux_process_restart_and_replay",
+      "status": "passed",
+      "seconds": 0.680885
+    },
+    {
+      "test": "test_intake.IntakePolicy.test_accepts_only_literal_evidence_for_requested_fields",
+      "status": "passed",
+      "seconds": 0.000107
+    },
+    {
+      "test": "test_intake.IntakePolicy.test_complete_first_message_still_gets_welcome",
+      "status": "passed",
+      "seconds": 5.3e-05
+    },
+    {
+      "test": "test_intake.IntakePolicy.test_hard_limit_reserves_final_reply_for_handoff",
+      "status": "passed",
+      "seconds": 0.000136
+    },
+    {
+      "test": "test_intake.IntakePolicy.test_human_requests_skip_extraction",
+      "status": "passed",
+      "seconds": 5.6e-05
+    },
+    {
+      "test": "test_intake.IntakePolicy.test_model_unavailable_or_unstructured_output_transfers_with_known_facts",
+      "status": "passed",
+      "seconds": 4.7e-05
+    },
+    {
+      "test": "test_intake.IntakePolicy.test_rejects_invalid_configuration",
+      "status": "passed",
+      "seconds": 0.000222
+    },
+    {
+      "test": "test_intake.IntakePolicy.test_welcome_collects_all_three_groups_and_asks_only_for_missing_fields",
+      "status": "passed",
+      "seconds": 0.000162
+    },
+    {
+      "test": "test_intake_service.IntakeServiceAcceptance.test_disable_cancels_queued_and_enable_only_affects_new_sessions",
+      "status": "passed",
+      "seconds": 0.520439
+    },
+    {
+      "test": "test_intake_service.IntakeServiceAcceptance.test_mentions_stay_internal_and_plain_staff_reply_stops_ai",
+      "status": "passed",
+      "seconds": 0.518753
+    },
+    {
+      "test": "test_intake_service.IntakeServiceAcceptance.test_new_sessions_get_separate_rooms_and_provenanced_handoff",
+      "status": "passed",
+      "seconds": 0.519282
+    },
+    {
+      "test": "test_intake_service.IntakeServiceAcceptance.test_restart_replay_and_hard_reply_limit_send_one_room_broadcast",
+      "status": "passed",
+      "seconds": 0.522033
+    },
+    {
+      "test": "test_language.LanguageTests.test_chinese_employee_phrases_translate_to_customer_language",
+      "status": "passed",
+      "seconds": 0.000116
+    },
+    {
+      "test": "test_language.LanguageTests.test_known_knowledge_answer_and_unknown_escalation",
+      "status": "passed",
+      "seconds": 0.000115
+    },
+    {
+      "test": "test_language.LanguageTests.test_short_ambiguous_message_keeps_previous_language",
+      "status": "passed",
+      "seconds": 3.7e-05
+    },
+    {
+      "test": "test_language.LanguageTests.test_text_wins_over_profile_hint",
+      "status": "passed",
+      "seconds": 3.2e-05
+    },
+    {
+      "test": "test_language.LanguageTests.test_unknown_translation_never_returns_source_as_success",
+      "status": "passed",
+      "seconds": 5.4e-05
+    },
+    {
+      "test": "test_live_media.LiveMediaAcceptance.test_customer_text_cannot_approve_or_change_settings",
+      "status": "passed",
+      "seconds": 0.007954
+    },
+    {
+      "test": "test_live_media.LiveMediaAcceptance.test_images_and_documents_are_delivered_to_each_matching_conversation",
+      "status": "passed",
+      "seconds": 0.008042
+    },
+    {
+      "test": "test_live_media.LiveMediaAcceptance.test_unconfirmed_telegram_media_does_not_repeat_after_restart",
+      "status": "passed",
+      "seconds": 0.007543
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_advisor_fails_closed_for_invalid_input_output_and_model_failure",
+      "status": "passed",
+      "seconds": 0.014777
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_advisor_uses_the_transcript_as_data_and_returns_a_chinese_draft",
+      "status": "passed",
+      "seconds": 0.010889
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_extracts_requested_intake_fields_without_translating_them",
+      "status": "passed",
+      "seconds": 0.011142
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_fresh_messages_use_the_model_in_both_directions",
+      "status": "passed",
+      "seconds": 0.012023
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_refuses_truncation_invalid_envelopes_and_untranslated_text",
+      "status": "passed",
+      "seconds": 0.013708
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_rejects_external_urls_and_redirects",
+      "status": "passed",
+      "seconds": 0.011266
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_rejects_intake_output_with_wrong_shape_and_sanitizes_errors",
+      "status": "passed",
+      "seconds": 0.012599
+    },
+    {
+      "test": "test_local_translation.TranslationTests.test_same_language_and_number_only_messages_do_not_call_the_endpoint",
+      "status": "passed",
+      "seconds": 0.010458
+    },
+    {
+      "test": "test_management.ManagementAcceptance.test_business_label_falls_back_until_explicitly_saved_and_survives_restart",
+      "status": "passed",
+      "seconds": 0.50153
+    },
+    {
+      "test": "test_management.ManagementAcceptance.test_new_defaults_apply_only_to_new_conversations_and_survive_restart",
+      "status": "passed",
+      "seconds": 0.530905
+    },
+    {
+      "test": "test_management.ManagementAcceptance.test_web_and_slash_use_the_same_permission_and_room_membership",
+      "status": "passed",
+      "seconds": 0.531952
+    },
+    {
+      "test": "test_management.ManagementAcceptance.test_welcome_preview_publish_and_rollback_freeze_the_exact_items",
+      "status": "passed",
+      "seconds": 0.60095
+    },
+    {
+      "test": "test_onboarding.ConnectionScopedBridge.test_only_the_bound_connection_can_establish_new_private_service_groups",
+      "status": "passed",
+      "seconds": 0.005439
+    },
+    {
+      "test": "test_onboarding.ConnectionScopedBridge.test_round_robin_persists_across_restart_without_reassigning_existing_customer",
+      "status": "passed",
+      "seconds": 0.005234
+    },
+    {
+      "test": "test_onboarding.OnboardingContracts.test_callback_requires_fresh_private_proof_and_bound_live_connection",
+      "status": "passed",
+      "seconds": 0.000345
+    },
+    {
+      "test": "test_onboarding.OnboardingContracts.test_configure_official_receipts_replace_manual_identity_fields",
+      "status": "passed",
+      "seconds": 0.003951
+    },
+    {
+      "test": "test_onboarding.OnboardingContracts.test_credentials_are_literal_and_owner_only",
+      "status": "passed",
+      "seconds": 0.000327
+    },
+    {
+      "test": "test_onboarding.OnboardingContracts.test_feishu_profile_must_match_and_only_bootstrap_identity_is_retained",
+      "status": "passed",
+      "seconds": 0.001312
+    },
+    {
+      "test": "test_onboarding.OnboardingContracts.test_prepare_feishu_keeps_configured_profile_on_migration",
+      "status": "passed",
+      "seconds": 0.000995
+    },
+    {
+      "test": "test_onboarding.OnboardingContracts.test_secret_prompt_rejects_echo_fallback",
+      "status": "passed",
+      "seconds": 0.000244
+    },
+    {
+      "test": "test_onboarding_delivery.ChallengeDelivery.test_already_delivered_uses_tdlib_nullable_field_omission",
+      "status": "passed",
+      "seconds": 7.7e-05
+    },
+    {
+      "test": "test_onboarding_delivery.ChallengeDelivery.test_confirmation_before_the_rpc_response",
+      "status": "passed",
+      "seconds": 6e-05
+    },
+    {
+      "test": "test_onboarding_delivery.ChallengeDelivery.test_failed_deleted_and_unknown_are_distinct",
+      "status": "passed",
+      "seconds": 0.000304
+    },
+    {
+      "test": "test_onboarding_delivery.ChallengeDelivery.test_legacy_checkpoint_cannot_skip_new_verification_and_failed_send_does_not_save",
+      "status": "passed",
+      "seconds": 0.000425
+    },
+    {
+      "test": "test_onboarding_delivery.ChallengeDelivery.test_non_outgoing_does_not_confirm",
+      "status": "passed",
+      "seconds": 5.3e-05
+    },
+    {
+      "test": "test_onboarding_delivery.ChallengeDelivery.test_waits_for_matching_success_and_ignores_other_chat_id_and_client",
+      "status": "passed",
+      "seconds": 6.8e-05
+    },
+    {
+      "test": "test_onboarding_delivery.FeishuPermissions.test_complete_scope_list_does_not_request_permissions",
+      "status": "passed",
+      "seconds": 0.000373
+    },
+    {
+      "test": "test_onboarding_delivery.FeishuPermissions.test_missing_app_scopes_produce_exact_official_request_and_qr",
+      "status": "passed",
+      "seconds": 0.000387
+    },
+    {
+      "test": "test_onboarding_delivery.FeishuPermissions.test_user_permissions_never_count_as_application_grant",
+      "status": "passed",
+      "seconds": 0.000248
+    },
+    {
+      "test": "test_onboarding_delivery.PrivateTools.test_extracts_only_verified_cli_and_rejects_digest_mismatch",
+      "status": "passed",
+      "seconds": 0.00109
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_cached_archive_tampering_is_rejected_without_repair",
+      "status": "passed",
+      "seconds": 0.00144
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_changed_installed_binary_is_preserved_and_never_executed",
+      "status": "passed",
+      "seconds": 0.001513
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_corrupt_archive_never_executes_or_installs",
+      "status": "passed",
+      "seconds": 0.000837
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_duplicate_executable_in_archive_is_rejected",
+      "status": "passed",
+      "seconds": 0.001385
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_earlier_verified_binary_is_adopted_without_overwrite",
+      "status": "passed",
+      "seconds": 0.001133
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_native_version_mismatch_does_not_publish_binary",
+      "status": "passed",
+      "seconds": 0.001188
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_offline_install_and_repeat_preserve_existing_binary",
+      "status": "passed",
+      "seconds": 0.001761
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_receipt_tampering_is_rejected",
+      "status": "passed",
+      "seconds": 0.00176
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_supplied_archive_symlink_is_rejected",
+      "status": "passed",
+      "seconds": 0.000721
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_symlink_binary_is_not_followed_or_replaced",
+      "status": "passed",
+      "seconds": 0.001169
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_unsupported_platform_does_not_create_tools",
+      "status": "passed",
+      "seconds": 0.000784
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_world_readable_cache_is_rejected",
+      "status": "passed",
+      "seconds": 0.001272
+    },
+    {
+      "test": "test_onboarding_tools.LarkToolInstallation.test_wrong_architecture_rejected_before_execution",
+      "status": "passed",
+      "seconds": 0.001147
+    },
+    {
+      "test": "test_personal.PersonalContract.test_allowlist_iterator_is_retained_and_validated",
+      "status": "passed",
+      "seconds": 8.9e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_default_deny_and_private_chat_filter",
+      "status": "passed",
+      "seconds": 4e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_deletion_and_scope",
+      "status": "passed",
+      "seconds": 3.8e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_document_voice_and_animation_without_a_text_body",
+      "status": "passed",
+      "seconds": 0.000122
+    },
+    {
+      "test": "test_personal.PersonalContract.test_media_uses_authenticated_role_and_native_caption",
+      "status": "passed",
+      "seconds": 4.3e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_owner_customer_and_echo_are_distinct",
+      "status": "passed",
+      "seconds": 3.6e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_poll_only_business_updates",
+      "status": "passed",
+      "seconds": 2.3e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_recall_exact_receipt_and_right",
+      "status": "passed",
+      "seconds": 3.4e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_revocation_and_owner_binding",
+      "status": "passed",
+      "seconds": 2.7e-05
+    },
+    {
+      "test": "test_personal.PersonalContract.test_send_original_account_and_window",
+      "status": "passed",
+      "seconds": 3.3e-05
+    },
+    {
+      "test": "test_personal_install.PersonalInstallTest.test_defer_unit_waits_for_dependencies_and_preserves_custom_draft",
+      "status": "passed",
+      "seconds": 0.176963
+    },
+    {
+      "test": "test_personal_install.PersonalInstallTest.test_failed_activation_restores_exact_unit_and_restarts_old_version",
+      "status": "passed",
+      "seconds": 0.232441
+    },
+    {
+      "test": "test_personal_install.PersonalInstallTest.test_fresh_install_refuses_existing_instance_without_mutation",
+      "status": "passed",
+      "seconds": 0.089606
+    },
+    {
+      "test": "test_personal_install.PersonalInstallTest.test_preflight_failure_preserves_previous_service",
+      "status": "passed",
+      "seconds": 0.159702
+    },
+    {
+      "test": "test_personal_install.PersonalInstallTest.test_prepare_does_not_change_enabled_deployment",
+      "status": "passed",
+      "seconds": 0.128269
+    },
+    {
+      "test": "test_personal_install.PersonalInstallTest.test_refuses_a_symlink_to_other_credentials",
+      "status": "passed",
+      "seconds": 0.093425
+    },
+    {
+      "test": "test_personal_install.PersonalInstallTest.test_staging_reuses_live_settings_and_db_without_starting",
+      "status": "passed",
+      "seconds": 0.087461
+    },
+    {
+      "test": "test_personal_intake.PersonalIntakeAcceptance.test_disabled_first_contact_is_still_mirrored_without_an_ai_send",
+      "status": "passed",
+      "seconds": 0.004561
+    },
+    {
+      "test": "test_personal_intake.PersonalIntakeAcceptance.test_welcome_and_human_takeover_survive_restart",
+      "status": "passed",
+      "seconds": 0.01124
+    },
+    {
+      "test": "test_personal_managed.ManagedBridgeAcceptance.test_mismatched_telegram_receipt_stays_unknown_and_other_chat_can_send",
+      "status": "passed",
+      "seconds": 0.006831
+    },
+    {
+      "test": "test_personal_managed.ManagedBridgeAcceptance.test_reopening_with_different_authorized_peers_fails_closed",
+      "status": "passed",
+      "seconds": 0.002876
+    },
+    {
+      "test": "test_personal_managed.ManagedBridgeAcceptance.test_two_isolated_groups_require_same_room_and_exact_version_approval",
+      "status": "passed",
+      "seconds": 0.013084
+    },
+    {
+      "test": "test_personal_managed.ManagedBridgeAcceptance.test_unknown_room_creation_does_not_suppress_fixed_welcome",
+      "status": "passed",
+      "seconds": 0.004245
+    },
+    {
+      "test": "test_personal_runner.BridgeAcceptance.test_discovery_leaves_first_customer_update_for_the_runner",
+      "status": "passed",
+      "seconds": 0.00327
+    },
+    {
+      "test": "test_personal_runner.BridgeAcceptance.test_revocation_blocks_pending_reply",
+      "status": "passed",
+      "seconds": 0.004162
+    },
+    {
+      "test": "test_personal_runner.BridgeAcceptance.test_two_way_text_owner_echo_and_replay",
+      "status": "passed",
+      "seconds": 0.005801
+    },
+    {
+      "test": "test_personal_runner.BridgeAcceptance.test_wrong_receipt_is_unknown_and_never_resent",
+      "status": "passed",
+      "seconds": 0.004883
+    },
+    {
+      "test": "test_receipts.ReceiptAcceptance.test_platform_accepted_send_but_empty_receipt_is_unknown_and_not_retried",
+      "status": "passed",
+      "seconds": 0.508954
+    },
+    {
+      "test": "test_receipts.ReceiptAcceptance.test_platform_deleted_message_but_empty_receipt_is_unknown",
+      "status": "passed",
+      "seconds": 0.54509
+    },
+    {
+      "test": "test_receipts.ReceiptAcceptance.test_room_created_with_missing_receipt_is_unknown_and_not_created_again",
+      "status": "passed",
+      "seconds": 0.505982
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_compatibility_uses_noninstalling_offline_resolver",
+      "status": "passed",
+      "seconds": 0.001194
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_extra_or_symlink_wheelhouse_file_is_refused",
+      "status": "passed",
+      "seconds": 0.000537
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_failed_creation_cleans_only_its_unpublished_directory",
+      "status": "passed",
+      "seconds": 0.045596
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_find_does_not_install_and_partial_environment_is_preserved",
+      "status": "passed",
+      "seconds": 0.085
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_invalid_wheel_refused_before_execution_or_venv",
+      "status": "passed",
+      "seconds": 0.022843
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_lock_requires_exact_versions_and_sha256",
+      "status": "passed",
+      "seconds": 0.000813
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_missing_one_locked_wheel_is_refused_before_execution",
+      "status": "passed",
+      "seconds": 0.023068
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_pip_and_python_ambient_settings_are_removed",
+      "status": "passed",
+      "seconds": 0.001088
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_public_or_symlink_tools_are_refused",
+      "status": "passed",
+      "seconds": 0.000388
+    },
+    {
+      "test": "test_sdk_dependencies.SDKDependenciesTest.test_real_offline_install_reuse_and_cache_tampering",
+      "status": "passed",
+      "seconds": 3.602398
+    },
+    {
+      "test": "test_service.ServiceTests.test_ai_history_and_resumed_answers_appear_in_room_with_separate_delivery_ids",
+      "status": "passed",
+      "seconds": 0.015564
+    },
+    {
+      "test": "test_service.ServiceTests.test_authorization_denial_is_terminal",
+      "status": "passed",
+      "seconds": 0.003501
+    },
+    {
+      "test": "test_service.ServiceTests.test_bot_echo_does_not_create_conversation_or_ai_message",
+      "status": "passed",
+      "seconds": 0.001651
+    },
+    {
+      "test": "test_service.ServiceTests.test_customer_delete_before_message_survives_restart_and_is_message_scoped",
+      "status": "passed",
+      "seconds": 0.015952
+    },
+    {
+      "test": "test_service.ServiceTests.test_customer_delete_during_mirror_send_deletes_the_eventual_mirror",
+      "status": "passed",
+      "seconds": 0.012575
+    },
+    {
+      "test": "test_service.ServiceTests.test_duplicate_and_conflicting_event_have_observable_distinct_results",
+      "status": "passed",
+      "seconds": 0.004218
+    },
+    {
+      "test": "test_service.ServiceTests.test_inflight_delivery_on_restart_is_unknown_not_resent",
+      "status": "passed",
+      "seconds": 0.003717
+    },
+    {
+      "test": "test_service.ServiceTests.test_loopback_transport_refuses_external_hosts_redirects_and_bad_response_shape",
+      "status": "passed",
+      "seconds": 0.002952
+    },
+    {
+      "test": "test_service.ServiceTests.test_manual_takeover_cancels_ai_and_resume_reenables_it",
+      "status": "passed",
+      "seconds": 0.012824
+    },
+    {
+      "test": "test_service.ServiceTests.test_max_http_200_delete_failure_does_not_falsify_message_status",
+      "status": "passed",
+      "seconds": 0.010356
+    },
+    {
+      "test": "test_service.ServiceTests.test_media_source_token_is_kept_pending_and_never_reused_for_destination",
+      "status": "passed",
+      "seconds": 0.008727
+    },
+    {
+      "test": "test_service.ServiceTests.test_nonmember_cannot_reply_or_recall",
+      "status": "passed",
+      "seconds": 0.007374
+    },
+    {
+      "test": "test_service.ServiceTests.test_one_account_many_conversations_and_accounts_are_isolated",
+      "status": "passed",
+      "seconds": 0.145489
+    },
+    {
+      "test": "test_service.ServiceTests.test_queued_message_can_be_cancelled_on_all_channels",
+      "status": "passed",
+      "seconds": 0.01848
+    },
+    {
+      "test": "test_service.ServiceTests.test_rate_limit_respects_retry_after_and_stops_after_three_attempts",
+      "status": "passed",
+      "seconds": 0.004677
+    },
+    {
+      "test": "test_service.ServiceTests.test_recall_callback_recovers_original_author_and_cross_room_ids_are_rejected",
+      "status": "passed",
+      "seconds": 0.01196
+    },
+    {
+      "test": "test_service.ServiceTests.test_restart_restores_mapping_language_members_and_pending_delivery",
+      "status": "passed",
+      "seconds": 0.010328
+    },
+    {
+      "test": "test_service.ServiceTests.test_room_title_uses_customer_business_and_server_creation_date",
+      "status": "passed",
+      "seconds": 0.016687
+    },
+    {
+      "test": "test_service.ServiceTests.test_sent_recall_supported_and_whatsapp_unsupported",
+      "status": "passed",
+      "seconds": 0.025107
+    },
+    {
+      "test": "test_service.ServiceTests.test_seven_employees_share_one_room_and_default_messages_all_forward",
+      "status": "passed",
+      "seconds": 0.016074
+    },
+    {
+      "test": "test_service.ServiceTests.test_staff_recall_before_receive_survives_restart_without_forwarding",
+      "status": "passed",
+      "seconds": 0.00934
+    },
+    {
+      "test": "test_service.ServiceTests.test_staff_recall_during_delivery_waits_for_platform_id_then_deletes",
+      "status": "passed",
+      "seconds": 0.00805
+    },
+    {
+      "test": "test_service.ServiceTests.test_stale_and_short_messages_do_not_override_latest_language",
+      "status": "passed",
+      "seconds": 0.002774
+    },
+    {
+      "test": "test_service.ServiceTests.test_stale_message_is_recorded_without_outdated_language_auto_reply",
+      "status": "passed",
+      "seconds": 0.002753
+    },
+    {
+      "test": "test_service.ServiceTests.test_three_channels_automatically_reply_in_detected_language",
+      "status": "passed",
+      "seconds": 0.004675
+    },
+    {
+      "test": "test_service.ServiceTests.test_unconfirmed_delivery_is_not_blindly_retried",
+      "status": "passed",
+      "seconds": 0.003956
+    },
+    {
+      "test": "test_service.ServiceTests.test_unknown_employee_translation_is_visible_failure_and_is_not_sent",
+      "status": "passed",
+      "seconds": 0.005673
+    },
+    {
+      "test": "test_service.ServiceTests.test_whatsapp_window_checked_both_when_queued_and_when_sent",
+      "status": "passed",
+      "seconds": 0.005321
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_configure_executes_private_interpreter_and_fixed_paths",
+      "status": "passed",
+      "seconds": 0.003084
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_dependency_failure_stops_before_account_entry",
+      "status": "passed",
+      "seconds": 0.001564
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_invalid_bundle_rejected_before_any_instance_files",
+      "status": "passed",
+      "seconds": 0.001055
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_native_install_publishes_binary_and_receipt_together",
+      "status": "passed",
+      "seconds": 0.001596
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_prepare_does_not_invoke_account_entry",
+      "status": "passed",
+      "seconds": 0.001688
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_tampered_cached_binary_not_probed",
+      "status": "passed",
+      "seconds": 0.001108
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_tampered_source_not_extracted_or_executed",
+      "status": "passed",
+      "seconds": 0.001134
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_wrong_native_digest_never_loaded_or_published",
+      "status": "passed",
+      "seconds": 0.000878
+    },
+    {
+      "test": "test_setup_personal.SetupPersonalTest.test_wrong_native_version_does_not_publish_partial_install",
+      "status": "passed",
+      "seconds": 0.001616
+    },
+    {
+      "test": "test_staff_invites.StaffInvites.test_admin_direct_invite_uses_only_explicit_target_and_server_origin",
+      "status": "passed",
+      "seconds": 0.501493
+    },
+    {
+      "test": "test_staff_invites.StaffInvites.test_concurrent_unbound_claims_cannot_grant_access_and_revocation_denies_retry",
+      "status": "passed",
+      "seconds": 0.509955
+    },
+    {
+      "test": "test_staff_invites.StaffInvites.test_neither_expired_link_nor_expired_pending_claim_can_grant_access",
+      "status": "passed",
+      "seconds": 0.506456
+    },
+    {
+      "test": "test_staff_invites.StaffInvites.test_targeted_invite_requires_matching_authenticated_employee_and_csrf",
+      "status": "passed",
+      "seconds": 0.50174
+    },
+    {
+      "test": "test_staff_invites.StaffInvites.test_unbound_claim_requires_admin_and_only_changes_new_groups",
+      "status": "passed",
+      "seconds": 0.524902
+    },
+    {
+      "test": "test_telegram_live.TelegramPolling.test_cursor_expires_before_telegram_update_id_resets",
+      "status": "passed",
+      "seconds": 0.002715
+    },
+    {
+      "test": "test_telegram_live.TelegramPolling.test_failed_connection_refresh_clears_permissions_and_does_not_ack",
+      "status": "passed",
+      "seconds": 0.001851
+    },
+    {
+      "test": "test_telegram_live.TelegramPolling.test_only_configured_chat_and_connection_are_emitted_in_order",
+      "status": "passed",
+      "seconds": 0.001785
+    },
+    {
+      "test": "test_telegram_live.TelegramPolling.test_prerequisite_and_durable_offset",
+      "status": "passed",
+      "seconds": 0.002448
+    },
+    {
+      "test": "test_telegram_live.TelegramPolling.test_queued_enabled_connection_cannot_override_current_revocation",
+      "status": "passed",
+      "seconds": 0.001849
+    },
+    {
+      "test": "test_telegram_live.TelegramSetup.test_identity_and_existing_webhook_stop_setup_without_writing",
+      "status": "passed",
+      "seconds": 0.000713
+    },
+    {
+      "test": "test_telegram_live.TelegramSetup.test_resolves_verified_name_and_checks_an_expected_name_case_insensitively",
+      "status": "passed",
+      "seconds": 0.000225
+    },
+    {
+      "test": "test_telegram_live.TelegramSetup.test_secretary_changes_only_a_bot_that_needs_it_and_requires_readback",
+      "status": "passed",
+      "seconds": 0.000487
+    },
+    {
+      "test": "test_telegram_live.TelegramSetup.test_setup_url_only_encodes_a_valid_name_and_challenge",
+      "status": "passed",
+      "seconds": 0.000213
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_explicit_proxy_tunnels_only_to_telegram",
+      "status": "passed",
+      "seconds": 0.001429
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_fixed_tls_endpoint_and_server_receipt",
+      "status": "passed",
+      "seconds": 0.001714
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_media_download_rejects_invalid_paths_oversize_and_redirects",
+      "status": "passed",
+      "seconds": 0.001367
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_media_download_resolves_file_id_on_fixed_proxy_endpoint",
+      "status": "passed",
+      "seconds": 0.001141
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_media_upload_multipart_preserves_file_bytes_and_business_routing",
+      "status": "passed",
+      "seconds": 0.00232
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_media_upload_uses_native_photo_only_for_compatible_mime",
+      "status": "passed",
+      "seconds": 0.000996
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_ssh_forward_keeps_telegram_tls_name",
+      "status": "passed",
+      "seconds": 0.001034
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_transport_failure_does_not_expose_token",
+      "status": "passed",
+      "seconds": 0.000403
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_welcome_photo_keeps_rate_limit_and_sanitizes_unknown_delivery",
+      "status": "passed",
+      "seconds": 0.000856
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_welcome_photo_rejects_invalid_media_before_transport",
+      "status": "passed",
+      "seconds": 0.000345
+    },
+    {
+      "test": "test_telegram_live.TelegramTransport.test_welcome_photo_upload_preserves_proxy_and_exact_multipart",
+      "status": "passed",
+      "seconds": 0.002996
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_auth_denial_does_not_become_retryable_or_success",
+      "status": "passed",
+      "seconds": 0.502174
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_non_loopback_and_credential_urls_are_rejected",
+      "status": "passed",
+      "seconds": 0.501465
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_nondict_rate_limit_body_is_a_channel_error",
+      "status": "passed",
+      "seconds": 0.50192
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_null_or_array_retry_parameters_use_header_without_crashing",
+      "status": "passed",
+      "seconds": 0.503512
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_rate_limit_preserves_retry_after",
+      "status": "passed",
+      "seconds": 0.502285
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_real_http_send_reaches_platform",
+      "status": "passed",
+      "seconds": 0.503476
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_redirect_is_not_followed",
+      "status": "passed",
+      "seconds": 0.503074
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_relative_request_cannot_escape_loopback",
+      "status": "passed",
+      "seconds": 0.501365
+    },
+    {
+      "test": "test_transport.TransportAcceptance.test_server_failure_is_an_unconfirmed_delivery",
+      "status": "passed",
+      "seconds": 0.502071
+    },
+    {
+      "test": "test_welcome_templates.WelcomeDocumentTest.test_compiles_ordered_rich_text_and_image_from_revision_checked_pages",
+      "status": "passed",
+      "seconds": 0.002177
+    },
+    {
+      "test": "test_welcome_templates.WelcomeDocumentTest.test_no_cli_access_for_unscoped_urls_or_matching_document_for_wrong_profile",
+      "status": "passed",
+      "seconds": 0.000685
+    },
+    {
+      "test": "test_welcome_templates.WelcomeDocumentTest.test_rejects_revision_changed_during_capture",
+      "status": "passed",
+      "seconds": 0.000887
+    },
+    {
+      "test": "test_welcome_templates.WelcomeDocumentTest.test_rejects_unsupported_blocks_invalid_links_and_invalid_images",
+      "status": "passed",
+      "seconds": 0.001688
+    }
+  ],
+  "limits": [
+    "No live platform credentials or customer messages",
+    "Deterministic translation and AI fixtures",
+    "No production capacity or model quality claim",
+    "Media binary relay remains a separate milestone"
+  ]
+}

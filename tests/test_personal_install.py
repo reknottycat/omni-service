@@ -142,6 +142,39 @@ class PersonalInstallTest(unittest.TestCase):
         self.assertTrue(expected.is_symlink())
         self.assertTrue(other.is_file())
 
+    def test_fresh_install_refuses_existing_instance_without_mutation(self):
+        first = self.install("--no-start", "--fresh")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        protected = (self.config / "personal.json", self.config / "credentials.env", self.unit)
+        before = {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in protected}
+        result = self.install("--no-start", "--fresh")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("拒绝覆盖", result.stderr)
+        self.assertEqual(before, {path: (path.read_bytes(), path.stat().st_mtime_ns) for path in protected})
+        self.assertFalse(self.systemctl_log.exists())
+
+    def test_prepare_does_not_change_enabled_deployment(self):
+        incoming = self.work / "enabled.json"
+        incoming.write_text('{"mode":"personal-managed"}')
+        self.assertEqual(self.install("--config", str(incoming)).returncode, 0)
+        before = self.unit.read_bytes(), self.systemctl_log.read_bytes()
+        (self.sources / "personal_runner.py").write_text("# newer source\n")
+        result = self.install("--no-start")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(before, (self.unit.read_bytes(), self.systemctl_log.read_bytes()))
+
+    def test_defer_unit_waits_for_dependencies_and_preserves_custom_draft(self):
+        result = self.install("--no-start", "--defer-unit")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(self.unit.exists())
+        result = self.install("--no-start")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.unit.write_bytes(self.unit.read_bytes() + b"\n# user's custom draft\n")
+        before = self.unit.read_bytes()
+        for arguments in (("--no-start", "--defer-unit"), ("--no-start",)):
+            self.assertEqual(self.install(*arguments).returncode, 0)
+            self.assertEqual(self.unit.read_bytes(), before)
+
     def test_failed_activation_restores_exact_unit_and_restarts_old_version(self):
         incoming = self.work / "first-config.json"
         incoming.write_text('{"mode":"personal-managed"}')

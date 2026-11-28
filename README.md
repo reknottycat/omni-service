@@ -8,6 +8,9 @@
 
 Telegram–飞书团队接入见[团队部署](docs/personal-deployment.md)，包括 Linux 服务、平台授权与客服邀请。
 
+全新 DGX / Ubuntu 24.04 的自动依赖安装、固定版本离线发行包和干净环境测试见
+[全新 Linux 安装](docs/dgx-clean-install.md)。安装准备与真实扫码授权、服务启动分别执行。
+
 本仓库当前交付可运行的协议与会话验收台。HTTP webhook、渠道适配、SQLite 队列、会话状态及出站 HTTP 都执行实际代码；平台接收端和 AI/翻译使用确定性模拟服务。**这不是已接通真实账号的生产部署。**
 
 - 模拟 Telegram / MAX / WhatsApp：一账号多客户、账号和客户隔离、批量回调与去重。
@@ -21,7 +24,8 @@ Telegram–飞书团队接入见[团队部署](docs/personal-deployment.md)，�
 
 ## 一条命令验收
 
-环境：Linux、Python 3.12+。运行与测试只用 Python 标准库，无须 pip 安装、数据库服务器、平台 token 或外网访问。
+环境：Linux、CPython 3.12（含 venv）。常规协议测试和安装器负测不需要数据库服务器、平台 token 或外网。
+安装器测试会在临时 venv 中安装合成 wheel；真实官方 SDK、CLI 和 TDLib 的检查另见[干净环境测试](docs/dgx-clean-install.md#4-干净环境复验)。
 
 ```bash
 git clone https://github.com/reknottycat/omni-service.git

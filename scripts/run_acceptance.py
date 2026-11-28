@@ -57,7 +57,7 @@ def source_manifest():
         for path in sorted((ROOT / folder).rglob("*")):
             if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"}:
                 files.append({"path": str(path.relative_to(ROOT)), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
-    for name in ("requirements-onboarding.txt",):
+    for name in ("requirements-onboarding.txt", "requirements-onboarding.lock"):
         path = ROOT / name
         if path.is_file():
             files.append({"path": name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
@@ -70,8 +70,8 @@ def main():
     if platform.system() != "Linux":
         print("This acceptance contract requires Linux.", file=sys.stderr)
         return 2
-    if sys.version_info < (3, 12):
-        print("Python 3.12 or newer is required.", file=sys.stderr)
+    if sys.implementation.name != "cpython" or sys.version_info[:2] != (3, 12):
+        print("CPython 3.12 with venv is required by the pinned onboarding contract.", file=sys.stderr)
         return 2
     required = {"test_channels.py", "test_language.py", "test_service.py", "test_http.py", "test_transport.py"}
     missing = sorted(name for name in required if not (ROOT / "tests" / name).is_file())

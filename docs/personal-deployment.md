@@ -6,6 +6,10 @@
 
 ## 1. 准备 Linux
 
+全新 DGX / Ubuntu 24.04 实例优先使用[自动安装与离线依赖包入口](dgx-clean-install.md)：
+`bash scripts/install-dgx.sh 新团队名 --install-system-deps`。该入口拒绝覆盖已有部署，
+只准备固定版本、经摘要校验的组件，随后继续本页原有扫码流程。
+
 准备 Python 3.12（含 venv）、systemd 用户会话、已签发 HTTPS 证书的域名。第一次构建固定官方 TDLib 时，Linux 部署机器另需 CMake、C++ 编译器、gperf 及 OpenSSL/zlib 开发库。部署者准备这些系统构建工具即可；操作员不需要单独下载、安装或登录任何 CLI。
 
 在运行服务的普通 Linux 用户下，从仓库执行：

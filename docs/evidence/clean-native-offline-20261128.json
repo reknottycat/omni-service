@@ -1,0 +1,28 @@
+{
+  "phase": "offline",
+  "status": "passed",
+  "source_sha256": "a3f0280a28d767269a62f5ea6f340e9715eea898f13e9d2ae893330acb0b4310",
+  "os_release": "PRETTY_NAME=\"Ubuntu 24.04.5 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.5 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+  "architecture": "x86_64",
+  "python": "3.12.3",
+  "libc": [
+    "glibc",
+    "2.39"
+  ],
+  "global_sdk_and_cli_absent": true,
+  "tdlib_version": "1.8.71",
+  "tdlib_commit": "1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d",
+  "tdlib_sha256": "577e3f3d5a1f9e64019bc45a0984ee08874fe2c6ae8f2a956e315db7cf7486b5",
+  "lark_cli": "lark-cli version 1.0.99",
+  "sdk": {
+    "lark_oapi": "1.9.0"
+  },
+  "repeat_prepare_preserved_files": true,
+  "bundle_sha256": "866942680aa527e4d34cb1aab496856a569ee4929ec4bd5d98882544dc1afe83",
+  "existing_instance_refused": true,
+  "offline_network_required": true,
+  "service_started": false,
+  "compiler_absent": true,
+  "account_authorization": "not_run",
+  "dgx_hardware": "not_tested"
+}

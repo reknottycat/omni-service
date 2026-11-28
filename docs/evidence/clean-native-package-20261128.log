@@ -1,0 +1,53 @@
+配置	/work/config/omni-service/source-complete/personal.json
+凭据	/work/config/omni-service/source-complete/credentials.env
+飞书配置	/work/config/omni-service/source-complete/lark
+飞书凭据目录	/work/config/omni-service/source-complete/lark-data
+数据	/work/data/omni-service/source-complete/bridge.sqlite3
+版本	/work/data/omni-service/source-complete/releases/03d4f26f39adb24bca07263e
+服务	omni-service-source-complete.service
+已准备部署文件。本次未调用系统服务。
+配置	/work/config/omni-service/source-complete/personal.json
+凭据	/work/config/omni-service/source-complete/credentials.env
+飞书配置	/work/config/omni-service/source-complete/lark
+飞书凭据目录	/work/config/omni-service/source-complete/lark-data
+数据	/work/data/omni-service/source-complete/bridge.sqlite3
+版本	/work/data/omni-service/source-complete/releases/03d4f26f39adb24bca07263e
+服务	omni-service-source-complete.service
+已准备部署文件。本次未调用系统服务。
+飞书和 Telegram 组件准备并通过本机检查；未启动服务或登录平台。
+Looking in links: /tmp/omni-bundle-j0zja8zv/content/wheelhouse
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/anyio-4.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 2))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/certifi-2026.11.20-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 4))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/charset_normalizer-3.5.3-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 6))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/h11-0.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 14))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/httpcore-1.0.9-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 16))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/httpx-0.29.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 18))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/idna-3.20-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 20))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/lark_oapi-1.9.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 22))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/pycryptodome-4.6.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 24))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/requests-2.34.2-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 29))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/requests_toolbelt-1.0.0-py2.py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 31))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/typing_extensions-4.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 33))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/urllib3-2.8.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 35))
+Processing /tmp/omni-bundle-j0zja8zv/content/wheelhouse/websockets-15.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 37))
+Would install anyio-4.16.0 certifi-2026.11.20 charset-normalizer-3.5.3 h11-0.16.0 httpcore-1.0.9 httpx-0.29.0 idna-3.20 lark-oapi-1.9.0 pycryptodome-4.6.0 requests-2.34.2 requests-toolbelt-1.0.0 typing_extensions-4.16.0 urllib3-2.8.0 websockets-15.0.1
+{"bundle": "/work/onboarding-linux.tar.gz", "sha256": "866942680aa527e4d34cb1aab496856a569ee4929ec4bd5d98882544dc1afe83", "platform": "linux-amd64", "kind": "native", "account_authorization": "not_attempted"}
+{
+  "status": "passed",
+  "platform": "linux-amd64",
+  "source_bundle_sha256": "d1c3e0c6cf14bae5e3fbcf5f7af8c5f4de6da32d12b4005a51ecfede76face1b",
+  "tdlib_commit": "1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d",
+  "tdlib_source_sha256": "e7d319970e62bfb48dbccc0a6b0d9a14361a0df04866332f5b6e1db1ca1a28c2",
+  "tdlib_version": "1.8.71",
+  "native_sha256": "577e3f3d5a1f9e64019bc45a0984ee08874fe2c6ae8f2a956e315db7cf7486b5",
+  "native_bundle_sha256": "866942680aa527e4d34cb1aab496856a569ee4929ec4bd5d98882544dc1afe83",
+  "full_source_bootstrap_command": "bash scripts/install-dgx.sh source-complete --bundle SOURCE_BUNDLE --bundle-sha256 SOURCE_SHA --source-build --jobs 2",
+  "build_network": "disconnected network namespace",
+  "build_source_scope": "Working tree during implementation; packager and SDK wheelhouse validation were refined during the build. Not a frozen whole-tree acceptance claim.",
+  "final_prepare_revalidation": "passed with final frozen installer code and preserved configuration, credentials, unit and native library",
+  "native_packaging_network": "disconnected network namespace",
+  "sdk_wheels": 14,
+  "account_authorization": "not_run",
+  "service_start": "not_run",
+  "dgx_hardware": "not_tested"
+}

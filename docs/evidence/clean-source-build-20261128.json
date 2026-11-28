@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "platform": "linux-amd64",
+  "source_bundle_sha256": "d1c3e0c6cf14bae5e3fbcf5f7af8c5f4de6da32d12b4005a51ecfede76face1b",
+  "tdlib_commit": "1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d",
+  "tdlib_source_sha256": "e7d319970e62bfb48dbccc0a6b0d9a14361a0df04866332f5b6e1db1ca1a28c2",
+  "tdlib_version": "1.8.71",
+  "native_sha256": "577e3f3d5a1f9e64019bc45a0984ee08874fe2c6ae8f2a956e315db7cf7486b5",
+  "native_bundle_sha256": "866942680aa527e4d34cb1aab496856a569ee4929ec4bd5d98882544dc1afe83",
+  "full_source_bootstrap_command": "bash scripts/install-dgx.sh source-complete --bundle SOURCE_BUNDLE --bundle-sha256 SOURCE_SHA --source-build --jobs 2",
+  "build_network": "disconnected network namespace",
+  "build_source_scope": "Working tree during implementation; packager and SDK wheelhouse validation were refined during the build. Not a frozen whole-tree acceptance claim.",
+  "final_prepare_revalidation": "passed with final frozen installer code and preserved configuration, credentials, unit and native library",
+  "native_packaging_network": "disconnected network namespace",
+  "sdk_wheels": 14,
+  "account_authorization": "not_run",
+  "service_start": "not_run",
+  "dgx_hardware": "not_tested"
+}

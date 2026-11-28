@@ -24,3 +24,4 @@ ts	phase	decision	why	evidence	result
 2026-11-26T18:35:26+08:00	verification	Linux 团队部署、扫码引导和飞书组织内客服邀请	按人员验证身份和按会话授权，无全局协作模式；升级保留原数据和权限	docs/personal-deployment.md	DGX 227 Linux mock tests passed; new-tenant and mixed external roster live acceptance pending
 2026-11-26T19:02:00+08:00	verification	不同公司使用独立 Telegram 与飞书应用实例	以公司区分配置、账户和数据库，提供本机管理入口并检查重复绑定	docs/personal-deployment.md#多公司和多个-telegram-原账号	DGX 231 Linux mock tests passed; multi-company live authorization pending
 2026-11-27T10:47:13+08:00	verification	管理员配置新群业务简称，采用服务器本地建群日期	沿用实例的管理员设置接口；显式空值省略简称	docs/evidence/linux-mock-acceptance.md#2026-11-27-客服群命名复验	DGX 254 Linux mock tests passed
+2026-11-28T10:44:04+08:00	verification	全新Linux固定依赖包与私有安装闭环	固定源码/CLI/wheels并逐层校验；新实例拒绝覆盖，保留扫码授权	docs/evidence/dgx-clean-install-20261128.md	304 regressions passed; Ubuntu amd64 source and compiler-free offline native installs passed; ARM64 native, DGX hardware and real accounts not tested

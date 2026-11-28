@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -37,7 +38,9 @@ class SetupPersonalTest(unittest.TestCase):
               patch.object(setup, "ensure_tdlib", return_value=self.binary) as td,
               patch.object(setup.subprocess, "run") as external):
             self.assertEqual(setup.main(["support", "prepare"]), 0)
-        self.assertEqual(run.call_args.args[0][-2:], ("support", "--no-start"))
+        self.assertEqual(run.call_args_list[0].args[0][-3:], ("support", "--no-start", "--defer-unit"))
+        self.assertEqual(run.call_args_list[-1].args[0][0], self.py)
+        self.assertEqual(run.call_args_list[-1].args[0][-2:], ("support", "--no-start"))
         lark.assert_called_once_with(self.root)
         sdk.assert_called_once_with(self.tools)
         td.assert_called_once_with(self.tools, None)
@@ -63,6 +66,48 @@ class SetupPersonalTest(unittest.TestCase):
         self.assertEqual(command[6:9], ("configure", "--telegram-owner", "@example"))
         self.assertEqual(command[-4:], ("--config", self.root / "personal.json",
                                         "--secrets-file", self.root / "credentials.env"))
+        self.assertEqual(command[command.index("--tdlib-library") + 1], str(self.binary))
+
+    def test_invalid_bundle_rejected_before_any_instance_files(self):
+        bundle = self.root / "invalid.tar.gz"
+        bundle.write_bytes(b"not a trusted bundle")
+        with patch.object(setup, "_run") as run:
+            self.assertEqual(setup.main(["support", "prepare", "--bundle", str(bundle),
+                                         "--bundle-sha256", "0" * 64]), 1)
+        run.assert_not_called()
+
+    def test_native_install_publishes_binary_and_receipt_together(self):
+        library = self.root / "libtdjson.so.fixture"
+        library.write_bytes(b"synthetic native fixture; probe mocked")
+        digest = hashlib.sha256(library.read_bytes()).hexdigest()
+        with patch.object(setup, "_offline_probe") as probe:
+            binary = setup.ensure_tdlib(self.tools, native_library=library, native_sha256=digest)
+            receipt = json.loads((binary.parent / "tdlib-install.json").read_text())
+            self.assertEqual(receipt["sha256"], digest)
+            before = binary.stat().st_mtime_ns
+            reused = setup.ensure_tdlib(self.tools)
+            self.assertEqual(binary, reused)
+            self.assertEqual(binary.stat().st_mtime_ns, before)
+            self.assertEqual(probe.call_count, 2)
+        self.assertFalse(list(self.tools.glob(".tdlib-*")))
+
+    def test_wrong_native_digest_never_loaded_or_published(self):
+        library = self.root / "native-fixture"
+        library.write_bytes(b"wrong native")
+        with patch.object(setup, "_offline_probe") as probe:
+            with self.assertRaisesRegex(setup.SetupError, "摘要不匹配"):
+                setup.ensure_tdlib(self.tools, native_library=library, native_sha256="0" * 64)
+        probe.assert_not_called()
+        self.assertEqual(list(self.tools.iterdir()), [])
+
+    def test_wrong_native_version_does_not_publish_partial_install(self):
+        library = self.root / "native-fixture"
+        library.write_bytes(b"unloadable fixture")
+        with patch.object(setup, "_offline_probe", side_effect=setup.SetupError("version mismatch")):
+            with self.assertRaises(setup.SetupError):
+                setup.ensure_tdlib(self.tools, native_library=library,
+                                   native_sha256=hashlib.sha256(library.read_bytes()).hexdigest())
+        self.assertEqual(list(self.tools.iterdir()), [])
 
     def test_tampered_source_not_extracted_or_executed(self):
         source = self.root / "wrong.tar.gz"

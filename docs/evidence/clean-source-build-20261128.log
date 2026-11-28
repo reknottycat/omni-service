@@ -1,0 +1,792 @@
+配置	/work/config/omni-service/source-complete/personal.json
+凭据	/work/config/omni-service/source-complete/credentials.env
+飞书配置	/work/config/omni-service/source-complete/lark
+飞书凭据目录	/work/config/omni-service/source-complete/lark-data
+数据	/work/data/omni-service/source-complete/bridge.sqlite3
+版本	/work/data/omni-service/source-complete/releases/03d4f26f39adb24bca07263e
+服务	omni-service-source-complete.service
+已准备部署文件。本次未调用系统服务。
+Looking in links: /tmp/omni-bundle-gcsa7_3t/content/wheelhouse
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/anyio-4.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 2))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/certifi-2026.11.20-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 4))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/charset_normalizer-3.5.3-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 6))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/h11-0.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 14))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/httpcore-1.0.9-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 16))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/httpx-0.29.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 18))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/idna-3.20-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 20))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/lark_oapi-1.9.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 22))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/pycryptodome-4.6.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 24))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/requests-2.34.2-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 29))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/requests_toolbelt-1.0.0-py2.py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 31))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/typing_extensions-4.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 33))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/urllib3-2.8.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 35))
+Processing /tmp/omni-bundle-gcsa7_3t/content/wheelhouse/websockets-15.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 37))
+Installing collected packages: websockets, urllib3, typing-extensions, pycryptodome, idna, h11, charset-normalizer, certifi, requests, httpcore, anyio, requests-toolbelt, httpx, lark-oapi
+Successfully installed anyio-4.16.0 certifi-2026.11.20 charset-normalizer-3.5.3 h11-0.16.0 httpcore-1.0.9 httpx-0.29.0 idna-3.20 lark-oapi-1.9.0 pycryptodome-4.6.0 requests-2.34.2 requests-toolbelt-1.0.0 typing-extensions-4.16.0 urllib3-2.8.0 websockets-15.0.1
+WARNING: The directory '/home/omni/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you should use sudo's -H flag.
+No broken requirements found.
+-- The CXX compiler identification is Clang 18.1.3
+-- The C compiler identification is Clang 18.1.3
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/clang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/clang - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Could NOT find ccache (this is NOT an error)
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- Found OpenSSL: /usr/lib/x86_64-linux-gnu/libcrypto.a (found version "3.0.13")  
+-- Found OpenSSL: /usr/include /usr/lib/x86_64-linux-gnu/libssl.a;/usr/lib/x86_64-linux-gnu/libcrypto.a;dl
+-- Performing Test HAVE_STD17
+-- Performing Test HAVE_STD17 - Success
+-- Performing Test HAVE_CXX_FLAG_WALL
+-- Performing Test HAVE_CXX_FLAG_WALL - Success
+-- Performing Test HAVE_CXX_FLAG_WEXTRA
+-- Performing Test HAVE_CXX_FLAG_WEXTRA - Success
+-- Performing Test HAVE_CXX_FLAG_FLTO_ODR_TYPE_MERGING
+-- Performing Test HAVE_CXX_FLAG_FLTO_ODR_TYPE_MERGING - Failed
+-- Performing Test HAVE_CXX_FLAG_QUNUSED_ARGUMENTS
+-- Performing Test HAVE_CXX_FLAG_QUNUSED_ARGUMENTS - Success
+-- Performing Test HAVE_CXX_FLAG_WALLOC_ZERO
+-- Performing Test HAVE_CXX_FLAG_WALLOC_ZERO - Failed
+-- Performing Test HAVE_CXX_FLAG_WCXX17_COMPAT_PEDANTIC
+-- Performing Test HAVE_CXX_FLAG_WCXX17_COMPAT_PEDANTIC - Success
+-- Performing Test HAVE_CXX_FLAG_WCAST_QUAL
+-- Performing Test HAVE_CXX_FLAG_WCAST_QUAL - Success
+-- Performing Test HAVE_CXX_FLAG_WCONVERSION
+-- Performing Test HAVE_CXX_FLAG_WCONVERSION - Success
+-- Performing Test HAVE_CXX_FLAG_WDEPRECATED
+-- Performing Test HAVE_CXX_FLAG_WDEPRECATED - Success
+-- Performing Test HAVE_CXX_FLAG_WDUPLICATED_BRANCHES
+-- Performing Test HAVE_CXX_FLAG_WDUPLICATED_BRANCHES - Failed
+-- Performing Test HAVE_CXX_FLAG_WDUPLICATED_COND
+-- Performing Test HAVE_CXX_FLAG_WDUPLICATED_COND - Failed
+-- Performing Test HAVE_CXX_FLAG_WIMPLICIT_FALLTHROUGH_2
+-- Performing Test HAVE_CXX_FLAG_WIMPLICIT_FALLTHROUGH_2 - Failed
+-- Performing Test HAVE_CXX_FLAG_WLOGICAL_OP
+-- Performing Test HAVE_CXX_FLAG_WLOGICAL_OP - Failed
+-- Performing Test HAVE_CXX_FLAG_WPSABI
+-- Performing Test HAVE_CXX_FLAG_WPSABI - Success
+-- Performing Test HAVE_CXX_FLAG_WSIGN_CONVERSION
+-- Performing Test HAVE_CXX_FLAG_WSIGN_CONVERSION - Success
+-- Performing Test HAVE_CXX_FLAG_WTAUTOLOGICAL_COMPARE
+-- Performing Test HAVE_CXX_FLAG_WTAUTOLOGICAL_COMPARE - Success
+-- Performing Test HAVE_CXX_FLAG_WUNKNOWN_WARNING_OPTION
+-- Performing Test HAVE_CXX_FLAG_WUNKNOWN_WARNING_OPTION - Success
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_COMMAND_LINE_ARGUMENT
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_COMMAND_LINE_ARGUMENT - Success
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_PARAMETER
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_PARAMETER - Success
+-- Performing Test HAVE_CXX_FLAG_WNON_VIRTUAL_DTOR
+-- Performing Test HAVE_CXX_FLAG_WNON_VIRTUAL_DTOR - Success
+-- Performing Test HAVE_CXX_FLAG_WODR
+-- Performing Test HAVE_CXX_FLAG_WODR - Success
+-- Performing Test HAVE_CXX_FLAG_WPOINTER_ARITH
+-- Performing Test HAVE_CXX_FLAG_WPOINTER_ARITH - Success
+-- Performing Test HAVE_CXX_FLAG_WSIGN_COMPARE
+-- Performing Test HAVE_CXX_FLAG_WSIGN_COMPARE - Success
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_MEMBER_FUNCTION
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_MEMBER_FUNCTION - Success
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_PRIVATE_FIELD
+-- Performing Test HAVE_CXX_FLAG_WUNUSED_PRIVATE_FIELD - Success
+-- Performing Test HAVE_CXX_FLAG_WVLA
+-- Performing Test HAVE_CXX_FLAG_WVLA - Success
+-- Git state: GITDIR-NOTFOUND
+-- Found ZLIB: /usr/lib/x86_64-linux-gnu/libz.so (found version "1.3")  
+-- Found ZLIB: /usr/include /usr/lib/x86_64-linux-gnu/libz.so
+-- Performing Test ATOMICS_FOUND
+-- Performing Test ATOMICS_FOUND - Success
+-- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY
+-- Performing Test COMPILER_HAS_HIDDEN_VISIBILITY - Success
+-- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY
+-- Performing Test COMPILER_HAS_HIDDEN_INLINE_VISIBILITY - Success
+-- Performing Test COMPILER_HAS_DEPRECATED_ATTR
+-- Performing Test COMPILER_HAS_DEPRECATED_ATTR - Success
+-- Configuring done (4.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: /work/config/omni-service/source-complete/tools/.tdlib-dvoiut63/build
+[  0%] Building CXX object tdutils/generate/CMakeFiles/generate_mime_types_gperf.dir/generate_mime_types_gperf.cpp.o
+[  1%] Building C object sqlite/CMakeFiles/tdsqlite.dir/sqlite/sqlite3.c.o
+[  1%] Linking CXX executable generate_mime_types_gperf
+[  1%] Built target generate_mime_types_gperf
+[  1%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_config.cpp.o
+[  1%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_core.cpp.o
+[  1%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_file_outputer.cpp.o
+[  1%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_file_utils.cpp.o
+[  1%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_generate.cpp.o
+[  1%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_outputer.cpp.o
+[  2%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_string_outputer.cpp.o
+[  2%] Building CXX object tdtl/CMakeFiles/tdtl.dir/td/tl/tl_writer.cpp.o
+[  2%] Linking CXX static library libtdtl.a
+[  2%] Built target tdtl
+[  2%] Building C object td/generate/tl-parser/CMakeFiles/tl-parser.dir/crc32.c.o
+[  2%] Building C object td/generate/tl-parser/CMakeFiles/tl-parser.dir/tlc.c.o
+[  3%] Building C object td/generate/tl-parser/CMakeFiles/tl-parser.dir/tl-parser.c.o
+[  3%] Linking C executable tl-parser
+[  3%] Built target tl-parser
+[  3%] Generating /work/config/omni-service/source-complete/tools/.tdlib-dvoiut63/td-1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d/tdutils/generate/auto/mime_type_to_extension.gperf, /work/config/omni-service/source-complete/tools/.tdlib-dvoiut63/td-1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d/tdutils/generate/auto/extension_to_mime_type.gperf
+Extension "wmz" matches more than one type
+Extension "sub" matches more than one type
+[  3%] Generating /work/config/omni-service/source-complete/tools/.tdlib-dvoiut63/td-1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d/tdutils/generate/auto/mime_type_to_extension.cpp
+[  3%] Generating /work/config/omni-service/source-complete/tools/.tdlib-dvoiut63/td-1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d/tdutils/generate/auto/extension_to_mime_type.cpp
+[  3%] Built target tdmime_auto
+[  3%] Building CXX object td/generate/CMakeFiles/tl_writer_cpp.dir/tl_writer_cpp.cpp.o
+[  5%] Building CXX object td/generate/CMakeFiles/tl_writer_cpp.dir/tl_writer_h.cpp.o
+[  5%] Building CXX object td/generate/CMakeFiles/tl_writer_cpp.dir/tl_writer_hpp.cpp.o
+[  5%] Linking C static library libtdsqlite.a
+[  5%] Built target tdsqlite
+[  5%] Generate TLO files
+[  5%] Building CXX object td/generate/CMakeFiles/tl_writer_cpp.dir/tl_writer_jni_cpp.cpp.o
+[  5%] Built target tl_generate_tlo
+[  5%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/Clocks.cpp.o
+[  5%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/FileFd.cpp.o
+[  5%] Building CXX object td/generate/CMakeFiles/tl_writer_cpp.dir/tl_writer_jni_h.cpp.o
+[  5%] Building CXX object td/generate/CMakeFiles/tl_writer_cpp.dir/tl_writer_td.cpp.o
+[  5%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/IPAddress.cpp.o
+[  5%] Linking CXX static library libtl_writer_cpp.a
+[  5%] Built target tl_writer_cpp
+[  5%] Building CXX object td/generate/CMakeFiles/generate_common.dir/generate_common.cpp.o
+[  6%] Linking CXX executable generate_common
+[  6%] Built target generate_common
+[  6%] Building CXX object td/generate/CMakeFiles/generate_mtproto.dir/generate_mtproto.cpp.o
+[  6%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/MemoryMapping.cpp.o
+[  7%] Linking CXX executable generate_mtproto
+[  7%] Built target generate_mtproto
+[  7%] Generate common TL source files
+Write file td/telegram/telegram_api_0.cpp
+Write file td/telegram/telegram_api_1.cpp
+Write file td/telegram/telegram_api_2.cpp
+Write file td/telegram/telegram_api_3.cpp
+Write file td/telegram/telegram_api_4.cpp
+Write file td/telegram/telegram_api_5.cpp
+Write file td/telegram/telegram_api_6.cpp
+Write file td/telegram/telegram_api_7.cpp
+Write file td/telegram/telegram_api_8.cpp
+Write file td/telegram/telegram_api_9.cpp
+Write file td/telegram/telegram_api.h
+Write file td/telegram/telegram_api.hpp
+Write file td/telegram/secret_api.cpp
+Write file td/telegram/secret_api.h
+Write file td/telegram/secret_api.hpp
+Write file td/telegram/e2e_api.cpp
+Write file td/telegram/e2e_api.h
+Write file td/telegram/e2e_api.hpp
+Write file td/telegram/td_api_0.cpp
+Write file td/telegram/td_api_1.cpp
+Write file td/telegram/td_api_2.cpp
+Write file td/telegram/td_api_3.cpp
+Write file td/telegram/td_api_4.cpp
+Write file td/telegram/td_api_5.cpp
+Write file td/telegram/td_api_6.cpp
+Write file td/telegram/td_api_7.cpp
+Write file td/telegram/td_api_8.cpp
+Write file td/telegram/td_api_9.cpp
+Write file td/telegram/td_api.h
+Write file td/telegram/td_api.hpp
+[  7%] Built target tl_generate_common
+[  7%] Generate MTProto API source files
+Write file td/mtproto/mtproto_api.cpp
+Write file td/mtproto/mtproto_api.h
+Write file td/mtproto/mtproto_api.hpp
+[  7%] Built target tl_generate_mtproto
+[  7%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/path.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/platform.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/PollFlags.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/rlimit.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/ServerSocketFd.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/signals.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/sleep.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/SocketFd.cpp.o
+[  8%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/stacktrace.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/Stat.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/StdStreams.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/thread_local.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/UdpSocketFd.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/uname.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/user.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/wstring_convert.cpp.o
+[ 10%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/Epoll.cpp.o
+[ 11%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/EventFdBsd.cpp.o
+[ 11%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/EventFdLinux.cpp.o
+[ 11%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/EventFdWindows.cpp.o
+[ 11%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/Iocp.cpp.o
+[ 11%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/KQueue.cpp.o
+[ 11%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/NativeFd.cpp.o
+[ 11%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/Poll.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/Select.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/ThreadIdGuard.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/ThreadPthread.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/port/detail/WineventPoll.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/generate/auto/mime_type_to_extension.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/generate/auto/extension_to_mime_type.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/AsyncFileLog.cpp.o
+[ 12%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/base64.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/BigNum.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/buffer.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/BufferedUdp.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/check.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/crypto.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Ed25519.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/emoji.cpp.o
+[ 13%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/ExitGuard.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/FileLog.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/filesystem.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/find_boundary.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/FlatHashTable.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/FloodControlGlobal.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Gzip.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/GzipByteFlow.cpp.o
+[ 15%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Hints.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/HttpDate.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/HttpUrl.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/JsonBuilder.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/logging.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/misc.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/MpmcQueue.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/OptionParser.cpp.o
+[ 16%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/PathView.cpp.o
+[ 17%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Random.cpp.o
+[ 17%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/SharedSlice.cpp.o
+[ 17%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Slice.cpp.o
+[ 17%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/StackAllocator.cpp.o
+[ 17%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Status.cpp.o
+[ 17%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/StringBuilder.cpp.o
+[ 17%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/tests.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Time.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/Timer.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/tl_parsers.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/translit.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/TsCerr.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/TsFileLog.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/TsLog.cpp.o
+[ 18%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/unicode.cpp.o
+[ 20%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/utf8.cpp.o
+[ 20%] Building CXX object tdutils/CMakeFiles/tdutils.dir/td/utils/MimeType.cpp.o
+[ 20%] Linking CXX static library libtdutils.a
+[ 20%] Built target tdutils
+[ 20%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_0.cpp.o
+[ 20%] Building CXX object tdactor/CMakeFiles/tdactor.dir/td/actor/ConcurrentScheduler.cpp.o
+[ 20%] Building CXX object tdactor/CMakeFiles/tdactor.dir/td/actor/impl/Scheduler.cpp.o
+[ 20%] Building CXX object tdactor/CMakeFiles/tdactor.dir/td/actor/MultiPromise.cpp.o
+[ 20%] Building CXX object tdactor/CMakeFiles/tdactor.dir/td/actor/MultiTimeout.cpp.o
+[ 21%] Linking CXX static library libtdactor.a
+[ 21%] Built target tdactor
+[ 21%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_1.cpp.o
+[ 21%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_2.cpp.o
+[ 21%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/bip39.cpp.o
+[ 21%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/BitString.cpp.o
+[ 21%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_3.cpp.o
+[ 21%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/Blockchain.cpp.o
+[ 21%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/Call.cpp.o
+[ 21%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_4.cpp.o
+[ 21%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/CheckSharedSecret.cpp.o
+[ 21%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/DecryptedKey.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/e2e_api.cpp.o
+[ 22%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_5.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/EncryptedKey.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/EncryptedStorage.cpp.o
+[ 22%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_6.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/Keys.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/MessageEncryption.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/Mnemonic.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/QRHandshake.cpp.o
+[ 22%] Building CXX object tde2e/CMakeFiles/tde2e.dir/td/e2e/Trie.cpp.o
+[ 23%] Building CXX object tde2e/CMakeFiles/tde2e.dir/__/td/generate/auto/td/telegram/e2e_api.cpp.o
+[ 25%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_7.cpp.o
+[ 25%] Linking CXX static library libtde2e.a
+[ 25%] Built target tde2e
+[ 25%] Building CXX object td/generate/CMakeFiles/generate_json.dir/generate_json.cpp.o
+[ 25%] Building CXX object td/generate/CMakeFiles/generate_json.dir/tl_json_converter.cpp.o
+[ 25%] Linking CXX executable generate_json
+[ 25%] Built target generate_json
+[ 25%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_8.cpp.o
+[ 25%] Building CXX object CMakeFiles/tdapi.dir/td/generate/auto/td/telegram/td_api_9.cpp.o
+[ 25%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/binlog/Binlog.cpp.o
+[ 25%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/binlog/BinlogEvent.cpp.o
+[ 25%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/binlog/ConcurrentBinlog.cpp.o
+[ 25%] Linking CXX static library libtdapi.a
+[ 25%] Built target tdapi
+[ 25%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/GetHostByNameActor.cpp.o
+[ 26%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/binlog/detail/BinlogEventsBuffer.cpp.o
+[ 26%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/binlog/detail/BinlogEventsProcessor.cpp.o
+[ 26%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpChunkedByteFlow.cpp.o
+[ 26%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/detail/RawSqliteDb.cpp.o
+[ 26%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/SqliteConnectionSafe.cpp.o
+[ 26%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpConnectionBase.cpp.o
+[ 26%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/SqliteDb.cpp.o
+[ 27%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpContentLengthByteFlow.cpp.o
+[ 27%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/SqliteKeyValue.cpp.o
+[ 27%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpFile.cpp.o
+[ 27%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpHeaderCreator.cpp.o
+[ 27%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/SqliteKeyValueAsync.cpp.o
+[ 27%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpInboundConnection.cpp.o
+[ 27%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/SqliteStatement.cpp.o
+[ 27%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpOutboundConnection.cpp.o
+[ 28%] Building CXX object tddb/CMakeFiles/tddb.dir/td/db/TQueue.cpp.o
+[ 28%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpProxy.cpp.o
+[ 28%] Linking CXX static library libtddb.a
+[ 28%] Built target tddb
+[ 28%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpQuery.cpp.o
+[ 30%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/HttpReader.cpp.o
+[ 30%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/Socks5.cpp.o
+[ 30%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/SslCtx.cpp.o
+[ 30%] Generate JSON TL source files
+[ 30%] Built target tl_generate_json
+[ 30%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/SslStream.cpp.o
+[ 30%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/TcpListener.cpp.o
+[ 30%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/TransparentProxy.cpp.o
+[ 30%] Building CXX object tdnet/CMakeFiles/tdnet.dir/td/net/Wget.cpp.o
+[ 30%] Linking CXX static library libtdnet.a
+[ 30%] Built target tdnet
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/AuthData.cpp.o
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/ConnectionManager.cpp.o
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/DhHandshake.cpp.o
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/Handshake.cpp.o
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/HandshakeActor.cpp.o
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/HttpTransport.cpp.o
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/IStreamTransport.cpp.o
+[ 31%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/KDF.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/Ping.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/PingConnection.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/ProxySecret.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/RawConnection.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/RSA.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/SessionConnection.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/TcpTransport.cpp.o
+[ 32%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/TlsInit.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/TlsReaderByteFlow.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/Transport.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdmtproto.dir/td/mtproto/utils.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdmtproto.dir/td/generate/auto/td/mtproto/mtproto_api.cpp.o
+[ 33%] Linking CXX static library libtdmtproto.a
+[ 33%] Built target tdmtproto
+[ 33%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AccountManager.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ActiveStoryState.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AffiliateType.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AgeVerificationParameters.cpp.o
+[ 33%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AiComposeStyle.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AiComposeTone.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AiComposeToneExample.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AlarmManager.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AnimationsManager.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Application.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AttachMenuManager.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AuctionBidLevel.cpp.o
+[ 35%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AudiosManager.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AuthManager.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AutoDownloadSettings.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/AutosaveManager.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BackgroundInfo.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BackgroundManager.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BackgroundType.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BaseTheme.cpp.o
+[ 36%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Birthdate.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BoostManager.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotAccessSettings.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotCommand.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotCommandScope.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotInfoManager.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotMenuButton.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotQueries.cpp.o
+[ 37%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotRecommendationManager.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotVerification.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BotVerifierSettings.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessAwayMessage.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessAwayMessageSchedule.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessBotManageBar.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessBotRights.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessChatLink.cpp.o
+[ 38%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessConnectedBot.cpp.o
+[ 40%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessConnectionManager.cpp.o
+[ 40%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessGreetingMessage.cpp.o
+[ 40%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessInfo.cpp.o
+[ 40%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessIntro.cpp.o
+[ 40%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessManager.cpp.o
+[ 40%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessRecipients.cpp.o
+[ 40%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/BusinessWorkHours.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CallActor.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CallbackQueriesManager.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CallDiscardReason.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CallManager.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ChannelParticipantFilter.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ChannelRecommendationManager.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ChatManager.cpp.o
+[ 41%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ChatReactions.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ChatTheme.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ClientActor.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CommonDialogManager.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CommunityManager.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ConfigManager.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ConnectionState.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ConnectionStateManager.cpp.o
+[ 42%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Contact.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CountryInfoManager.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/CurrencyAmount.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DelayDispatcher.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Dependencies.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DeviceTokenManager.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DhCache.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogAction.cpp.o
+[ 43%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogActionBar.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogActionManager.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogAdministrator.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogDb.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogEventLog.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogFilter.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogFilterInviteLink.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogFilterManager.cpp.o
+[ 45%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogId.cpp.o
+[ 46%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogInviteLink.cpp.o
+[ 46%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogInviteLinkManager.cpp.o
+[ 46%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogListId.cpp.o
+[ 46%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogLocation.cpp.o
+[ 46%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogManager.cpp.o
+[ 46%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogNotificationSettings.cpp.o
+[ 46%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogParticipant.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogParticipantFilter.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogParticipantManager.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogPhoto.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DialogSource.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DiffText.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Dimensions.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DisallowedGiftsSettings.cpp.o
+[ 47%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Document.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DocumentsManager.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DownloadManager.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DownloadManagerCallback.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DraftMessage.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/DraftMessageManager.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/EmailVerification.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/EmojiGameInfo.cpp.o
+[ 48%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/EmojiGroup.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/EmojiGroupType.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/EmojiStatus.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/FactCheck.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/FileReferenceManager.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileBitmask.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileDb.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileDownloader.cpp.o
+[ 50%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileDownloadManager.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileEncryptionKey.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileFromBytes.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileGcParameters.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileGcWorker.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileGenerateManager.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileHashUploader.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileLoaderUtils.cpp.o
+[ 51%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileLoadManager.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileManager.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileStats.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileStatsWorker.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileType.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileUploader.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileUploadId.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/FileUploadManager.cpp.o
+[ 52%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/PartsManager.cpp.o
+[ 53%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/ResourceManager.cpp.o
+[ 53%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/files/ResourceState.cpp.o
+[ 53%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/FormattedDate.cpp.o
+[ 53%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ForumTopic.cpp.o
+[ 53%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ForumTopicEditedData.cpp.o
+[ 53%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ForumTopicIcon.cpp.o
+[ 53%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ForumTopicInfo.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ForumTopicManager.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Game.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GameManager.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GiveawayParameters.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Global.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GlobalPrivacySettings.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GroupCallJoinParameters.cpp.o
+[ 55%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GroupCallManager.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GroupCallMessage.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GroupCallMessageLimit.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GroupCallParticipant.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GroupCallParticipantOrder.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GroupCallVideoPayload.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/HashtagHints.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InlineKeyboardButton.cpp.o
+[ 56%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InlineMessageManager.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InlineQueriesManager.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InputBusinessChatLink.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InputCallId.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InputDialogId.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InputGroupCall.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InputGroupCallId.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InputInvoice.cpp.o
+[ 57%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/InputMessageText.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/JoinChatBotResult.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/JsonValue.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/KeyboardButton.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/KeyboardButtonStyle.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/LabeledPricePart.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/LanguagePackManager.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/LinkManager.cpp.o
+[ 58%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Location.cpp.o
+[ 60%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/logevent/LogEventHelper.cpp.o
+[ 60%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Logging.cpp.o
+[ 60%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MediaArea.cpp.o
+[ 60%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MediaAreaCoordinates.cpp.o
+[ 60%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageContent.cpp.o
+[ 60%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageContentType.cpp.o
+[ 60%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageCopyOptions.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageCover.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageDb.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageEntity.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageExtendedMedia.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageForwardInfo.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageId.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageImportManager.cpp.o
+[ 61%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageInputReplyTo.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageOrigin.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageQueryManager.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageQuote.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageReaction.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageReactor.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageReplyHeader.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageReplyInfo.cpp.o
+[ 62%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageSearchFilter.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageSearchOffset.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageSelfDestructType.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageSender.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageSendOptions.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessagesInfo.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessagesManager.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageSource.cpp.o
+[ 63%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageThreadDb.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageTopic.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageTtl.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MessageViewer.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/misc.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/MissingInvitee.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/AuthDataShared.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/ConnectionCreator.cpp.o
+[ 65%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/DcAuthManager.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/DcOptionsSet.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/MtprotoHeader.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetActor.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetQuery.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetQueryCreator.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetQueryDelayer.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetQueryDispatcher.cpp.o
+[ 66%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetQueryStats.cpp.o
+[ 67%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetQueryVerifier.cpp.o
+[ 67%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/NetStatsManager.cpp.o
+[ 67%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/Proxy.cpp.o
+[ 67%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/ProxyChecker.cpp.o
+[ 67%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/PublicRsaKeySharedCdn.cpp.o
+[ 67%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/PublicRsaKeySharedMain.cpp.o
+[ 67%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/PublicRsaKeyWatchdog.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/Session.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/SessionMultiProxy.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/SessionProxy.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/net/WebProxyManager.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NewPasswordState.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NotificationGroupInfo.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NotificationGroupType.cpp.o
+[ 68%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NotificationManager.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NotificationSettingsManager.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NotificationSettingsScope.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NotificationSound.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/NotificationType.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/OnlineManager.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/OptionManager.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/OrderedMessage.cpp.o
+[ 70%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/OrderInfo.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Outline.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PaidReactionType.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Passkey.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PasswordManager.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Payments.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PeerColor.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PeerColorCollectible.cpp.o
+[ 71%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PeopleNearbyManager.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PhoneNumberManager.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Photo.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PhotoSize.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PhotoSizeSource.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PollManager.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PollOption.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Premium.cpp.o
+[ 72%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PremiumGiftOption.cpp.o
+[ 73%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PrivacyManager.cpp.o
+[ 73%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ProfileShareTheme.cpp.o
+[ 73%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ProfileTab.cpp.o
+[ 73%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/PromoDataManager.cpp.o
+[ 73%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/QueryCombiner.cpp.o
+[ 73%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/QueryMerger.cpp.o
+[ 73%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/QuickReplyManager.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReactionListType.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReactionManager.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReactionNotificationSettings.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReactionNotificationsFrom.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReactionType.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RecentDialogList.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReferralProgramInfo.cpp.o
+[ 75%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReferralProgramManager.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReferralProgramParameters.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReferralProgramSortOrder.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RepliedMessageInfo.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReplyMarkup.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ReportReason.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RequestedDialogType.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Requests.cpp.o
+[ 76%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RestrictionReason.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RichButtonStyle.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RichMessage.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RichMessageMedia.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/RichText.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SavedMessagesManager.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SavedMessagesTopicId.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ScopeNotificationSettings.cpp.o
+[ 77%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SearchPostsFlood.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SecretChatActor.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SecretChatDb.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SecretChatsManager.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SecretInputMedia.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SecureManager.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SecureStorage.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SecureValue.cpp.o
+[ 78%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SendCodeHelper.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SentEmailCode.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SequenceDispatcher.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SharedDialog.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SpecialStickerSetType.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SponsoredMessageManager.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarAmount.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGift.cpp.o
+[ 80%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftAttribute.cpp.o
+[ 81%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftAttributeId.cpp.o
+[ 81%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftAttributeRarity.cpp.o
+[ 81%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftAuctionRound.cpp.o
+[ 81%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftAuctionState.cpp.o
+[ 81%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftAuctionUserState.cpp.o
+[ 81%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftBackground.cpp.o
+[ 81%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftCollection.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftId.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftManager.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftResalePrice.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarGiftSettings.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarManager.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarRating.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarSubscription.cpp.o
+[ 82%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StarSubscriptionPricing.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StateManager.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StatisticsManager.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StickerFormat.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StickerListType.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StickerMaskPosition.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StickerPhotoSize.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StickerSetId.cpp.o
+[ 83%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StickersManager.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StickerType.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StorageManager.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryAlbum.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryContent.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryContentType.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryDb.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryForwardInfo.cpp.o
+[ 85%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryInteractionInfo.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryManager.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryStealthMode.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/StoryViewer.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SuggestedAction.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SuggestedActionManager.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SuggestedPost.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SuggestedPostPrice.cpp.o
+[ 86%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Support.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/SynchronousRequests.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TargetDialogTypes.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Td.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TdDb.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TempPasswordState.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TermsOfService.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TermsOfServiceManager.cpp.o
+[ 87%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ThemeManager.cpp.o
+[ 88%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ThemeSettings.cpp.o
+[ 88%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TimeZoneManager.cpp.o
+[ 88%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ToDoCompletion.cpp.o
+[ 88%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ToDoItem.cpp.o
+[ 88%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/ToDoList.cpp.o
+[ 88%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TonAmount.cpp.o
+[ 88%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TonNft.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TonWalletCard.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TonWalletCardSticker.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TonWalletManager.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TonWalletOwnershipProof.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TopDialogCategory.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TopDialogManager.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TranscriptionInfo.cpp.o
+[ 90%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TranscriptionManager.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/TranslationManager.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/UpdatesManager.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/UserId.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/UserManager.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Usernames.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/UserPrivacySetting.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/UserPrivacySettingRule.cpp.o
+[ 91%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/UserStarGift.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/Venue.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/VerificationStatus.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/VideoNotesManager.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/VideosManager.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/VoiceNotesManager.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebApp.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebAppManager.cpp.o
+[ 92%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebAppOpenParameters.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebBrowserManager.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebBrowserSettings.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebDomainException.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebPageBlock.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WebPagesManager.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WelcomeMessageManager.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/WidgetManager.cpp.o
+[ 93%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_0.cpp.o
+[ 95%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_1.cpp.o
+[ 95%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_2.cpp.o
+[ 95%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_3.cpp.o
+[ 95%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_4.cpp.o
+[ 95%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_5.cpp.o
+[ 95%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_6.cpp.o
+[ 95%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_7.cpp.o
+[ 96%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_8.cpp.o
+[ 96%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/telegram_api_9.cpp.o
+[ 96%] Building CXX object CMakeFiles/tdcore.dir/td/generate/auto/td/telegram/secret_api.cpp.o
+[ 96%] Building CXX object CMakeFiles/tdcore.dir/td/telegram/GitCommitHash.cpp.o
+[ 96%] Linking CXX static library libtdcore.a
+[ 96%] Built target tdcore
+[ 97%] Building CXX object CMakeFiles/tdclient.dir/td/telegram/Log.cpp.o
+[ 97%] Building CXX object CMakeFiles/tdclient.dir/td/telegram/Client.cpp.o
+[ 97%] Linking CXX static library libtdclient.a
+[ 97%] Built target tdclient
+[ 97%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_1.cpp.o
+[ 97%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_0.cpp.o
+[ 97%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_2.cpp.o
+[ 98%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_3.cpp.o
+[ 98%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_4.cpp.o
+[ 98%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_5.cpp.o
+[ 98%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_6.cpp.o
+[ 98%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_7.cpp.o
+[ 98%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_8.cpp.o
+[ 98%] Building CXX object CMakeFiles/tdjson_private.dir/td/generate/auto/td/telegram/td_api_json_9.cpp.o
+[100%] Building CXX object CMakeFiles/tdjson_private.dir/td/telegram/ClientJson.cpp.o
+[100%] Linking CXX static library libtdjson_private.a
+[100%] Built target tdjson_private
+[100%] Building CXX object CMakeFiles/tdjson.dir/td/telegram/td_json_client.cpp.o
+[100%] Building CXX object CMakeFiles/tdjson.dir/td/telegram/td_log.cpp.o
+[100%] Linking CXX shared library libtdjson.so
+[100%] Built target tdjson
+配置	/work/config/omni-service/source-complete/personal.json
+凭据	/work/config/omni-service/source-complete/credentials.env
+飞书配置	/work/config/omni-service/source-complete/lark
+飞书凭据目录	/work/config/omni-service/source-complete/lark-data
+数据	/work/data/omni-service/source-complete/bridge.sqlite3
+版本	/work/data/omni-service/source-complete/releases/03d4f26f39adb24bca07263e
+服务	omni-service-source-complete.service
+已准备部署文件。本次未调用系统服务。
+飞书和 Telegram 组件准备并通过本机检查；未启动服务或登录平台。

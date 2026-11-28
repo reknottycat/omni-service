@@ -1,0 +1,86 @@
+配置	/work/offline/config/omni-service/clean-offline/personal.json
+凭据	/work/offline/config/omni-service/clean-offline/credentials.env
+飞书配置	/work/offline/config/omni-service/clean-offline/lark
+飞书凭据目录	/work/offline/config/omni-service/clean-offline/lark-data
+数据	/work/offline/data/omni-service/clean-offline/bridge.sqlite3
+版本	/work/offline/data/omni-service/clean-offline/releases/03d4f26f39adb24bca07263e
+服务	omni-service-clean-offline.service
+已准备部署文件。本次未调用系统服务。
+Looking in links: /tmp/omni-bundle-8ubvberj/content/wheelhouse
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/anyio-4.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 2))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/certifi-2026.11.20-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 4))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/charset_normalizer-3.5.3-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 6))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/h11-0.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 14))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/httpcore-1.0.9-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 16))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/httpx-0.29.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 18))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/idna-3.20-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 20))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/lark_oapi-1.9.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 22))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/pycryptodome-4.6.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 24))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/requests-2.34.2-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 29))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/requests_toolbelt-1.0.0-py2.py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 31))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/typing_extensions-4.16.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 33))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/urllib3-2.8.0-py3-none-any.whl (from -r /repo/requirements-onboarding.lock (line 35))
+Processing /tmp/omni-bundle-8ubvberj/content/wheelhouse/websockets-15.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (from -r /repo/requirements-onboarding.lock (line 37))
+Installing collected packages: websockets, urllib3, typing-extensions, pycryptodome, idna, h11, charset-normalizer, certifi, requests, httpcore, anyio, requests-toolbelt, httpx, lark-oapi
+Successfully installed anyio-4.16.0 certifi-2026.11.20 charset-normalizer-3.5.3 h11-0.16.0 httpcore-1.0.9 httpx-0.29.0 idna-3.20 lark-oapi-1.9.0 pycryptodome-4.6.0 requests-2.34.2 requests-toolbelt-1.0.0 typing-extensions-4.16.0 urllib3-2.8.0 websockets-15.0.1
+WARNING: The directory '/home/omni/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you should use sudo's -H flag.
+No broken requirements found.
+配置	/work/offline/config/omni-service/clean-offline/personal.json
+凭据	/work/offline/config/omni-service/clean-offline/credentials.env
+飞书配置	/work/offline/config/omni-service/clean-offline/lark
+飞书凭据目录	/work/offline/config/omni-service/clean-offline/lark-data
+数据	/work/offline/data/omni-service/clean-offline/bridge.sqlite3
+版本	/work/offline/data/omni-service/clean-offline/releases/03d4f26f39adb24bca07263e
+服务	omni-service-clean-offline.service
+已准备部署文件。本次未调用系统服务。
+飞书和 Telegram 组件准备并通过本机检查；未启动服务或登录平台。
+WARNING: The directory '/home/omni/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you should use sudo's -H flag.
+No broken requirements found.
+配置	/work/offline/config/omni-service/clean-offline/personal.json
+凭据	/work/offline/config/omni-service/clean-offline/credentials.env
+飞书配置	/work/offline/config/omni-service/clean-offline/lark
+飞书凭据目录	/work/offline/config/omni-service/clean-offline/lark-data
+数据	/work/offline/data/omni-service/clean-offline/bridge.sqlite3
+版本	/work/offline/data/omni-service/clean-offline/releases/03d4f26f39adb24bca07263e
+服务	omni-service-clean-offline.service
+已准备部署文件。本次未调用系统服务。
+配置	/work/offline/config/omni-service/clean-offline/personal.json
+凭据	/work/offline/config/omni-service/clean-offline/credentials.env
+飞书配置	/work/offline/config/omni-service/clean-offline/lark
+飞书凭据目录	/work/offline/config/omni-service/clean-offline/lark-data
+数据	/work/offline/data/omni-service/clean-offline/bridge.sqlite3
+版本	/work/offline/data/omni-service/clean-offline/releases/03d4f26f39adb24bca07263e
+服务	omni-service-clean-offline.service
+已准备部署文件。本次未调用系统服务。
+飞书和 Telegram 组件准备并通过本机检查；未启动服务或登录平台。
+Refusing to overwrite existing instance: /work/offline/config/omni-service/clean-offline
+Choose a new team name.
+OmniService 接入准备未完成：依赖包 SHA256 不匹配，未解包或执行。
+{
+  "phase": "offline",
+  "status": "passed",
+  "source_sha256": "a3f0280a28d767269a62f5ea6f340e9715eea898f13e9d2ae893330acb0b4310",
+  "os_release": "PRETTY_NAME=\"Ubuntu 24.04.5 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"24.04\"\nVERSION=\"24.04.5 LTS (Noble Numbat)\"\nVERSION_CODENAME=noble\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=noble\nLOGO=ubuntu-logo\n",
+  "architecture": "x86_64",
+  "python": "3.12.3",
+  "libc": [
+    "glibc",
+    "2.39"
+  ],
+  "global_sdk_and_cli_absent": true,
+  "tdlib_version": "1.8.71",
+  "tdlib_commit": "1b9efe84d6e9a2e2f6eadeeea32b0726d2b8c25d",
+  "tdlib_sha256": "577e3f3d5a1f9e64019bc45a0984ee08874fe2c6ae8f2a956e315db7cf7486b5",
+  "lark_cli": "lark-cli version 1.0.99",
+  "sdk": {
+    "lark_oapi": "1.9.0"
+  },
+  "repeat_prepare_preserved_files": true,
+  "bundle_sha256": "866942680aa527e4d34cb1aab496856a569ee4929ec4bd5d98882544dc1afe83",
+  "existing_instance_refused": true,
+  "offline_network_required": true,
+  "service_started": false,
+  "compiler_absent": true,
+  "account_authorization": "not_run",
+  "dgx_hardware": "not_tested"
+}

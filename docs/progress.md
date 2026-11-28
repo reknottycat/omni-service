@@ -8,10 +8,11 @@
 | ID / 状态 / 负责人 | 价值与交付 | 允许修改的文件 | 依赖 / 复验 / 通过条件 |
 |---|---|---|---|
 | DGX-01 / done / 依赖审查 | 核实三类上游固定版本和摘要，避免下载漂移 | `onboarding_tools.py`、对应专项测试 | 官方 Release/PyPI/source；固定值可逐项核对 |
-| DGX-02 / verify / SDK 与总控 | 完整依赖包、私有 SDK 校验、原生库原子发布、新安装脚本与正确解释器 | `deploy/`、安装/打包 scripts、依赖专项测试 | `bash scripts/acceptance.sh`；摘要错误不执行、不修改旧实例 |
-| DGX-03 / in_progress / 干净环境验证 | 全新 Ubuntu 原生组件与断网包安装证据；amd64/arm64 CI | `scripts/test-clean-onboarding.sh`、容器及工作流、证据 | 真实加载固定 TDLib/CLI/SDK；重跑幂等、无授权/DB/systemctl |
+| DGX-02 / done / SDK 与总控 | 完整依赖包、私有 SDK 校验、原生库原子发布、新安装脚本与正确解释器 | `deploy/`、安装/打包 scripts、依赖专项测试 | 完整回归 304 项通过；摘要错误不执行、不修改旧实例 |
+| DGX-03 / done（限定 amd64 实测与 CI 配置）/ 干净环境验证 | 全新 Ubuntu amd64 原生组件与断网包安装证据；amd64/arm64 CI 配置 | `scripts/test-clean-onboarding.sh`、容器及工作流、证据 | 最新源码入口断网构建成功；定稿 native 包在无编译器 runtime 断网安装成功；重跑幂等、无授权/DB/systemctl |
 
-具体安装命令和验收边界见[全新 DGX 安装](dgx-clean-install.md)。任务完成状态仅在取得实际结果后更新。
+具体命令见[全新 DGX 安装](dgx-clean-install.md)，结果见[2026-11-28 验证记录](evidence/dgx-clean-install-20261128.md)。
+ARM64 原生执行、远端 CI、DGX 真机和真实账号授权保持待验，不包含在上述 done 范围内。
 
 ## 当前目标
 

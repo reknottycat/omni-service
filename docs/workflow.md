@@ -58,6 +58,32 @@
 
 平台能力差异由状态表示。尤其 WhatsApp 不能因为验收使用假服务就虚构已发送消息的全员撤回 API。超时后的投递结果若无法核对，保留 `unknown`，不将潜在重复消息当作可靠性修复。
 
+## Claude Code 真实流验证与审查回执
+
+Claude Code 可以用 `/verify` 快速启动验证。先验证受影响的用户实际入口，再选适用的端到端、属性或差分检查；遵守本轮环境与副作用授权。模拟、真实平台和 GitHub CI 各记自己的结果。相同阻塞三轮修复复验仍失败时，停止重复修补并交接证据。不要用无关注释代替验证记录。
+
+`/verify` 是方便调用的入口，不是依赖。Claude 没加载该技能或没有审查插件时，直接运行 `python3 -m unittest discover -s tests -p 'test_<changed>.py'` 等受影响测试、按需使用 `python3 scripts/demo.py` 和 Linux 验收入口，再按基础提交的有效规则独立复核。小修只跑与风险相称的测试（已有合同或 CI 要求除外）；涉及账号隔离、权限、客户外发/撤回或状态迁移时跑对应用户端到端正负例。缺少工具、环境或真实回执不能算通过；审查输出只列有证据、可行动的发现和未验收项。
+
+独立复核的规则取自可信的目标提交：有 `REVIEW.md` 就用它，否则回退到同一个提交的 `AGENTS.md`，再没有就用校验器内置的 `builtin-v1`。既有规则损坏或为空要报告，不静默降级。候选 PR 新增、修改规则都不能改变本轮选择。项目 `REVIEW.md` 中的历史回归和反例用来衡量漏报和误报。保存不知道期望结果的审查者原始输出，不把案例文档本身当测试结果。
+
+项目提供可选的只读回执校验器，默认关闭。它不调用模型、不执行项目代码，也未接入 CI、上线或合并；在可信工作区使用**基线版本脚本**，并由操作者提供 GitHub 当前 head/base 和实际合并提交，不从待审回执反推这些值：
+
+```sh
+python3 scripts/check_review_receipt.py --mode observe \
+  --receipt /path/to/independent-receipt.json \
+  --head "$HEAD_SHA" --base "$BASE_SHA" --tested "$TESTED_MERGE_SHA"
+```
+
+- `off` 不读回执；`observe` 检查并报告，不把问题转成失败退出；`enforce` 对缺失、证据过期、无效或阻断回执退出非零，成功仍不代表可以合并。
+- 回执为 JSON 对象，字段是 `head`、`base`、`tested_commit`、`tested_tree`、`policy_sha256`、`decision`（`pass` 或 `block`）、`evidence`（非空的日志/报告引用列表）。`policy_sha256` 用 `python3 scripts/check_review_receipt.py --show-policy --base "$BASE_SHA"` 获取规则文件来源及 SHA-256。只接受父提交为该 base 和 head 的合并提交；不适用于仅测试 head。
+- 校验器只检查结构与 Git 对象一致性，不证明日志真实存在、审查者身份、CI 结论或目标仍是当前分支版本。这些由可信 PR 提交者、审查者和平台验收另行核实。默认不新增合并门禁。
+
+### 可选工具的分工
+
+- **Alibaba OpenCodeReview**：由独立审查者在可信工作区调用，不由编码者给自己签字。有获准的模型端点时运行 `ocr review --from "$BASE_SHA" --to "$HEAD_SHA" --format json --output "$REVIEW_OUT"`；不需要另配 OCR 模型时可用官方 [delegation 模式](https://github.com/alibaba/open-code-review#choose-a-review-mode)，由独立宿主模型审查。只有获准的代码与模型端点才能发送差异。没装 OCR 就独立读 Git diff，对照同一基线规则；只记录实证发现。OCR 输出只是审查材料，不是 CI 或合并授权。
+- **pstack**：可用 [Babysit](https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/babysit.md) 跟进 CI、冲突和评审意见；已授权交付时用 [Shipping](https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/shipping.md) 的验收和合并回读。没有插件用 `gh pr view`、`gh pr checks` 和平台回执，不因为工具缺失停在 PR。head 或 base 改变时重新核对；PR、CI、真实使用验收各报各的结果。
+- **项目规则与平台门禁不变**：工具可以替换，基线、证据和授权不能被跳过。未打通自动跟进前，不把安装插件或配置文件当成常驻交付已启用。
+
 ## 决策轨迹
 
 统一使用 `docs/decisions.tsv`，只追加，由协调负责人写入。列沿用 pstack：
